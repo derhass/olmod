@@ -219,21 +219,36 @@ namespace GameMod
         static void ReadControlData()
         {
             string fn = PilotManager.FileName(PilotFileType.CONFIG) + "mod";
+            Debug.Log("olmod controls config: " + fn);
+	    for (int k = 0; k<5; k++) {
+		   Debug.Log("dz: " + Controls.DEADZONE_ADDITIONAL[k]);
+		   Debug.Log("dz: " + Controls.DEADZONE_ADDITIONAL[k]);
+	    }
             for (int i = 0; i < Controls.m_controllers.Count; i++)
             {
+                Debug.Log("i: " + i);
                 int[] m_sensitivity = (int[])AccessTools.Field(typeof(Overload.Controller), "m_sensitivity").GetValue(Controls.m_controllers[i]);
+            Debug.Log("AAAAAAAAAAAA");
                 int[] m_deadzone = (int[])AccessTools.Field(typeof(Overload.Controller), "m_deadzone").GetValue(Controls.m_controllers[i]);
+            Debug.Log("BBBBBBB");
 
                 Controllers.controllers.Add(new Controllers.Controller
                 {
                     axes = new List<Controllers.Controller.Axis>()
                 });
+            Debug.Log("CCCCC");
                 for (int j = 0; j < Controls.m_controllers[i].m_axis_count; j++)
                 {
+                    Debug.Log("j: " + j);
                     int dz_index = Controls.m_controllers[i].GetAxisDeadzone(j);
+                    Debug.Log("XX dz_index" + dz_index);
                     int sens_index = Controls.m_controllers[i].GetAxisSensitivity(j);
+                    Debug.Log("XY");
                     float sens = (RWInput.sens_multiplier[m_sensitivity[sens_index]] / 2.2f) * 100f;
-                    float deadzone = (Controls.DEADZONE_ADDITIONAL[m_deadzone[dz_index]] / 0.5f) * 100f;
+                    Debug.Log("XZ");
+		    float deadzone = 0.0f;
+                    ///float deadzone = (Controls.DEADZONE_ADDITIONAL[m_deadzone[dz_index]] / 0.5f) * 100f;
+                    Debug.Log("XW");
 
                     Controllers.controllers[i].axes.Add(new Controllers.Controller.Axis()
                     {
@@ -242,13 +257,17 @@ namespace GameMod
                     });
                 }
             }
+            Debug.Log("GOT HERE");
             Controllers.m_serialized_data = Platform.ReadTextUserData(fn);
+            Debug.Log("GOT HERE2");
             if (Controllers.m_serialized_data == null)
             {
+            	Debug.Log("GOT HERE NF");
                 Controllers.m_serialized_data = String.Empty;
                 Debug.Log("No existing .xconfigmod file");
                 return;
             }
+            Debug.Log("GOT HERE WTF???????");
             using (MemoryStream memoryStream = new MemoryStream(Encoding.ASCII.GetBytes(Controllers.m_serialized_data)))
             {
                 using (StreamReader streamReader = new StreamReader(memoryStream))
@@ -260,20 +279,24 @@ namespace GameMod
 
         static void ReadControlDataFromStream(StreamReader sr)
         {
+            Debug.Log("READ1");
             string text = sr.ReadLine(); // 1
             if (!RUtility.StringStartsWith(text, Controls.CONFIG_KEY))
             {
                 Debug.Log("olmod controls config save file has an incorrect key: " + text);
                 return;
             }
+            Debug.Log("READ2");
             int numControllers = int.Parse(sr.ReadLine());
             int[] controllers = new int[numControllers];
             for (int i = 0; i < numControllers; i++)
             {
+            	Debug.Log("READ3 " + i);
                 string controllerName = sr.ReadLine();
                 int numAxes = int.Parse(sr.ReadLine());
                 for (int j = 0; j < numAxes; j++)
                 {
+            	    Debug.Log("READ4 " + j);
                     Controllers.controllers[i].axes[j].deadzone = int.Parse(sr.ReadLine());
                     Controllers.controllers[i].axes[j].sensitivity = int.Parse(sr.ReadLine());
                     Controllers.SetAxisDeadzone(i, j, Controllers.controllers[i].axes[j].deadzone);
