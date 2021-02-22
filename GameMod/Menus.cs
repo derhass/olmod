@@ -41,6 +41,7 @@ namespace GameMod
 
         public static int mms_weapon_lag_compensation_max = 100;
         public static int mms_ship_lag_compensation_max = 100;
+        public static int mms_ship_lag_compensation_offset = 34;
         public static int mms_weapon_lag_compensation_scale = 75;
         public static int mms_ship_lag_compensation_scale = 75;
     }
@@ -301,6 +302,8 @@ namespace GameMod
             position.y += 62f;
             SelectAndDrawSliderItem(uie, Loc.LS("SHIP LAG COMPENSATION SCALE"), position, 9, Menus.mms_ship_lag_compensation_scale, 100);
             position.y += 62f;
+            SelectAndDrawSliderItem(uie, Loc.LS("SHIP LAG COMPENSATION OFFSET"), position, 10, Menus.mms_ship_lag_compensation_offset, 100);
+            position.y += 62f;
         }
 
         static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> codes)
@@ -341,6 +344,9 @@ namespace GameMod
                         break;
                     case 9:
                         Menus.mms_ship_lag_compensation_scale = (int)(UIElement.SliderPos * 100f);
+                        break;
+                    case 10:
+                        Menus.mms_ship_lag_compensation_offset = (int)(UIElement.SliderPos*100f);
                         break;
                     default:
                         break;

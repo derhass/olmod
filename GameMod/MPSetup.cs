@@ -227,6 +227,7 @@ namespace GameMod {
                     MPInternet.MenuIPAddress = ModPrefs.GetString("MP_PM_IP_ADDRESS", MPInternet.MenuIPAddress);
                 Menus.mms_weapon_lag_compensation_max = ModPrefs.GetInt("MP_PM_WEAPON_LAG_COMPENSATION", Menus.mms_weapon_lag_compensation_max);
                 Menus.mms_ship_lag_compensation_max = ModPrefs.GetInt("MP_PM_SHIP_LAG_COMPENSATION", Menus.mms_ship_lag_compensation_max);
+                Menus.mms_ship_lag_compensation_offset = ModPrefs.GetInt("MP_PM_SHIP_LAG_COMPENSATION_OFFSET", Menus.mms_ship_lag_compensation_offset);
                 Menus.mms_weapon_lag_compensation_scale = ModPrefs.GetInt("MP_PM_WEAPON_LAG_COMPENSATION_SCALE", Menus.mms_weapon_lag_compensation_scale);
                 Menus.mms_ship_lag_compensation_scale = ModPrefs.GetInt("MP_PM_SHIP_LAG_COMPENSATION_SCALE", Menus.mms_ship_lag_compensation_scale);
             }
@@ -269,6 +270,7 @@ namespace GameMod {
             ModPrefs.SetBool("MP_PM_SCALE_RESPAWN_TIME", Menus.mms_scale_respawn_time);
             ModPrefs.SetInt("MP_PM_WEAPON_LAG_COMPENSATION", Menus.mms_weapon_lag_compensation_max);
             ModPrefs.SetInt("MP_PM_SHIP_LAG_COMPENSATION", Menus.mms_ship_lag_compensation_max);
+            ModPrefs.SetInt("MP_PM_SHIP_LAG_COMPENSATION_OFFSET", Menus.mms_ship_lag_compensation_offset);
             ModPrefs.SetInt("MP_PM_WEAPON_LAG_COMPENSATION_SCALE", Menus.mms_weapon_lag_compensation_scale);
             ModPrefs.SetInt("MP_PM_SHIP_LAG_COMPENSATION_SCALE", Menus.mms_ship_lag_compensation_scale);
             ModPrefs.Flush(filename + "mod");

@@ -67,10 +67,11 @@ namespace GameMod {
             if (MPObserver.Enabled) {
                 return 0f;
             }
+
             float time_ms =  Math.Min(GameManager.m_local_player.m_avg_ping_ms,
                                       Menus.mms_ship_lag_compensation_max);
-            return (Menus.mms_ship_lag_compensation_scale / 100f) * time_ms / 1000f;
-
+            time_ms = (Menus.mms_ship_lag_compensation_scale / 100f) * time_ms / 1000f;
+            return time_ms + (Menus.mms_ship_lag_compensation_offset/1000.0f);
         }
 
         public static void InitForMatch() {
@@ -168,7 +169,17 @@ namespace GameMod {
         static bool Prefix(){
             if (Client.m_InterpolationBuffer[0] == null)
             {
-                return true;
+                while (Client.m_PendingPlayerSnapshotMessages.Count > 3)
+                {
+                    Client.m_PendingPlayerSnapshotMessages.Dequeue();
+                }
+                if (Client.m_PendingPlayerSnapshotMessages.Count >= 3) {
+                    Client.m_InterpolationBuffer[0] = Client.m_PendingPlayerSnapshotMessages.Dequeue();
+                    Client.m_InterpolationBuffer[1] = Client.m_PendingPlayerSnapshotMessages.Dequeue();
+                    Client.m_InterpolationBuffer[2] = Client.m_PendingPlayerSnapshotMessages.Dequeue();
+                    Client.m_InterpolationStartTime = Time.time;
+                }
+                return false;
             }
             else
             {
@@ -176,23 +187,40 @@ namespace GameMod {
                     return false;
                 }
                 else if(Client.m_PendingPlayerSnapshotMessages.Count == 1){
+                    Client.m_InterpolationBuffer[0] = Client.m_InterpolationBuffer[1];
                     Client.m_InterpolationBuffer[1] = Client.m_InterpolationBuffer[2];
                     Client.m_InterpolationBuffer[2] = Client.m_PendingPlayerSnapshotMessages.Dequeue();
+                    Client.m_InterpolationStartTime += Time.fixedDeltaTime;
                 }
-                else{
-                    while (Client.m_PendingPlayerSnapshotMessages.Count > 2)
-                    {
-                        Client.m_PendingPlayerSnapshotMessages.Dequeue();
-                    }
+                else if (Client.m_PendingPlayerSnapshotMessages.Count == 2) {
+                    Client.m_InterpolationBuffer[0] = Client.m_InterpolationBuffer[2];
                     Client.m_InterpolationBuffer[1] = Client.m_PendingPlayerSnapshotMessages.Dequeue();
                     Client.m_InterpolationBuffer[2] = Client.m_PendingPlayerSnapshotMessages.Dequeue();
+                    Client.m_InterpolationStartTime += 2.0f *Time.fixedDeltaTime;
+                } else {
+                    while (Client.m_PendingPlayerSnapshotMessages.Count > 3)
+                    {
+                        Client.m_PendingPlayerSnapshotMessages.Dequeue();
+                        Client.m_InterpolationStartTime += Time.fixedDeltaTime;
+                    }
+                    Client.m_InterpolationBuffer[0] = Client.m_PendingPlayerSnapshotMessages.Dequeue();
+                    Client.m_InterpolationBuffer[1] = Client.m_PendingPlayerSnapshotMessages.Dequeue();
+                    Client.m_InterpolationBuffer[2] = Client.m_PendingPlayerSnapshotMessages.Dequeue();
+                    Client.m_InterpolationStartTime += 3.0f *Time.fixedDeltaTime;
                 }
-                Client.m_InterpolationStartTime = Time.time;
+                while (Client.m_InterpolationStartTime + 1.5f * Time.fixedDeltaTime < Time.time) {
+                    Client.m_InterpolationStartTime += Time.fixedDeltaTime;
+                }
+                if (Client.m_InterpolationStartTime > Time.time) {
+                    Client.m_InterpolationStartTime = Time.time;
+                }
 
                 return false;
             }
         }
     }
+
+    
 
     [HarmonyPatch(typeof(Client), "InterpolateRemotePlayers")]
     class MPClientExtrapolation_InterpolateRemotePlayers {
@@ -203,16 +231,26 @@ namespace GameMod {
                 return true;
             }
             float num = CalculateLerpParameter();
-            PlayerSnapshotToClientMessage msg;
+            PlayerSnapshotToClientMessage msg0;
+            PlayerSnapshotToClientMessage msg1;
             PlayerSnapshotToClientMessage msg2;
-            msg = Client.m_InterpolationBuffer[1];
+            msg0 = Client.m_InterpolationBuffer[0];
+            msg1 = Client.m_InterpolationBuffer[1];
             msg2 = Client.m_InterpolationBuffer[2];
             foreach (Player player in Overload.NetworkManager.m_Players) {
                 if (player != null && !player.isLocalPlayer && !player.m_spectator) {
-                    PlayerSnapshot playerSnapshotFromInterpolationBuffer = (PlayerSnapshot)_Client_GetPlayerSnapshotFromInterpolationBuffer_Method.Invoke(null, new object[] { player, msg });
-                    PlayerSnapshot playerSnapshotFromInterpolationBuffer2 = (PlayerSnapshot)_Client_GetPlayerSnapshotFromInterpolationBuffer_Method.Invoke(null, new object[] { player, msg2 });
-                    if (playerSnapshotFromInterpolationBuffer != null && playerSnapshotFromInterpolationBuffer2 != null) {
-                        LerpRemotePlayer(player, playerSnapshotFromInterpolationBuffer, playerSnapshotFromInterpolationBuffer2, num);
+                    PlayerSnapshot A,B;
+                    if (num < 1.0f) {
+                        A = (PlayerSnapshot)_Client_GetPlayerSnapshotFromInterpolationBuffer_Method.Invoke(null, new object[] { player, msg0 });
+                        B = (PlayerSnapshot)_Client_GetPlayerSnapshotFromInterpolationBuffer_Method.Invoke(null, new object[] { player, msg1 });
+                    } else {
+                        A = (PlayerSnapshot)_Client_GetPlayerSnapshotFromInterpolationBuffer_Method.Invoke(null, new object[] { player, msg1 });
+                        B = (PlayerSnapshot)_Client_GetPlayerSnapshotFromInterpolationBuffer_Method.Invoke(null, new object[] { player, msg2 });
+                        num -= 1.0f;
+                    }
+
+                    if (A != null && B != null) {
+                        LerpRemotePlayer(player, A,B, num);
                     }
                 }
             }
@@ -226,7 +264,7 @@ namespace GameMod {
             }
 
             // Lookahead in frames.
-            float lookahead = 1f + (MPClientExtrapolation.GetShipExtrapolationTime() / Time.fixedDeltaTime);
+            float lookahead = (MPClientExtrapolation.GetShipExtrapolationTime() / Time.fixedDeltaTime);
 
             // reduce oversteer by extrapolating less for rotation
             var rot_lookahead = lookahead * .5f;
