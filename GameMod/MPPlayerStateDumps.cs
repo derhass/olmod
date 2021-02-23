@@ -251,7 +251,7 @@ namespace GameMod {
 
 		}
 
-		private static Buffer buf = new Buffer();
+		public static Buffer buf = new Buffer();
 
     
 		/* these are not working as I had hoped...
@@ -306,6 +306,7 @@ namespace GameMod {
 			buf.AddSnapshot(ref msg);
 		}
 
+		/*
 
 		[HarmonyPatch(typeof(Client), "UpdateInterpolationBuffer")]
 		class MPPlayerStateDump_UpdateInterpolationBuffer {
@@ -316,7 +317,9 @@ namespace GameMod {
 				buf.AddUpdateEnd(Client.m_InterpolationStartTime);
 			}
 		}
+		*/
 
+		/*
 		[HarmonyPatch(typeof(Client), "InterpolateRemotePlayers")]
 		class MPPlayerStateDump_InterpolateRemotePlayers {
 		        static void Prefix() {
@@ -327,7 +330,9 @@ namespace GameMod {
 				buf.AddCommand((uint)Command.INTERPOLATE_END);
 			}
         	}
+		*/
 
+		/*
 		[HarmonyPatch(typeof(Player), "LerpRemotePlayer")]
 		class MPPlayerStateDump_LerpRemotePlayer {
 		        static void Prefix(Player __instance, ref PlayerSnapshot A, ref PlayerSnapshot B, float t) {
@@ -337,5 +342,6 @@ namespace GameMod {
 				buf.AddLerpEnd(__instance.m_lerp_wait_for_respawn_pos);
 			}
         	}
+		*/
 	}
 }

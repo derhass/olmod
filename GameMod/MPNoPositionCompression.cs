@@ -86,6 +86,7 @@ namespace GameMod {
         public static void OnNewPlayerSnapshotToClient(NetworkMessage msg) {
             if (NetworkMatch.GetMatchState() == MatchState.PREGAME || NetworkMatch.InGameplay()) {
                 PlayerSnapshotToClientMessage item = msg.ReadMessage<NewPlayerSnapshotToClientMessage>().ToPlayerSnapshotToClientMessage();
+			    MPPlayerStateDump.buf.AddSnapshot(ref item);
                 Client.m_PendingPlayerSnapshotMessages.Enqueue(item);
             }
         }

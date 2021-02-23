@@ -11,7 +11,7 @@ using UnityEngine;
 namespace GameMod.Core {
     public class GameMod
     {
-        public static string Version = "olmod 0.3.6 RC 2 DH1";
+        public static string Version = "olmod 0.3.6 RC 2 DH1 DMP";
         private static Version GameVersion;
         public static bool Modded = false;
         public static bool VREnabled = false;
