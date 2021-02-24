@@ -17,9 +17,19 @@ enum Command {
 	INTERPOLATE_END,
 	LERP_BEGIN,
 	LERP_END,
+	UPDATE_BUFFER_CONTENTS, // FUCK this is incompatible with older!!!!!! fix that
 	FINISH,
 
 	COMMAND_END_MARKER
+};
+
+struct UpdateBufferContents {
+	float timestamp;
+	int size;
+	uint before;
+	PlayerSnapshotMessage A;
+	PlayerSnapshotMessage B;
+	PlayerSnapshotMessage C;
 };
 
 struct UpdateCycle {
@@ -27,6 +37,8 @@ struct UpdateCycle {
 	float timestamp;
 	float m_InterpolationStartTime_before;
 	float m_InterpolationStartTime_after;
+	UpdateBufferContents before;
+	UpdateBufferContents after;
 
 	UpdateCycle() :
 		valid(false)

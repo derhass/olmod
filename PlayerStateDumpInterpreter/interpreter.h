@@ -50,6 +50,7 @@ class Interpreter {
 		uint32_t ReadUint();
 		float ReadFloat();
 		void ReadPlayerSnapshot(PlayerSnapshot& s);
+		uint32_t ReadPlayerSnapshotMessage(PlayerSnapshotMessage& s);
 
 	        void SimulateBufferEnqueue();
 		void SimulateBufferUpdate();
@@ -62,6 +63,7 @@ class Interpreter {
 		void ProcessInterpolateEnd();
 		void ProcessLerpBegin();
 		void ProcessLerpEnd();
+		void ProcessUpdateBufferContents();
 
 		bool ProcessCommand();
 

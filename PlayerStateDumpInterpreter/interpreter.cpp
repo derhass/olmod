@@ -159,6 +159,18 @@ void Interpreter::ReadPlayerSnapshot(PlayerSnapshot& s)
 	}
 }
 
+uint32_t Interpreter::ReadPlayerSnapshotMessage(PlayerSnapshotMessage& s)
+{
+	uint32_t i, num = ReadUint();
+	s.snapshot.resize(num);
+	for (i=0; i<num; i++) {
+		ReadPlayerSnapshot(s.snapshot[i]);
+	}
+
+	return num;
+}
+
+
 void Interpreter::SimulateBufferEnqueue()
 {
 	log.Log(Logger::INFO, "ENQUEUE: for %u players", (unsigned)currentSnapshots.snapshot.size());
@@ -205,11 +217,10 @@ void Interpreter::SimulateInterpolation()
 void Interpreter::ProcessEnqueue()
 {
 	float ts = ReadFloat();
-	uint32_t i, num = ReadUint();
+	uint32_t i, num = ReadPlayerSnapshotMessage(currentSnapshots);
 	log.Log(Logger::DEBUG, "got ENQUEUE at %fs for %u players", ts, (unsigned)num);
 	currentSnapshots.snapshot.resize(num);
 	for (i=0; i<num; i++) {
-		ReadPlayerSnapshot(currentSnapshots.snapshot[i]);
 		currentSnapshots.snapshot[i].state.timestamp = ts;
 		if (file) {
 			Player& p = gameState.GetPlayer(currentSnapshots.snapshot[i].id);
@@ -236,6 +247,8 @@ void Interpreter::ProcessUpdateBegin()
 {
 	update.valid = true;
 	update.timestamp =  ReadFloat();
+	update.before.timestamp = 0.0f;
+	update.after.timestamp = 0.0f;
 	update.m_InterpolationStartTime_before = ReadFloat();
 	log.Log(Logger::DEBUG, "got UPDATE_BEGIN at %fs %fs", update.timestamp, update.m_InterpolationStartTime_before);
 }
@@ -327,6 +340,35 @@ void Interpreter::ProcessLerpEnd()
 	rpc->Add(p.mostRecentState);
 }
 
+void Interpreter::ProcessUpdateBufferContents()
+{
+	float ts = ReadFloat();
+	int32_t size = ReadInt();
+	uint32_t before = ReadUint();
+	uint32_t i, num;
+
+	log.Log(Logger::DEBUG, "got UPDATE BUFFER CONTENTS at %fs size: %d before: %u", ts, (int)size, (unsigned)before);
+	UpdateBufferContents& u=(before)?update.before:update.after;
+
+	u.timestamp = ts;
+	u.size = size;
+	u.before = before;
+
+       	num = ReadPlayerSnapshotMessage(u.A);
+	for (i=0; i<num; i++) {
+		u.A.snapshot[i].state.timestamp = ts;
+	}
+       	num = ReadPlayerSnapshotMessage(u.B);
+	for (i=0; i<num; i++) {
+		u.B.snapshot[i].state.timestamp = ts;
+	}
+       	num = ReadPlayerSnapshotMessage(u.C);
+	for (i=0; i<num; i++) {
+		u.C.snapshot[i].state.timestamp = ts;
+	}
+
+}
+
 bool Interpreter::ProcessCommand()
 {
 	if (!file || feof(file) || ferror(file)) {
@@ -361,6 +403,9 @@ bool Interpreter::ProcessCommand()
 			log.Log(Logger::DEBUG, "got FINISH");
 			process = false;
 			return true;
+		case UPDATE_BUFFER_CONTENTS:
+			ProcessUpdateBufferContents();
+			break;
 		default:
 			if (file) {
 				log.Log(Logger::ERROR, "INVALID COMMAND 0x%x", (unsigned)cmd);
