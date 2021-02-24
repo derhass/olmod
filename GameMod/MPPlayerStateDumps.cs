@@ -21,6 +21,7 @@ namespace GameMod {
 			INTERPOLATE_END,
 			LERP_BEGIN,
 			LERP_END,
+			UPDATE_BUFFER_CONTENTS,
 			FINISH
 		}	
 		public class Buffer {
@@ -248,7 +249,39 @@ namespace GameMod {
 				}
 			}
 
-
+			public void AddBufferUpdateContents(ref PlayerSnapshotToClientMessage A,
+							    ref PlayerSnapshotToClientMessage B,
+							    ref PlayerSnapshotToClientMessage C,
+							    int size, uint before)
+			{
+				if (!go) {
+					return;
+				}
+				mtx.WaitOne();
+				try {
+					bw.Write((uint)Command.UPDATE_BUFFER_CONTENTS);
+					bw.Write(Time.time);
+					bw.Write(before);
+					bw.Write(size);
+					bw.Write(A.m_num_snapshots);
+					for (int i = 0; i<A.m_num_snapshots; i++) {
+						WritePlayerSnapshot(ref A.m_snapshots[i]);
+					}
+					bw.Write(B.m_num_snapshots);
+					for (int i = 0; i<B.m_num_snapshots; i++) {
+						WritePlayerSnapshot(ref B.m_snapshots[i]);
+					}
+					bw.Write(C.m_num_snapshots);
+					for (int i = 0; i<C.m_num_snapshots; i++) {
+						WritePlayerSnapshot(ref C.m_snapshots[i]);
+					}
+					Flush(false);
+				} catch (Exception e) {
+					Debug.Log("MPPlayerStateDump: failed to dump buffer update contents: " + e);
+				} finally {
+					mtx.ReleaseMutex();
+				}
+			}
 		}
 
 		public static Buffer buf = new Buffer();

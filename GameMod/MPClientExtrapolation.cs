@@ -185,6 +185,7 @@ namespace GameMod {
             }
             else
             {
+                MPPlayerStateDump.buf.AddBufferUpdateContents(ref Client.m_InterpolationBuffer[0], ref Client.m_InterpolationBuffer[1], ref Client.m_InterpolationBuffer[2], Client.m_PendingPlayerSnapshotMessages.Count, 1);
                 if(Client.m_PendingPlayerSnapshotMessages.Count < 1){
                     MPPlayerStateDump.buf.AddUpdateEnd(Client.m_InterpolationStartTime);
                     return false;
@@ -211,6 +212,7 @@ namespace GameMod {
                     Client.m_InterpolationBuffer[2] = Client.m_PendingPlayerSnapshotMessages.Dequeue();
                     Client.m_InterpolationStartTime += 3.0f *Time.fixedDeltaTime;
                 }
+                MPPlayerStateDump.buf.AddBufferUpdateContents(ref Client.m_InterpolationBuffer[0], ref Client.m_InterpolationBuffer[1], ref Client.m_InterpolationBuffer[2], Client.m_PendingPlayerSnapshotMessages.Count, 0);
                 while (Client.m_InterpolationStartTime + 1.5f * Time.fixedDeltaTime < Time.time) {
                     Client.m_InterpolationStartTime += Time.fixedDeltaTime;
                 }
