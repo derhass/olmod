@@ -1,7 +1,8 @@
 #ifndef OLMD_SIMULATOR_ORIGINAL_H
 #define OLMD_SIMULATOR_ORIGINAL_H
 
-#include "interpreter.h"
+#include "simulator_base.h"
+#include "player_types.h"
 
 #include <queue>
 
@@ -52,6 +53,7 @@ class Original : public SimulatorBase {
 		bool LerpRemotePlayer(PlayerSnapshot& p, size_t idx, const InterpolationCycle& interpolationInfo, const PlayerSnapshot&A, const PlayerSnapshot& B, float t);
 		float CalculateLerpParameter(float timestamp);
 
+		virtual void Start();
 		virtual void Finish();
 	public:
 		Original(ResultProcessor& rp);

@@ -1,4 +1,6 @@
 #include "simulator_36rc2.h"
+
+#include "interpreter.h"
 #include "math_helper.h"
 
 #include <sstream>
@@ -134,6 +136,12 @@ float Olmod36RC2::CalculateLerpParameter(float timestamp)
 		num = 0.0f;
 	}
 	return num / fixedDeltaTime;
+}
+
+void Olmod36RC2::Start()
+{
+	Original::Start();
+	ClearInstrumentationPoints(instrp, INSTR_COUNT);
 }
 
 void Olmod36RC2::Finish()

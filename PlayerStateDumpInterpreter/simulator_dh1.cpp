@@ -1,10 +1,35 @@
 #include "simulator_dh1.h"
+
+#include "interpreter.h"
 #include "math_helper.h"
 
 #include <sstream>
 
 namespace OlmodPlayerDumpState {
 namespace Simulator {
+
+PlayerExtraDH1::PlayerExtraDH1()
+{
+	Init();
+}
+
+PlayerExtraDH1::~PlayerExtraDH1()
+{
+	Clear();
+}
+
+void PlayerExtraDH1::Init()
+{
+	Clear();
+}
+
+void PlayerExtraDH1::Clear()
+{
+	size_t i;
+	for (i=0; i<AUX_PLAYER_CHANNELS_COUNT; i++) {
+		rpcAux[i]=NULL;
+	}
+}
 
 Derhass1::Derhass1(ResultProcessor& rp) :
 	Original(rp),
@@ -31,6 +56,21 @@ const char *Derhass1::GetBaseName() const
 	return "derhass1";
 }
 
+void Derhass1::NewPlayer(Player& p, size_t idx)
+{
+	size_t i;
+	for (i=0; i<PlayerExtraDH1::AUX_PLAYER_CHANNELS_COUNT; i++) {
+		bool isNew;
+		playerExtra[idx].rpcAux[i]=resultProcessor.GetAuxChannel(p.id, registerID, i, isNew);
+		if (isNew) {
+			playerExtra[idx].rpcAux[i]->SetLogger(&log);
+			playerExtra[idx].rpcAux[i]->SetName(fullName.c_str());
+			playerExtra[idx].rpcAux[i]->StartStream(ip->GetOutputDir());
+			log.Log(Logger::INFO,"created new aux result process channel '%s'", playerExtra[idx].rpcAux[i]->GetName());
+		}
+	}
+}
+
 int Derhass1::GetPing()
 {
 	if (ping <= -1000) {
@@ -51,8 +91,14 @@ float Derhass1::GetShipExtrapolationTime()
 
 void Derhass1::DoBufferUpdate(const UpdateCycle& updateInfo)
 {
-	// bypass it
+	rpcAux[AUX_BUFFER_UPDATE]->Add(updateInfo.timestamp);
+	rpcAux[AUX_BUFFER_UPDATE]->Add(updateInfo.m_InterpolationStartTime_before);
+	rpcAux[AUX_BUFFER_UPDATE]->Add(m_InterpolationStartTime);
+	// not bypass it
 	DoBufferUpdateX(updateInfo);
+	rpcAux[AUX_BUFFER_UPDATE]->Add(updateInfo.m_InterpolationStartTime_after);
+	rpcAux[AUX_BUFFER_UPDATE]->Add(m_InterpolationStartTime);
+	rpcAux[AUX_BUFFER_UPDATE]->FlushCurrent();
 }
 
 void Derhass1::DoBufferUpdateX(const UpdateCycle& updateInfo)
@@ -123,6 +169,11 @@ bool Derhass1::DoInterpolation(const InterpolationCycle& interpolationInfo, Inte
 	SimulatorBase::DoInterpolation(interpolationInfo, results);
 	float num = CalculateLerpParameter(interpolationInfo.timestamp);
 
+	rpcAux[AUX_INTERPOLATE]->Add(interpolationInfo.timestamp);
+	rpcAux[AUX_INTERPOLATE]->Add((float)interpolationInfo.ping);
+	rpcAux[AUX_INTERPOLATE]->Add(num);
+	rpcAux[AUX_INTERPOLATE]->FlushCurrent();
+
 	for (size_t i=0; i<gameState.playerCnt; i++) {
 		const Player& cp=gameState.player[i];
 		PlayerSnapshot& p=results.player[results.playerCnt];
@@ -152,6 +203,11 @@ bool Derhass1::DoInterpolation(const InterpolationCycle& interpolationInfo, Inte
 				if (LerpRemotePlayer(p, i, interpolationInfo, *sn[0], *sn[1], num)) {
 					results.playerCnt++;
 				}
+			} else {
+				if (LerpRemotePlayer(p, i, interpolationInfo, *sn[1], *sn[2], num-1.0f)) {
+					results.playerCnt++;
+				}
+		/*
 			} else if (num < 2.0f) {
 				if (LerpRemotePlayer(p, i, interpolationInfo, *sn[1], *sn[2], num-1.0f)) {
 					results.playerCnt++;
@@ -160,7 +216,7 @@ bool Derhass1::DoInterpolation(const InterpolationCycle& interpolationInfo, Inte
 				if (LerpRemotePlayer(p, i, interpolationInfo, *sn[2], B, num-2.0f)) {
 					results.playerCnt++;
 				}
-			}
+		*/	}
 		}
 	}
 
@@ -170,6 +226,8 @@ bool Derhass1::DoInterpolation(const InterpolationCycle& interpolationInfo, Inte
 bool Derhass1::LerpRemotePlayer(PlayerSnapshot& p, size_t idx, const InterpolationCycle& interpolationInfo, const PlayerSnapshot&A, const PlayerSnapshot& B, float t)
 {
 	Player& gp=gameState.player[idx];
+	PlayerExtraDH1& ep=playerExtra[idx];
+	ResultProcessorAuxChannel *rpc=ep.rpcAux[PlayerExtraDH1::AUX_PLAYER_LERP];
 
 	if (gp.waitForRespawn) {
 		return Original::LerpRemotePlayer(p, idx, interpolationInfo, A, B, t);
@@ -185,6 +243,21 @@ bool Derhass1::LerpRemotePlayer(PlayerSnapshot& p, size_t idx, const Interpolati
 	slerp(A.state.rot, B.state.rot,p.state.rot,t + rot_lookahead);
 	p.state.timestamp = interpolationInfo.timestamp;
 
+	const LerpCycle *lc = interpolationInfo.FindLerp(p.id);
+	if (lc) {
+
+		rpc->Add(interpolationInfo.timestamp);
+		rpc->Add(lc->t);
+		rpc->Add(t);
+		rpc->Add(lc->A.state);
+		rpc->Add(lc->B.state);
+		rpc->Add(A.state);
+		rpc->Add(B.state);
+		rpc->FlushCurrent();
+	} else {
+		log.Log(Logger::WARN, "failed to find lerp cycle for player %u", (unsigned)p.id);
+	}
+
 	return true;	
 }
 
@@ -198,10 +271,40 @@ float Derhass1::CalculateLerpParameter(float timestamp)
 	return num / fixedDeltaTime;
 }
 
+void Derhass1::Start()
+{
+	size_t i;
+
+	Original::Start();
+	ClearInstrumentationPoints(instrp, INSTR_COUNT);
+	for (i=0; i<AUX_CHANNELS_COUNT; i++) {
+		bool isNew;
+		rpcAux[i]=resultProcessor.GetAuxChannel(0, registerID, i, isNew);
+		if (isNew) {
+			rpcAux[i]->SetLogger(&log);
+			rpcAux[i]->SetName(fullName.c_str());
+			rpcAux[i]->StartStream(ip->GetOutputDir());
+			log.Log(Logger::INFO,"created new aux result process channel '%s'", rpcAux[i]->GetName());
+		}
+	}
+
+	for (i=0; i<MAX_PLAYERS; i++) {
+		playerExtra[i].Init();
+	}
+}
+
 void Derhass1::Finish()
 {
-	Original::Finish();
+	size_t i;
 	DumpInstrumentationPoints(instrp, INSTR_COUNT);
+
+	for (i=0; i<MAX_PLAYERS; i++) {
+		playerExtra[i].Clear();
+	}
+	for (i=0; i<AUX_CHANNELS_COUNT; i++) {
+		rpcAux[i]=NULL;
+	}
+	Original::Finish();
 }
 
 } // namespace Simulator;
