@@ -211,7 +211,7 @@ namespace GameMod {
                     Client.m_InterpolationBuffer[2] = Client.m_PendingPlayerSnapshotMessages.Dequeue();
                     Client.m_InterpolationStartTime += 3.0f *Time.fixedDeltaTime;
                 }
-                while (Client.m_InterpolationStartTime + 1.5f * Time.fixedDeltaTime < Time.time) {
+                while (Client.m_InterpolationStartTime + 1.9f * Time.fixedDeltaTime < Time.time) {
                     Client.m_InterpolationStartTime += Time.fixedDeltaTime;
                 }
                 if (Client.m_InterpolationStartTime > Time.time) {
@@ -255,9 +255,11 @@ namespace GameMod {
                         B = (PlayerSnapshot)_Client_GetPlayerSnapshotFromInterpolationBuffer_Method.Invoke(null, new object[] { player, msg2 });
                         num -= 1.0f;
                     }
+		    num=1;
+                    A = (PlayerSnapshot)_Client_GetPlayerSnapshotFromInterpolationBuffer_Method.Invoke(null, new object[] { player, msg2 });
 
-                    if (A != null && B != null) {
-                        LerpRemotePlayer(player, A,B, num);
+                    if (A != null /* && B != null */) {
+                        LerpRemotePlayer(player, A,A, num);
                     }
                 }
             }
@@ -278,6 +280,8 @@ namespace GameMod {
 
             // reduce oversteer by extrapolating less for rotation
             var rot_lookahead = lookahead * .5f;
+	    lookahead = 0.0f;
+	    rot_lookahead = 0.0f;
 
             player.c_player_ship.c_transform.localPosition = Vector3.LerpUnclamped(A.m_pos, B.m_pos, t + lookahead);
             player.c_player_ship.c_transform.rotation = Quaternion.SlerpUnclamped(A.m_rot, B.m_rot, t + rot_lookahead);
