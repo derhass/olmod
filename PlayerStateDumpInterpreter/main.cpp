@@ -27,9 +27,14 @@ int main(int argc, char **argv)
 	sOVL.SetLogging(levelSim,  dir);
 
 	OlmodPlayerDumpState::Simulator::Olmod36RC2 sOlmod36RC2(rp);
-	sOlmod36RC2.Configure("max=1000;scale=100;ping=100;");
+	sOlmod36RC2.Configure("max=0;scale=0;ping=0;");
 	interpreter.AddSimulator(sOlmod36RC2);
 	sOlmod36RC2.SetLogging(levelSim,  dir);
+
+	OlmodPlayerDumpState::Simulator::Olmod36RC2 sOlmod36RC2b(rp);
+	sOlmod36RC2b.Configure("max=100;scale=100;ping=100;");
+	interpreter.AddSimulator(sOlmod36RC2b);
+	sOlmod36RC2b.SetLogging(levelSim,  dir);
 
 	OlmodPlayerDumpState::Simulator::Derhass1 sDH1(rp);
 	sDH1.Configure("max=0;scale=0;ping=0;");
