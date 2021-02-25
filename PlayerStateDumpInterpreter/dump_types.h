@@ -17,9 +17,13 @@ enum Command {
 	INTERPOLATE_END,
 	LERP_BEGIN,
 	LERP_END,
-	UPDATE_BUFFER_CONTENTS, // FUCK this is incompatible with older!!!!!! fix that
 	FINISH,
+	UPDATE_BUFFER_CONTENTS,
+	LERP_PARAM,
+	INTERPOLATE_PATH_01,
+	INTERPOLATE_PATH_12,
 
+	// alwways add new commands here
 	COMMAND_END_MARKER
 };
 
@@ -57,6 +61,7 @@ struct InterpolationCycle {
 	float timestamp;
 	int ping;
 	std::vector<LerpCycle> lerps;
+	UpdateBufferContents interpol;
 
 	InterpolationCycle() :
 		valid(false)

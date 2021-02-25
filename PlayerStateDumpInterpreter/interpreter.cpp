@@ -247,8 +247,8 @@ void Interpreter::ProcessUpdateBegin()
 {
 	update.valid = true;
 	update.timestamp =  ReadFloat();
-	update.before.timestamp = 0.0f;
-	update.after.timestamp = 0.0f;
+	update.before.timestamp = -1.0f;
+	update.after.timestamp = -1.0f;
 	update.m_InterpolationStartTime_before = ReadFloat();
 	log.Log(Logger::DEBUG, "got UPDATE_BEGIN at %fs interpolStart: %fs", update.timestamp, update.m_InterpolationStartTime_before);
 }
@@ -269,6 +269,7 @@ void Interpreter::ProcessInterpolateBegin()
 	interpolation.valid=true;
 	interpolation.timestamp = ReadFloat();
 	interpolation.ping = ReadInt();
+	interpolation.interpol.timestamp=-1.0f;
 	gameState.ping = interpolation.ping;
 	log.Log(Logger::DEBUG, "got INTERPOLATE_BEGIN at %fs ping %d", interpolation.timestamp, interpolation.ping);
 	interpolation.lerps.clear();
@@ -350,7 +351,18 @@ void Interpreter::ProcessUpdateBufferContents()
 	uint32_t i, num;
 
 	log.Log(Logger::DEBUG, "got UPDATE BUFFER CONTENTS at %fs size: %d before: %u", ts, (int)size, (unsigned)before);
-	UpdateBufferContents& u=(before)?update.before:update.after;
+	UpdateBufferContents *up;
+	switch (before) {
+		case 0:
+			up = &update.after;
+			break;
+		case 1:
+			up = &update.before;
+			break;
+		default:
+			up = &interpolation.interpol;
+	}
+	UpdateBufferContents& u=*up;
 
 	u.timestamp = ts;
 	u.size = size;
@@ -372,6 +384,12 @@ void Interpreter::ProcessUpdateBufferContents()
 	log.Log(Logger::DEBUG_DETAIL, u.A);
 	log.Log(Logger::DEBUG_DETAIL, u.B);
 	log.Log(Logger::DEBUG_DETAIL, u.C);
+}
+
+void Interpreter::ProcessLerpParam()
+{
+	float param = ReadFloat();
+	log.Log(Logger::DEBUG, "got LERP PARAMETER %f", param);
 }
 
 bool Interpreter::ProcessCommand()
@@ -410,6 +428,15 @@ bool Interpreter::ProcessCommand()
 			return true;
 		case UPDATE_BUFFER_CONTENTS:
 			ProcessUpdateBufferContents();
+			break;
+		case LERP_PARAM:
+			ProcessLerpParam();
+			break;
+		case INTERPOLATE_PATH_01:
+			log.Log(Logger::DEBUG, "got INTERPOLATE_PATH_01");
+			break;
+		case INTERPOLATE_PATH_12:
+			log.Log(Logger::DEBUG, "got INTERPOLATE_PATH_12");
 			break;
 		default:
 			if (file) {

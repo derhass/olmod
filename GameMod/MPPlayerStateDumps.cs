@@ -21,8 +21,12 @@ namespace GameMod {
 			INTERPOLATE_END,
 			LERP_BEGIN,
 			LERP_END,
+			FINISH,
 			UPDATE_BUFFER_CONTENTS,
-			FINISH
+			LERP_PARAM,
+			INTERPOLATE_PATH_01,
+			INTERPOLATE_PATH_12,
+			// always add new commands at the end!
 		}	
 		public class Buffer {
 			private FileStream fs;
@@ -261,8 +265,8 @@ namespace GameMod {
 				try {
 					bw.Write((uint)Command.UPDATE_BUFFER_CONTENTS);
 					bw.Write(Time.time);
-					bw.Write(before);
 					bw.Write(size);
+					bw.Write(before);
 					bw.Write(A.m_num_snapshots);
 					for (int i = 0; i<A.m_num_snapshots; i++) {
 						WritePlayerSnapshot(ref A.m_snapshots[i]);
@@ -282,6 +286,24 @@ namespace GameMod {
 					mtx.ReleaseMutex();
 				}
 			}
+
+			public void AddLerpParam(float num) {
+				if (!go) {
+					return;
+				}
+				mtx.WaitOne();
+				try {
+					bw.Write((uint)Command.LERP_PARAM);
+					bw.Write(num);
+
+					Flush(false);
+				} catch (Exception e) {
+					Debug.Log("MPPlayerStateDump: failed to dump lerp param: " + e);
+				} finally {
+					mtx.ReleaseMutex();
+				}
+			}
+
 		}
 
 		public static Buffer buf = new Buffer();

@@ -234,9 +234,9 @@ namespace GameMod {
 
         static bool Prefix() {
             int ping = GameManager.m_local_player.m_avg_ping_ms;
-			MPPlayerStateDump.buf.AddInterpolateBegin(Time.time, ping);
+            MPPlayerStateDump.buf.AddInterpolateBegin(Time.time, ping);
             if (Client.m_InterpolationBuffer[0] == null || Client.m_InterpolationBuffer[1] == null || Client.m_InterpolationBuffer[2] == null) {
-				MPPlayerStateDump.buf.AddCommand((uint)MPPlayerStateDump.Command.INTERPOLATE_END);
+                MPPlayerStateDump.buf.AddCommand((uint)MPPlayerStateDump.Command.INTERPOLATE_END);
                 return true;
             }
             float num = CalculateLerpParameter();
@@ -246,13 +246,16 @@ namespace GameMod {
             msg0 = Client.m_InterpolationBuffer[0];
             msg1 = Client.m_InterpolationBuffer[1];
             msg2 = Client.m_InterpolationBuffer[2];
+            MPPlayerStateDump.buf.AddBufferUpdateContents(ref msg0, ref msg1, ref msg2, 3, 2);
             foreach (Player player in Overload.NetworkManager.m_Players) {
                 if (player != null && !player.isLocalPlayer && !player.m_spectator) {
                     PlayerSnapshot A,B;
                     if (num < 1.0f) {
+                        MPPlayerStateDump.buf.AddCommand((uint)MPPlayerStateDump.Command.INTERPOLATE_PATH_01);
                         A = (PlayerSnapshot)_Client_GetPlayerSnapshotFromInterpolationBuffer_Method.Invoke(null, new object[] { player, msg0 });
                         B = (PlayerSnapshot)_Client_GetPlayerSnapshotFromInterpolationBuffer_Method.Invoke(null, new object[] { player, msg1 });
                     } else {
+                        MPPlayerStateDump.buf.AddCommand((uint)MPPlayerStateDump.Command.INTERPOLATE_PATH_12);
                         A = (PlayerSnapshot)_Client_GetPlayerSnapshotFromInterpolationBuffer_Method.Invoke(null, new object[] { player, msg1 });
                         B = (PlayerSnapshot)_Client_GetPlayerSnapshotFromInterpolationBuffer_Method.Invoke(null, new object[] { player, msg2 });
                         num -= 1.0f;
@@ -263,15 +266,15 @@ namespace GameMod {
                     }
                 }
             }
-			MPPlayerStateDump.buf.AddCommand((uint)MPPlayerStateDump.Command.INTERPOLATE_END);
+            MPPlayerStateDump.buf.AddCommand((uint)MPPlayerStateDump.Command.INTERPOLATE_END);
             return false;
         }
 
         static void LerpRemotePlayer(Player player, PlayerSnapshot A, PlayerSnapshot B, float t) {
-			MPPlayerStateDump.buf.AddLerpBegin(player.m_lerp_wait_for_respawn_pos,ref A,ref B,t);
+            MPPlayerStateDump.buf.AddLerpBegin(player.m_lerp_wait_for_respawn_pos,ref A,ref B,t);
             if (player.m_lerp_wait_for_respawn_pos) {
                 player.LerpRemotePlayer(A, B, t);
-				MPPlayerStateDump.buf.AddLerpEnd(player.m_lerp_wait_for_respawn_pos);
+                MPPlayerStateDump.buf.AddLerpEnd(player.m_lerp_wait_for_respawn_pos);
                 return;
             }
 
@@ -305,13 +308,15 @@ namespace GameMod {
             //    LocalPosition = Vector3.LerpUnclamped(A.m_pos, B.m_pos, t + 1),
             //    Rotation = Quaternion.SlerpUnclamped(A.m_rot, B.m_rot, t + 1)
             //};
-			MPPlayerStateDump.buf.AddLerpEnd(player.m_lerp_wait_for_respawn_pos);
+            MPPlayerStateDump.buf.AddLerpEnd(player.m_lerp_wait_for_respawn_pos);
         }
 
         // Not the same as vanilla
         private static float CalculateLerpParameter() {
             float num = Mathf.Max(0f, Time.time - Client.m_InterpolationStartTime);
-            return num / Time.fixedDeltaTime;
+            float num2 = num / Time.fixedDeltaTime;
+            MPPlayerStateDump.buf.AddLerpParam(num2);
+            return num2;
         }
     }
 }

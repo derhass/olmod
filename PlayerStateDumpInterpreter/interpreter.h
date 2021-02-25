@@ -64,6 +64,7 @@ class Interpreter {
 		void ProcessLerpBegin();
 		void ProcessLerpEnd();
 		void ProcessUpdateBufferContents();
+		void ProcessLerpParam();
 
 		bool ProcessCommand();
 
