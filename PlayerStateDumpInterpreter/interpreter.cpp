@@ -219,7 +219,6 @@ void Interpreter::ProcessEnqueue()
 	float ts = ReadFloat();
 	uint32_t i, num = ReadPlayerSnapshotMessage(currentSnapshots);
 	log.Log(Logger::DEBUG, "got ENQUEUE at %fs for %u players", ts, (unsigned)num);
-	currentSnapshots.snapshot.resize(num);
 	for (i=0; i<num; i++) {
 		currentSnapshots.snapshot[i].state.timestamp = ts;
 		if (file) {
@@ -240,6 +239,7 @@ void Interpreter::ProcessEnqueue()
 			rpc->Add(currentSnapshots.snapshot[i]);
 		}
 	}
+	log.Log(Logger::DEBUG_DETAIL, currentSnapshots);
 	SimulateBufferEnqueue();
 }
 
@@ -250,14 +250,14 @@ void Interpreter::ProcessUpdateBegin()
 	update.before.timestamp = 0.0f;
 	update.after.timestamp = 0.0f;
 	update.m_InterpolationStartTime_before = ReadFloat();
-	log.Log(Logger::DEBUG, "got UPDATE_BEGIN at %fs %fs", update.timestamp, update.m_InterpolationStartTime_before);
+	log.Log(Logger::DEBUG, "got UPDATE_BEGIN at %fs interpolStart: %fs", update.timestamp, update.m_InterpolationStartTime_before);
 }
 
 void Interpreter::ProcessUpdateEnd()
 {
 	update.m_InterpolationStartTime_after = ReadFloat();
 
-	log.Log(Logger::DEBUG, "got UPDATE_END %fs", update.m_InterpolationStartTime_after);
+	log.Log(Logger::DEBUG, "got UPDATE_END interpolStart: %fs", update.m_InterpolationStartTime_after);
 	if (update.valid) {
 		SimulateBufferUpdate();
 	}
@@ -293,6 +293,8 @@ void Interpreter::ProcessLerpBegin()
 	c.B.state.timestamp = -1.0f; /// we do not know
 	c.t=ReadFloat();
 	log.Log(Logger::DEBUG, "got LERP_BEGIN for player %u waitForRespwan=%u t=%f",c.A.id,c.waitForRespawn_before,c.t);
+	log.Log(Logger::DEBUG_DETAIL, c.A);
+	log.Log(Logger::DEBUG_DETAIL, c.B);
 	interpolation.lerps.push_back(c);
 	Player &p=gameState.GetPlayer(c.A.id);
 	if (!p.waitForRespawn && c.waitForRespawn_before) {
@@ -367,6 +369,9 @@ void Interpreter::ProcessUpdateBufferContents()
 		u.C.snapshot[i].state.timestamp = ts;
 	}
 
+	log.Log(Logger::DEBUG_DETAIL, u.A);
+	log.Log(Logger::DEBUG_DETAIL, u.B);
+	log.Log(Logger::DEBUG_DETAIL, u.C);
 }
 
 bool Interpreter::ProcessCommand()
