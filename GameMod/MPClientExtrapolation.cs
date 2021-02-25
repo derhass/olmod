@@ -240,17 +240,19 @@ namespace GameMod {
             foreach (Player player in Overload.NetworkManager.m_Players) {
                 if (player != null && !player.isLocalPlayer && !player.m_spectator) {
                     PlayerSnapshot A,B;
+		    float t;
                     if (num < 1.0f) {
                         A = (PlayerSnapshot)_Client_GetPlayerSnapshotFromInterpolationBuffer_Method.Invoke(null, new object[] { player, msg0 });
                         B = (PlayerSnapshot)_Client_GetPlayerSnapshotFromInterpolationBuffer_Method.Invoke(null, new object[] { player, msg1 });
+			t = num;
                     } else {
                         A = (PlayerSnapshot)_Client_GetPlayerSnapshotFromInterpolationBuffer_Method.Invoke(null, new object[] { player, msg1 });
                         B = (PlayerSnapshot)_Client_GetPlayerSnapshotFromInterpolationBuffer_Method.Invoke(null, new object[] { player, msg2 });
-                        num -= 1.0f;
+                        t = num - 1.0f;
                     }
 
                     if (A != null && B != null) {
-                        LerpRemotePlayer(player, A,B, num);
+                        LerpRemotePlayer(player, A,B, t);
                     }
                 }
             }
