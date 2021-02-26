@@ -112,14 +112,19 @@ void ResultProcessorChannel::StreamOut(const PlayerState& s, size_t idx)
 	float yawPitchRoll[3];
 
 	s.rot.ToEuler(yawPitchRoll);
-	fprintf(fStream, "%f\t%f\t%f\t%f\t%f\t%f\t%f",
+	fprintf(fStream, "%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f",
 			s.timestamp,
 			s.pos[0],
 			s.pos[1],
 			s.pos[2],
+			s.rot.v[0],
+			s.rot.v[1],
+			s.rot.v[2],
+			s.rot.v[3]);
+	/*,
 			yawPitchRoll[0],
 			yawPitchRoll[1],
-			yawPitchRoll[2]);
+			yawPitchRoll[2]);*/
 	if (resultProcessor.dumpDeltaPos && idx != (size_t)-1 && idx > 0) {
 		const PlayerState b=data[idx-1];
 		fprintf(fStream, "\t%f",s.timestamp-b.timestamp);
