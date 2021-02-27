@@ -280,7 +280,10 @@ namespace GameMod {
                     EnqueueToRing(msg);
                     m_last_update_time = Time.time; // Time.fixedTime; 
                 } else {
-                    int deltaFrames = (int)((msg.m_timestamp - m_last_message_timestamp) / Time.fixedDeltaTime + 0.5f);
+                    // ARGH, currently, the time base we get from the server is broken,
+                    //int deltaFrames = (int)((msg.m_timestamp - m_last_message_timestamp) / Time.fixedDeltaTime + 0.5f);
+                    int deltaFrames = 1; // don't use it for now
+
                     if (deltaFrames == 1) {
                         // next in sequence, as we expected
                         EnqueueToRing(msg);
@@ -335,9 +338,14 @@ namespace GameMod {
                            ResetForNewMatch();
                            EnqueueToRing(msg);
                            m_last_update_time = Time.time; // Time.fixedTime; 
-                          
                        } else {
                            Debug.LogFormat("got snapshot {0} frames from the past?! ignoring it!", -deltaFrames);
+                           NewPlayerSnapshotToClientMessage lastMsg = m_last_messages_ring[m_last_messages_ring_pos_last];
+                           Debug.LogFormat("last is {0} {1}, new is {2}, move {3} {4}",
+                                           m_last_message_timestamp, lastMsg.m_timestamp,
+                                           msg.m_timestamp,
+                                           lastMsg.m_snapshots[0].m_pos.x,
+                                           msg.m_snapshots[0].m_pos.x);
                        }
                        return;
                     }
@@ -346,7 +354,7 @@ namespace GameMod {
                 float delta = (Time.time /* Time.fixedTime */ - m_last_update_time)/ Time.fixedDeltaTime; // in Frames
                 // allow a sliding window to catch up for latency jitter
                 //flooat frameSync = Mathf.Max((float)Menus.mms_ship_max_interpolate_frames, 2.1f);
-                float frameSync = Mathf.Max((float)Menus.mms_ship_max_interpolate_frames, 2.5f);
+                float frameSync = Mathf.Max((float)Menus.mms_ship_max_interpolate_frames, 4.0f);
                 if (delta < -0.5*frameSync || delta > 0.5f*frameSync) {
                     // hard resync
                     Debug.LogFormat("hard resync by {0} frames", delta);
@@ -421,6 +429,7 @@ namespace GameMod {
                     // we need interpolate_frames + 1 frames in the buffer
                     if ( interpolate_frames >= m_last_messages_ring_count ) {
                         // not enough packets received so far
+                        // TODO: this is wrong: we could to extrapolation into the past
                         return;
                     }
                     msgA = m_last_messages_ring[(m_last_messages_ring_pos_last + 4 - interpolate_frames) & 3];
@@ -449,11 +458,11 @@ namespace GameMod {
             m_compensation_count++;
             m_compensation_interpol_count += (interpolate_frames > 0)?1:0;
             if (Time.time >= m_compensation_last + 5.0 && m_compensation_count > 0) {
-                Debug.LogFormat("ship lag compensation over last {0} frames: {1}ms / {2} physics ticks, {3} interpolation {4}%)",
+                Debug.LogFormat("ship lag compensation over last {0} frames: {1}ms / {2} physics ticks, {3} interpolation ({4}%)",
                                 m_compensation_count, 1000.0f* (m_compensation_sum/ m_compensation_count),
                                 (m_compensation_sum/m_compensation_count)/Time.fixedDeltaTime,
                                 m_compensation_interpol_count,
-                                100.0f*((float)m_compensation_interpol_count/(float)m_compensation_interpol_count));
+                                100.0f*((float)m_compensation_interpol_count/(float)m_compensation_count));
                 m_compensation_sum = 0.0f;
                 m_compensation_count = 0;
                 m_compensation_interpol_count = 0;
