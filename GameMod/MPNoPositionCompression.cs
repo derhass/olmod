@@ -1,4 +1,3 @@
-using System;
 using System.Linq;
 using Harmony;
 using Overload;
@@ -70,12 +69,12 @@ namespace GameMod {
                 writer.Write(m_snapshots[i].m_pos.y);
                 writer.Write(m_snapshots[i].m_pos.z);
                 writer.Write(m_snapshots[i].m_rot);
-                writer.Write(HalfHelper.Compress(m_snapshots[i].m_vel.x));
-                writer.Write(HalfHelper.Compress(m_snapshots[i].m_vel.y));
-                writer.Write(HalfHelper.Compress(m_snapshots[i].m_vel.z));
-                writer.Write(HalfHelper.Compress(m_snapshots[i].m_vrot.x));
-                writer.Write(HalfHelper.Compress(m_snapshots[i].m_vrot.y));
-                writer.Write(HalfHelper.Compress(m_snapshots[i].m_vrot.z));
+                writer.Write(System.HalfHelper.Compress(m_snapshots[i].m_vel.x));
+                writer.Write(System.HalfHelper.Compress(m_snapshots[i].m_vel.y));
+                writer.Write(System.HalfHelper.Compress(m_snapshots[i].m_vel.z));
+                writer.Write(System.HalfHelper.Compress(m_snapshots[i].m_vrot.x));
+                writer.Write(System.HalfHelper.Compress(m_snapshots[i].m_vrot.y));
+                writer.Write(System.HalfHelper.Compress(m_snapshots[i].m_vrot.z));
             }
         }
 
@@ -84,7 +83,7 @@ namespace GameMod {
         /// </summary>
         /// <param name="reader"></param>
         public override void Deserialize(NetworkReader reader) {
-            float timestamp = reader.ReadSingle();
+            m_timestamp = reader.ReadSingle();
             m_num_snapshots = (int)reader.ReadByte();
             for (int i = 0; i < m_num_snapshots; i++) {
                 NetworkInstanceId net_id = reader.ReadNetworkId();
@@ -94,18 +93,19 @@ namespace GameMod {
                 pos.z = reader.ReadSingle();
                 Quaternion rot = reader.ReadQuaternion();
                 Vector3 vel = default(Vector3);
-                vel.x = HalfHelper.Decompress(reader.ReadUInt16());
-                vel.y = HalfHelper.Decompress(reader.ReadUInt16());
-                vel.z = HalfHelper.Decompress(reader.ReadUInt16());
+                vel.x = System.HalfHelper.Decompress(reader.ReadUInt16());
+                vel.y = System.HalfHelper.Decompress(reader.ReadUInt16());
+                vel.z = System.HalfHelper.Decompress(reader.ReadUInt16());
                 Vector3 vrot = default(Vector3);
-                vrot.x = HalfHelper.Decompress(reader.ReadUInt16());
-                vrot.y = HalfHelper.Decompress(reader.ReadUInt16());
-                vrot.z = HalfHelper.Decompress(reader.ReadUInt16());
+                vrot.x = System.HalfHelper.Decompress(reader.ReadUInt16());
+                vrot.y = System.HalfHelper.Decompress(reader.ReadUInt16());
+                vrot.z = System.HalfHelper.Decompress(reader.ReadUInt16());
                 m_snapshots[i] = new NewPlayerSnapshot(net_id, pos, rot,
                                                        vel, vrot);
             }
         }
 
+        public float m_timestamp;
         public int m_num_snapshots;
         public NewPlayerSnapshot[] m_snapshots = Enumerable.Range(1, 16).Select(x => new NewPlayerSnapshot()).ToArray();
 
@@ -152,8 +152,7 @@ namespace GameMod {
         public static void OnNewPlayerSnapshotToClient(NetworkMessage msg) {
             if (NetworkMatch.GetMatchState() == MatchState.PREGAME || NetworkMatch.InGameplay()) {
                 NewPlayerSnapshotToClientMessage item = msg.ReadMessage<NewPlayerSnapshotToClientMessage>();
-                MPClientShipReckoning.m_last_update = item;
-                MPClientShipReckoning.m_last_update_time = NetworkMatch.m_match_elapsed_seconds;
+                MPClientShipReckoning.AddNewPlayerSnapshot(item);
             }
         }
 
