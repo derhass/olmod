@@ -358,7 +358,7 @@ namespace GameMod {
                 if (delta < -0.5*frameSync || delta > 0.5f*frameSync) {
                     // hard resync
                     Debug.LogFormat("hard resync by {0} frames", delta);
-                    m_last_update_time += Mathf.Floor(delta) * Time.fixedDeltaTime;
+                    m_last_update_time += Time.time; // Time.fixedTime;
                 } else {
                     // soft resync
                     m_last_update_time += 0.1f * delta * Time.fixedDeltaTime;
