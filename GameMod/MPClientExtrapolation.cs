@@ -167,6 +167,12 @@ namespace GameMod {
         public static float m_last_update_time;
         public static float m_last_frame_time;
 
+        // simple statistic
+        public static float m_compensation_sum;
+        public static int m_compensation_count;
+        public static int m_compensation_interpol_count;
+        public static float m_compensation_last;
+
         // simple ring buffer, use size 4 which is a power of two, so the % 4 becomes simple & 3
         private static NewPlayerSnapshotToClientMessage[] m_last_messages_ring = new NewPlayerSnapshotToClientMessage[4];
         private static int m_last_messages_ring_count = 0;
@@ -182,7 +188,7 @@ namespace GameMod {
                 m_last_messages_ring_count++;
             }
             m_last_message_timestamp = msg.m_timestamp;
-            Debug.LogFormat("Adding {0} at {1}, have {2}", msg.m_timestamp, Time.time, m_last_messages_ring_count);
+            //Debug.LogFormat("Adding {0} at {1}, have {2}", msg.m_timestamp, Time.time, m_last_messages_ring_count);
         }
 
         private static void ClearRing()
@@ -199,6 +205,10 @@ namespace GameMod {
                 m_last_update_time = Time.time; // Time.fixedTime
                 m_last_frame_time = Time.time;
             }
+            m_compensation_sum = 0.0f;
+            m_compensation_count = 0;
+            m_compensation_interpol_count = 0;
+            m_compensation_last = Time.time;
         }
 
         // interpolate a single NewPlayerSnapshot (including the extra fields besides pos and rot)!
@@ -319,28 +329,31 @@ namespace GameMod {
                         }
                     } else { 
                         // duplicate? probably never happens, but we're going to ignore it
-                       Debug.Log("got snapshot from the past?! ignoring it!");
                        if (deltaFrames < -10) {
+                           Debug.Log("re-syncing to server packets");
                            // we are out of sync with the server
                            ResetForNewMatch();
                            EnqueueToRing(msg);
                            m_last_update_time = Time.time; // Time.fixedTime; 
                           
+                       } else {
+                           Debug.LogFormat("got snapshot {0} frames from the past?! ignoring it!", -deltaFrames);
                        }
                        return;
                     }
-
-                    // check if the time base is still plausible
-                    if (m_last_update_time >= Time.time /* time.fixedTime */) {
-                        // can't lie in the future
-                        m_last_update_time = Time.time; // Time.fixedTime;
-                    } else { 
-                        float delta = (Time.time /* Time.fixedTime */ - m_last_update_time)/ Time.fixedDeltaTime; // in Frames
-                        if (delta > 1.5f) {
-                            // re-sync
-                            m_last_update_time += Mathf.Floor(delta) * Time.fixedDeltaTime;
-                        }
-                    }
+                }
+                // check if the time base is still plausible
+                float delta = (Time.time /* Time.fixedTime */ - m_last_update_time)/ Time.fixedDeltaTime; // in Frames
+                // allow a sliding window to catch up for latency jitter
+                //flooat frameSync = Mathf.Max((float)Menus.mms_ship_max_interpolate_frames, 2.1f);
+                float frameSync = Mathf.Max((float)Menus.mms_ship_max_interpolate_frames, 2.5f);
+                if (delta < -0.5*frameSync || delta > 0.5f*frameSync) {
+                    // hard resync
+                    Debug.LogFormat("hard resync by {0} frames", delta);
+                    m_last_update_time += Mathf.Floor(delta) * Time.fixedDeltaTime;
+                } else {
+                    // soft resync
+                    m_last_update_time += 0.1f * delta * Time.fixedDeltaTime;
                 }
             } // end lock 
         }
@@ -389,11 +402,13 @@ namespace GameMod {
 
             // find out which case we have, and get the relevant snapshot message(s)
             lock (m_last_messages_lock) {
+                /*
                 for (int xxx=0; xxx<m_last_messages_ring_count; xxx++) {
                     Debug.LogFormat("having snapshot from {0} represents {1}", m_last_messages_ring[(m_last_messages_ring_pos_last + 4 - xxx)&3].m_timestamp, m_last_update_time - xxx* Time.fixedDeltaTime);
                 }
+                */
 
-                delta_t = Mathf.Max(now + MPClientExtrapolation.GetShipExtrapolationTime() - m_last_update_time, 0.0f);
+                delta_t = now + MPClientExtrapolation.GetShipExtrapolationTime() - m_last_update_time;
                 // if we want interpolation, add this as negative offset
                 // we use 0 as the base point which exacty matches the state of the last received message
                 // (as whollycow's code also did)
@@ -401,8 +416,6 @@ namespace GameMod {
                 // time difference in physics frames 
                 float delta_frames = delta_t / Time.fixedDeltaTime;
                 interpolate_frames = -(int)Mathf.Floor(delta_frames);
-                //  note that interpolate_frames > 0 can only happen if mms_ship_max_interpolate_frames was > 0
-
 
                 if (interpolate_frames > 0) {
                     // we need interpolate_frames + 1 frames in the buffer
@@ -421,12 +434,30 @@ namespace GameMod {
             } // lock
             m_last_frame_time = now;
 
+            /*
             Debug.LogFormat("At: {0} Setting: {1} IntFrames: {2}, dt: {3}, IntFact {4}",now,Menus.mms_ship_max_interpolate_frames, interpolate_frames, delta_t, interpolate_factor);
             if (interpolate_frames > 0) {
                 Debug.LogFormat("Using A from {0}", msgA.m_timestamp);
                 Debug.LogFormat("Using B from {0}", msgB.m_timestamp);
             } else {
                 Debug.LogFormat("Using B from {0}", msgB.m_timestamp);
+            }
+            */
+
+            // keep statistics
+            m_compensation_sum += delta_t;
+            m_compensation_count++;
+            m_compensation_interpol_count += (interpolate_frames > 0)?1:0;
+            if (Time.time >= m_compensation_last + 5.0 && m_compensation_count > 0) {
+                Debug.LogFormat("ship lag compensation over last {0} frames: {1}ms / {2} physics ticks, {3} interpolation {4}%)",
+                                m_compensation_count, 1000.0f* (m_compensation_sum/ m_compensation_count),
+                                (m_compensation_sum/m_compensation_count)/Time.fixedDeltaTime,
+                                m_compensation_interpol_count,
+                                100.0f*((float)m_compensation_interpol_count/(float)m_compensation_interpol_count));
+                m_compensation_sum = 0.0f;
+                m_compensation_count = 0;
+                m_compensation_interpol_count = 0;
+                m_compensation_last = Time.time;
             }
 
             // actually apply the operation to each player
