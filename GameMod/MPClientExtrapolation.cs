@@ -354,6 +354,8 @@ namespace GameMod {
                 float delta = (Time.time /* Time.fixedTime */ - m_last_update_time)/ Time.fixedDeltaTime; // in Frames
                 // allow a sliding window to catch up for latency jitter
                 //flooat frameSync = Mathf.Max((float)Menus.mms_ship_max_interpolate_frames, 2.1f);
+                // the step between thos two could be replaced by a more smooth formula
+                // which would got to 1.0 * delta if the offset is too big
                 float frameSync = Mathf.Max((float)Menus.mms_ship_max_interpolate_frames, 4.0f);
                 if (delta < -0.5*frameSync || delta > 0.5f*frameSync) {
                     // hard resync
@@ -496,6 +498,9 @@ namespace GameMod {
     class MPClientExtrapolation_ClientUpdate{
         static bool Prefix(){
             // This function is called once per frame from Client.Update()
+            if (Overload.NetworkManager.IsServer() || NetworkMatch.m_match_state != MatchState.PLAYING) {
+                return true;
+            }
             MPClientShipReckoning.updatePlayerPositions();
             return false;
         }
@@ -506,6 +511,9 @@ namespace GameMod {
     [HarmonyPatch(typeof(Client), "FixedUpdate")]
     class MPClientExtrapolation_ClientFixedUpdate{
         static bool Prefix(){
+            if (Overload.NetworkManager.IsServer() || NetworkMatch.m_match_state != MatchState.PLAYING) {
+                return true;
+            }
             // Client.FixedUpdate() did nothing except call UpdateInterpolationBuffer,
             // which we now ignore
             return false;
@@ -517,10 +525,12 @@ namespace GameMod {
     class MPPlayerStateDump_Connect {
         private static void Postfix()
         {
+            if (Overload.NetworkManager.IsServer()) {
+                return;
+            }
             MPClientShipReckoning.ResetForNewMatch();
         }
     }
-
 
     /*[HarmonyPatch(typeof(Client), "UpdateInterpolationBuffer")]
     class MPClientExtrapolation_UpdateInterpolationBuffer {
