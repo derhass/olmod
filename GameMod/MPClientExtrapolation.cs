@@ -163,18 +163,228 @@ namespace GameMod {
     }
 
     class MPClientShipReckoning{
-        // dead reckoning ship extrapolation for clients
+        // ship interpolation OR extrapolation for clients
         public static float m_last_update_time;
         public static float m_last_frame_time;
-        public static NewPlayerSnapshotToClientMessage m_last_update = new NewPlayerSnapshotToClientMessage();
+
+        // simple statistic
+        public static float m_compensation_sum;
+        public static int m_compensation_count;
+        public static int m_compensation_interpol_count;
+        public static float m_compensation_last;
+
+        // simple ring buffer, use size 4 which is a power of two, so the % 4 becomes simple & 3
+        private static NewPlayerSnapshotToClientMessage[] m_last_messages_ring = new NewPlayerSnapshotToClientMessage[4];
+        private static int m_last_messages_ring_count = 0;          // number of elements in the ring buffer
+        private static int m_last_messages_ring_pos_last = 3;       // position of the last added element
+        private static object m_last_messages_lock = new object();  // lock used to guard access to buffer contents AND m_last_update_time
+        private static float m_last_message_timestamp = -1.0f;
+
+        private static void EnqueueToRing(NewPlayerSnapshotToClientMessage msg)
+        {
+            m_last_messages_ring_pos_last = (m_last_messages_ring_pos_last + 1) & 3;
+            m_last_messages_ring[m_last_messages_ring_pos_last] = msg;
+            if (m_last_messages_ring_count < 4) {
+                m_last_messages_ring_count++;
+            }
+            m_last_message_timestamp = msg.m_timestamp;
+            //Debug.LogFormat("Adding {0} at {1}, have {2}", msg.m_timestamp, Time.time, m_last_messages_ring_count);
+        }
+
+        // Clear the contents of the ring buffer
+        private static void ClearRing()
+        {
+            m_last_messages_ring_pos_last = 3;
+            m_last_messages_ring_count = 0;
+            m_last_message_timestamp = -1.0f;
+        }
+
+        // Prepare for a new match
+        // resets all history data and metadata we keep
+        public static void ResetForNewMatch()
+        {
+            lock (m_last_messages_lock) {
+                ClearRing();
+                m_last_update_time = Time.time;
+                m_last_frame_time = Time.time;
+            }
+            m_compensation_sum = 0.0f;
+            m_compensation_count = 0;
+            m_compensation_interpol_count = 0;
+            m_compensation_last = Time.time;
+        }
+
+        // interpolate a single NewPlayerSnapshot (including the extra fields besides pos and rot)!
+        private static void InterpolatePlayerSnapshot(ref NewPlayerSnapshot C, NewPlayerSnapshot A, NewPlayerSnapshot B, float t)
+        {
+            C.m_pos = Vector3.LerpUnclamped(A.m_pos, B.m_pos, t);
+            C.m_rot = Quaternion.SlerpUnclamped(A.m_rot, B.m_rot, t);
+            C.m_vel = Vector3.LerpUnclamped(A.m_vel, B.m_vel, t);
+            Quaternion A_vrot = Quaternion.Euler(A.m_vrot);
+            Quaternion B_vrot = Quaternion.Euler(C.m_vrot);
+            Quaternion C_vrot = Quaternion.SlerpUnclamped(A_vrot,B_vrot, t);
+            C.m_vrot = C_vrot.eulerAngles;
+            C.m_net_id = A.m_net_id;
+        }
+
+        // extrapolate a single NewPlayerSnapshot (including the extra fields besides pos and rot)!
+        private static void ExtrapolatePlayerSnapshot(ref NewPlayerSnapshot C, NewPlayerSnapshot B, float t)
+        {
+            C.m_pos = Vector3.LerpUnclamped(B.m_pos, B.m_pos + B.m_vel, t);
+            C.m_rot = Quaternion.SlerpUnclamped(B.m_rot, B.m_rot * Quaternion.Euler(B.m_vrot), t);
+            // assume the rest stays the same
+            C.m_vel = B.m_vel;
+            C.m_vrot = B.m_vrot;
+            C.m_net_id = B.m_net_id;
+        }
+
+        // interpolate a whole NewPlayerSnapshotToClientMessage
+        // interpolate between A and B, t is the relative factor between both
+        // If a player is not in both messages, it will not be in the resulting messages
+        private static NewPlayerSnapshotToClientMessage InterpolatePlayerSnapshotMessage(NewPlayerSnapshotToClientMessage A, NewPlayerSnapshotToClientMessage B, float t)
+        {
+            NewPlayerSnapshotToClientMessage C = new NewPlayerSnapshotToClientMessage();
+            int i,j;
+
+            C.m_num_snapshots = 0;
+
+            for (i=0; i<A.m_num_snapshots; i++) {
+                for (j=0; j<B.m_num_snapshots; j++) {
+                    if (A.m_snapshots[i].m_net_id.Value == B.m_snapshots[j].m_net_id.Value) {
+                        InterpolatePlayerSnapshot(ref C.m_snapshots[C.m_num_snapshots++], A.m_snapshots[i], B.m_snapshots[j], t);
+                        continue;
+                    }
+                }
+            }
+            
+            C.m_timestamp = (1.0f - t) * A.m_timestamp + t*B.m_timestamp;
+            return C;
+        }
+
+        // extrapolate a whole NewPlayerSnapshotToClientMessage
+        // extrapolate from B into t seconds into the future, t can be negative
+        private static NewPlayerSnapshotToClientMessage ExtrapolatePlayerSnapshotMessage(NewPlayerSnapshotToClientMessage B, float t)
+        {
+            NewPlayerSnapshotToClientMessage C = new NewPlayerSnapshotToClientMessage();
+            int i;
+
+            for (i=0; i<B.m_num_snapshots; i++) {
+                ExtrapolatePlayerSnapshot(ref C.m_snapshots[C.m_num_snapshots++], B.m_snapshots[i], t);
+            }
+
+            C.m_timestamp = B.m_timestamp + t;
+            return C;
+        }
+
+        // add a AddNewPlayerSnapshot(NewPlayerSnapshotToClientMessage
+        // this should be called as soon as possible after the message arrives
+        // This function adds the message into the ring buffer, and
+        // also implements the time sync algorithm between the message sequence and
+        // the local render time.
+        //
+        // It is safe to be called from an arbitrary thread, as accesses are
+        // guareded by a lock.
+        public static void AddNewPlayerSnapshot(NewPlayerSnapshotToClientMessage msg)
+        {
+            lock (m_last_messages_lock) {
+                if  (m_last_message_timestamp < 0.0f) {
+                    // first packet
+                    EnqueueToRing(msg);
+                    m_last_update_time = Time.time; 
+                } else {
+                    // ARGH, currently, the time base we get from the server is broken,
+                    //int deltaFrames = (int)((msg.m_timestamp - m_last_message_timestamp) / Time.fixedDeltaTime + 0.5f);
+                    int deltaFrames = 1; // don't use it for now
+
+                    if (deltaFrames == 1) {
+                        // next in sequence, as we expected
+                        EnqueueToRing(msg);
+                        m_last_update_time += Time.fixedDeltaTime; 
+                    } else if (deltaFrames > 1) {
+                        Debug.LogFormat("detected {0} missing snapshots",  deltaFrames - 1);
+                        if (Menus.mms_ship_max_interpolate_frames > 0) {
+                            // this is the slow path
+                            // we actually do the creation of missing packets here
+                            // one per received new snapshot, so that the per-frame
+                            // update code path can stay simple 
+                            NewPlayerSnapshotToClientMessage lastMsg = m_last_messages_ring[m_last_messages_ring_pos_last];
+                            if (deltaFrames == 2) {
+                                // there is one missing snapshot
+                                EnqueueToRing(InterpolatePlayerSnapshotMessage(lastMsg,msg,0.5f));
+                                EnqueueToRing(msg);
+                                m_last_update_time += 2.0f * Time.fixedDeltaTime; 
+                            } else if (deltaFrames == 3) {
+                                // there are two missing snapshots
+                                EnqueueToRing(InterpolatePlayerSnapshotMessage(lastMsg,msg,0.3333f));
+                                EnqueueToRing(InterpolatePlayerSnapshotMessage(lastMsg,msg,0.6666f));
+                                EnqueueToRing(msg);
+                                m_last_update_time += 3.0f * Time.fixedDeltaTime; 
+                            } else if (deltaFrames ==  4) {
+                                // there are three missing snapshots
+                                EnqueueToRing(InterpolatePlayerSnapshotMessage(lastMsg,msg,0.25f));
+                                EnqueueToRing(InterpolatePlayerSnapshotMessage(lastMsg,msg,0.5f));
+                                EnqueueToRing(InterpolatePlayerSnapshotMessage(lastMsg,msg,0.75f));
+                                EnqueueToRing(msg);
+                                m_last_update_time += 4.0f * Time.fixedDeltaTime;
+                            } else {
+                                // there are more than 3 missing snapshots,
+                                // just take the completely new data in
+                                EnqueueToRing(ExtrapolatePlayerSnapshotMessage(msg, -3.0f * Time.fixedDeltaTime));
+                                EnqueueToRing(ExtrapolatePlayerSnapshotMessage(msg, -2.0f * Time.fixedDeltaTime));
+                                EnqueueToRing(ExtrapolatePlayerSnapshotMessage(msg, -1.0f * Time.fixedDeltaTime));
+                                EnqueueToRing(msg);
+                                m_last_update_time += deltaFrames * Time.fixedDeltaTime; 
+                            }
+                        } else {
+                            // If interpolation is disabled, the per-frame update
+                            // will only ever access the latest element in the ring buffer anyway
+                            // so there is no point in trying to approximate previous states
+                            EnqueueToRing(msg);
+                            m_last_update_time += deltaFrames * Time.fixedDeltaTime; 
+                        }
+                    } else { 
+                        // duplicate? probably never happens, but we're going to ignore it
+                       if (deltaFrames < -10) {
+                           Debug.Log("re-syncing to server packets");
+                           // we are out of sync with the server
+                           ResetForNewMatch();
+                           EnqueueToRing(msg);
+                           m_last_update_time = Time.time; 
+                       } else {
+                           Debug.LogFormat("got snapshot {0} frames from the past?! ignoring it!", -deltaFrames);
+                           NewPlayerSnapshotToClientMessage lastMsg = m_last_messages_ring[m_last_messages_ring_pos_last];
+                           Debug.LogFormat("last is {0} {1}, new is {2}, move {3} {4}",
+                                           m_last_message_timestamp, lastMsg.m_timestamp,
+                                           msg.m_timestamp,
+                                           lastMsg.m_snapshots[0].m_pos.x,
+                                           msg.m_snapshots[0].m_pos.x);
+                       }
+                       return;
+                    }
+                }
+                // check if the time base is still plausible
+                float delta = (Time.time - m_last_update_time)/ Time.fixedDeltaTime; // in ticks
+                // allow a sliding window to catch up for latency jitter
+                float frameSoftSyncLimit = 2.0f; ///hard-sync if we're off by more than that many physics ticks
+                if (delta < -frameSoftSyncLimit || delta > frameSoftSyncLimit) {
+                    // hard resync
+                    Debug.LogFormat("hard resync by {0} frames", delta);
+                    m_last_update_time = Time.time;
+                } else {
+                    // soft resync
+                    m_last_update_time += 0.1f * delta * Time.fixedDeltaTime;
+                }
+            } // end lock 
+        }
+
 
         static private MethodInfo _Client_GetPlayerFromNetId_Method = AccessTools.Method(typeof(Client), "GetPlayerFromNetId");
 
-        public static NewPlayerSnapshot GetPlayerSnapshot(Player p)
+        public static NewPlayerSnapshot GetPlayerSnapshot(NewPlayerSnapshotToClientMessage msg, Player p)
         {
-            for (int i = 0; i < m_last_update.m_num_snapshots; i++)
+            for (int i = 0; i < msg.m_num_snapshots; i++)
             {
-                NewPlayerSnapshot playerSnapshot = m_last_update.m_snapshots[i];
+                NewPlayerSnapshot playerSnapshot = msg.m_snapshots[i];
                 Player candidate = (Player)_Client_GetPlayerFromNetId_Method.Invoke(null, new object[] {playerSnapshot.m_net_id});
 
                 if (candidate == p)
@@ -185,32 +395,157 @@ namespace GameMod {
             return null;
         }
 
+        // Deal with the respawn. Return true if the player should not be moved around
+        private static bool HandlePlayerRespawn(Player player, NewPlayerSnapshot snapshot)
+        {
+            // this logic was in vanilla Player.LerpRemotePlayer()
+            if (player.m_lerp_wait_for_respawn_pos) {
+                float num = Vector3.Distance(snapshot.m_pos, player.m_lerp_respawn_pos);
+                float num2 = Vector3.Distance(snapshot.m_pos, player.m_lerp_death_pos);
+                if (num >= num2) {
+                    // still special case for respawning
+                    return true;
+                }
+
+                player.m_lerp_wait_for_respawn_pos = false;
+            }
+            return false;
+        }
+
+        public static void interpolatePlayer(Player player, NewPlayerSnapshot A, NewPlayerSnapshot B, float t)
+        {
+            if (HandlePlayerRespawn(player,A)) {
+                return;
+            }
+            player.c_player_ship.c_transform.localPosition = Vector3.LerpUnclamped(A.m_pos, B.m_pos, t);
+            player.c_player_ship.c_transform.rotation = Quaternion.SlerpUnclamped(A.m_rot, B.m_rot, t);
+            player.c_player_ship.c_mesh_collider_trans.localPosition = player.c_player_ship.c_transform.localPosition;
+        }
+
         public static void extrapolatePlayer(Player player, NewPlayerSnapshot snapshot, float t){
+            if (HandlePlayerRespawn(player,snapshot)) {
+                return;
+            }
             player.c_player_ship.c_transform.localPosition = Vector3.LerpUnclamped(snapshot.m_pos, snapshot.m_pos+snapshot.m_vel, t);
             player.c_player_ship.c_transform.rotation = Quaternion.SlerpUnclamped(snapshot.m_rot, snapshot.m_rot*Quaternion.Euler(snapshot.m_vrot), t);
             player.c_player_ship.c_mesh_collider_trans.localPosition = player.c_player_ship.c_transform.localPosition;
         }
 
-        public static void updatePlayerPositions(){
-            float now = NetworkMatch.m_match_elapsed_seconds;
-            float delta_t = now - MPClientShipReckoning.m_last_update_time;
-            delta_t += MPClientExtrapolation.GetShipExtrapolationTime();
+        public static void updatePlayerPositions()
+        {
+            float now = Time.time; // needs to be the same time source we use for m_last_update_time
+            NewPlayerSnapshotToClientMessage msgA = null; // interpolation: start 
+            NewPlayerSnapshotToClientMessage msgB = null; // interpolation: end, extrapolation start
+            float interpolate_factor = 0.0f;              // interpolation: factor in [0,1]
+            float delta_t = 0.0f;
+            int interpolate_ticks = 0;
+            bool do_interpolation = false;
 
+            // find out which case we have, and get the relevant snapshot message(s)
+            lock (m_last_messages_lock) {
+                /*
+                for (int xxx=0; xxx<m_last_messages_ring_count; xxx++) {
+                    Debug.LogFormat("having snapshot from {0} represents {1}", m_last_messages_ring[(m_last_messages_ring_pos_last + 4 - xxx)&3].m_timestamp, m_last_update_time - xxx* Time.fixedDeltaTime);
+                }
+                */
+                if (m_last_messages_ring_count < 1) {
+                    // we do not have any snapshot messages...
+                    return;
+                }
+
+                delta_t = now + MPClientExtrapolation.GetShipExtrapolationTime() - m_last_update_time;
+                // if we want interpolation, add this as a _negative) offset
+                // we use delta_t=0  as the base for from which we extrapolate into the future
+                delta_t -=  Menus.mms_ship_max_interpolate_frames * Time.fixedDeltaTime;
+                // time difference in physics ticks
+                float delta_ticks = delta_t / Time.fixedDeltaTime;
+                // the number of frames we need to interpolate into
+                // <= 0 means no interpolation at all,
+                // 1 would mean we use the second most recent and the most recent snapshot, and so on...
+                interpolate_ticks = -(int)Mathf.Floor(delta_ticks);
+                // do we need to do interpolation?
+                do_interpolation = (interpolate_ticks > 0);
+
+                if (do_interpolation) {
+                    // we need interpolate_ticks + 1 elements in the ring buffer
+                    // NOTE: in the code below, the index [(m_last_messages_ring_pos_last + 4 - i) &3]
+                    //       effectively acceses the i-ith most recent element (i starting by 0)
+                    //       since 4-(i-1) == 4-i+ 1 = 5-i, 5-i references the next older one
+                    if ( interpolate_ticks < m_last_messages_ring_count ) {
+                        msgA = m_last_messages_ring[(m_last_messages_ring_pos_last + 4 - interpolate_ticks) & 3];
+                        msgB = m_last_messages_ring[(m_last_messages_ring_pos_last + 5 - interpolate_ticks) & 3];
+                        interpolate_factor = delta_ticks - Mathf.Floor(delta_ticks);
+                    } else {
+                        // not enough packets received so far
+                        // "extrapolate" into the past
+                        do_interpolation = false;
+                        // get the oldest snapshot we have
+                        msgB =  m_last_messages_ring[(m_last_messages_ring_pos_last + 5 - m_last_messages_ring_count) & 3];
+                        // offset the time for the extrapolation
+                        // delta_t is currently relative to the most recent element we have,
+                        // but we need it relative to msgA
+                        delta_t += Time.fixedDeltaTime * (m_last_messages_ring_count-1);
+                    }
+                } else {
+                    // extrapolation case
+                    // use the most recently received snapshot
+                    msgB = m_last_messages_ring[m_last_messages_ring_pos_last];
+                }
+            } // lock
+            m_last_frame_time = now;
+
+            /*
+            Debug.LogFormat("At: {0} Setting: {1} IntFrames: {2}, dt: {3}, IntFact {4}",now,Menus.mms_ship_max_interpolate_frames, interpolate_ticks, delta_t, interpolate_factor);
+            if (interpolate_ticks > 0) {
+                Debug.LogFormat("Using A from {0}", msgA.m_timestamp);
+                Debug.LogFormat("Using B from {0}", msgB.m_timestamp);
+            } else {
+                Debug.LogFormat("Using B from {0}", msgB.m_timestamp);
+            }
+            */
+
+            // keep statistics
+            m_compensation_sum += delta_t;
+            m_compensation_count++;
+            // NOTE: one can't replace(interpolate_ticks > 0) by do_interpolation here,
+            //       because even in the (interpolate_ticks > 0) case the code above could
+            //       have reset do_interpolation to false because we technically want
+            //       the "extrapolation" into the past thing, but we don't want to count that
+            //       as extrapolation...
+            m_compensation_interpol_count += (interpolate_ticks > 0)?1:0;
+            if (Time.time >= m_compensation_last + 5.0 && m_compensation_count > 0) {
+                Debug.LogFormat("ship lag compensation over last {0} frames: {1}ms / {2} physics ticks, {3} interpolation ({4}%)",
+                                m_compensation_count, 1000.0f* (m_compensation_sum/ m_compensation_count),
+                                (m_compensation_sum/m_compensation_count)/Time.fixedDeltaTime,
+                                m_compensation_interpol_count,
+                                100.0f*((float)m_compensation_interpol_count/(float)m_compensation_count));
+                m_compensation_sum = 0.0f;
+                m_compensation_count = 0;
+                m_compensation_interpol_count = 0;
+                m_compensation_last = Time.time;
+            }
+
+            // actually apply the operation to each player
             foreach (Player player in Overload.NetworkManager.m_Players)
             {
                 if (player != null && !player.isLocalPlayer && !player.m_spectator)
                 {
-                    NewPlayerSnapshot snapshot = GetPlayerSnapshot(player);
-                    if(snapshot != null){
-                        extrapolatePlayer(player, GetPlayerSnapshot(player), delta_t);
+                    // do the actual interpolation or extrapolation, as calculated above
+                    if (do_interpolation) {
+                        NewPlayerSnapshot A = GetPlayerSnapshot(msgA, player);
+                        NewPlayerSnapshot B = GetPlayerSnapshot(msgB, player);
+                        if(A != null && B != null){
+                            interpolatePlayer(player, A, B, interpolate_factor);
+                        }
+                    } else {
+                        NewPlayerSnapshot snapshot = GetPlayerSnapshot(msgB, player);
+                        if(snapshot != null){
+                            extrapolatePlayer(player, snapshot, delta_t);
+                        }
                     }
                 }
             }
-
-            MPClientShipReckoning.m_last_frame_time = now;
         }
-
-
     }
 
     // called per frame
@@ -218,6 +553,9 @@ namespace GameMod {
     class MPClientExtrapolation_ClientUpdate{
         static bool Prefix(){
             // This function is called once per frame from Client.Update()
+            if (Overload.NetworkManager.IsServer() || NetworkMatch.m_match_state != MatchState.PLAYING) {
+                return true;
+            }
             MPClientShipReckoning.updatePlayerPositions();
             return false;
         }
@@ -228,9 +566,24 @@ namespace GameMod {
     [HarmonyPatch(typeof(Client), "FixedUpdate")]
     class MPClientExtrapolation_ClientFixedUpdate{
         static bool Prefix(){
+            if (Overload.NetworkManager.IsServer() || NetworkMatch.m_match_state != MatchState.PLAYING) {
+                return true;
+            }
             // Client.FixedUpdate() did nothing except call UpdateInterpolationBuffer,
             // which we now ignore
             return false;
+        }
+    }
+
+    // called when connectig to the server
+    [HarmonyPatch(typeof(Client), "Connect")]
+    class MPPlayerStateDump_Connect {
+        private static void Postfix()
+        {
+            if (Overload.NetworkManager.IsServer()) {
+                return;
+            }
+            MPClientShipReckoning.ResetForNewMatch();
         }
     }
 
