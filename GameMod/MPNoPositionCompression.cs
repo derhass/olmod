@@ -61,6 +61,10 @@ namespace GameMod {
         /// </summary>
         /// <param name="writer"></param>
         public override void Serialize(NetworkWriter writer) {
+            System.DateTimeOffset v = System.DateTimeOffset.Now;
+            Debug.LogFormat("writing {0} snapshots at Time.time {1}, match {2}, wall clock {3}:{4}:{5}.{6}",
+                            m_num_snapshots, Time.time, NetworkMatch.m_match_elapsed_seconds,
+                            v.Hour, v.Minute,v.Second,v.Millisecond);
             writer.Write(NetworkMatch.m_match_elapsed_seconds);
             writer.Write((byte)m_num_snapshots);
             for (int i = 0; i < m_num_snapshots; i++) {

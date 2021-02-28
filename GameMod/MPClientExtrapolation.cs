@@ -293,8 +293,8 @@ namespace GameMod {
                     m_last_update_time = Time.time; 
                 } else {
                     // ARGH, currently, the time base we get from the server is broken,
-                    //int deltaFrames = (int)((msg.m_timestamp - m_last_message_timestamp) / Time.fixedDeltaTime + 0.5f);
-                    int deltaFrames = 1; // don't use it for now
+                    int deltaFrames = (int)((msg.m_timestamp - m_last_message_timestamp) / Time.fixedDeltaTime + 0.5f);
+                    //int deltaFrames = 1; // don't use it for now
 
                     if (deltaFrames == 1) {
                         // next in sequence, as we expected
