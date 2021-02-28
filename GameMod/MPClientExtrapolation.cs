@@ -202,7 +202,7 @@ namespace GameMod {
         {
             lock (m_last_messages_lock) {
                 ClearRing();
-                m_last_update_time = Time.time; // Time.fixedTime
+                m_last_update_time = Time.time;
                 m_last_frame_time = Time.time;
             }
             m_compensation_sum = 0.0f;
@@ -278,7 +278,7 @@ namespace GameMod {
                 if  (m_last_message_timestamp < 0.0f) {
                     // first packet
                     EnqueueToRing(msg);
-                    m_last_update_time = Time.time; // Time.fixedTime; 
+                    m_last_update_time = Time.time; 
                 } else {
                     // ARGH, currently, the time base we get from the server is broken,
                     //int deltaFrames = (int)((msg.m_timestamp - m_last_message_timestamp) / Time.fixedDeltaTime + 0.5f);
@@ -337,7 +337,7 @@ namespace GameMod {
                            // we are out of sync with the server
                            ResetForNewMatch();
                            EnqueueToRing(msg);
-                           m_last_update_time = Time.time; // Time.fixedTime; 
+                           m_last_update_time = Time.time; 
                        } else {
                            Debug.LogFormat("got snapshot {0} frames from the past?! ignoring it!", -deltaFrames);
                            NewPlayerSnapshotToClientMessage lastMsg = m_last_messages_ring[m_last_messages_ring_pos_last];
@@ -351,16 +351,13 @@ namespace GameMod {
                     }
                 }
                 // check if the time base is still plausible
-                float delta = (Time.time /* Time.fixedTime */ - m_last_update_time)/ Time.fixedDeltaTime; // in ticks
+                float delta = (Time.time - m_last_update_time)/ Time.fixedDeltaTime; // in ticks
                 // allow a sliding window to catch up for latency jitter
-                //flooat frameSync = Mathf.Max((float)Menus.mms_ship_max_interpolate_frames, 2.1f);
-                // the step between thos two could be replaced by a more smooth formula
-                // which would got to 1.0 * delta if the offset is too big
                 float frameSoftSyncLimit = 2.0f; ///hard-sync if we're off by more than that many physics ticks
                 if (delta < -frameSoftSyncLimit || delta > frameSoftSyncLimit) {
                     // hard resync
                     Debug.LogFormat("hard resync by {0} frames", delta);
-                    m_last_update_time = Time.time; // Time.fixedTime;
+                    m_last_update_time = Time.time;
                 } else {
                     // soft resync
                     m_last_update_time += 0.1f * delta * Time.fixedDeltaTime;
