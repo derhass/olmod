@@ -175,9 +175,9 @@ namespace GameMod {
 
         // simple ring buffer, use size 4 which is a power of two, so the % 4 becomes simple & 3
         private static NewPlayerSnapshotToClientMessage[] m_last_messages_ring = new NewPlayerSnapshotToClientMessage[4];
-        private static int m_last_messages_ring_count = 0;
-        private static int m_last_messages_ring_pos_last = 3; // position of the last added element
-        private static object m_last_messages_lock = new object();
+        private static int m_last_messages_ring_count = 0;          // number of elements in the ring buffer
+        private static int m_last_messages_ring_pos_last = 3;       // position of the last added element
+        private static object m_last_messages_lock = new object();  // lock used to guard access to buffer contents AND m_last_update_time
         private static float m_last_message_timestamp = -1.0f;
 
         private static void EnqueueToRing(NewPlayerSnapshotToClientMessage msg)
@@ -191,6 +191,7 @@ namespace GameMod {
             //Debug.LogFormat("Adding {0} at {1}, have {2}", msg.m_timestamp, Time.time, m_last_messages_ring_count);
         }
 
+        // Clear the contents of the ring buffer
         private static void ClearRing()
         {
             m_last_messages_ring_pos_last = 3;
@@ -198,6 +199,8 @@ namespace GameMod {
             m_last_message_timestamp = -1.0f;
         }
 
+        // Prepare for a new match
+        // resets all history data and metadata we keep
         public static void ResetForNewMatch()
         {
             lock (m_last_messages_lock) {
@@ -272,6 +275,14 @@ namespace GameMod {
             return C;
         }
 
+        // add a AddNewPlayerSnapshot(NewPlayerSnapshotToClientMessage
+        // this should be called as soon as possible after the message arrives
+        // This function adds the message into the ring buffer, and
+        // also implements the time sync algorithm between the message sequence and
+        // the local render time.
+        //
+        // It is safe to be called from an arbitrary thread, as accesses are
+        // guareded by a lock.
         public static void AddNewPlayerSnapshot(NewPlayerSnapshotToClientMessage msg)
         {
             lock (m_last_messages_lock) {
@@ -365,7 +376,6 @@ namespace GameMod {
             } // end lock 
         }
 
-        public static NewPlayerSnapshotToClientMessage m_last_update = new NewPlayerSnapshotToClientMessage();
 
         static private MethodInfo _Client_GetPlayerFromNetId_Method = AccessTools.Method(typeof(Client), "GetPlayerFromNetId");
 
@@ -401,7 +411,7 @@ namespace GameMod {
         {
             float now = Time.time; // needs to be the same time source we use for m_last_update_time
             NewPlayerSnapshotToClientMessage msgA = null; // interpolation: start 
-            NewPlayerSnapshotToClientMessage msgB = null; // interpolation: end, extrapolation start:
+            NewPlayerSnapshotToClientMessage msgB = null; // interpolation: end, extrapolation start
             float interpolate_factor = 0.0f;              // interpolation: factor in [0,1]
             float delta_t = 0.0f;
             int interpolate_ticks = 0;
