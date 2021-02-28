@@ -351,16 +351,16 @@ namespace GameMod {
                     }
                 }
                 // check if the time base is still plausible
-                float delta = (Time.time /* Time.fixedTime */ - m_last_update_time)/ Time.fixedDeltaTime; // in Frames
+                float delta = (Time.time /* Time.fixedTime */ - m_last_update_time)/ Time.fixedDeltaTime; // in ticks
                 // allow a sliding window to catch up for latency jitter
                 //flooat frameSync = Mathf.Max((float)Menus.mms_ship_max_interpolate_frames, 2.1f);
                 // the step between thos two could be replaced by a more smooth formula
                 // which would got to 1.0 * delta if the offset is too big
-                float frameSync = Mathf.Max((float)Menus.mms_ship_max_interpolate_frames, 4.0f);
-                if (delta < -0.5*frameSync || delta > 0.5f*frameSync) {
+                float frameSoftSyncLimit = 2.0f; ///hard-sync if we're off by more than that many physics ticks
+                if (delta < -frameSoftSyncLimit || delta > frameSoftSyncLimit) {
                     // hard resync
                     Debug.LogFormat("hard resync by {0} frames", delta);
-                    m_last_update_time += Time.time; // Time.fixedTime;
+                    m_last_update_time = Time.time; // Time.fixedTime;
                 } else {
                     // soft resync
                     m_last_update_time += 0.1f * delta * Time.fixedDeltaTime;
