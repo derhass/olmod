@@ -471,7 +471,7 @@ namespace GameMod {
                     // NOTE: in the code below, the index [(m_last_messages_ring_pos_last + 4 - i) &3]
                     //       effectively acceses the i-ith most recent element (i starting by 0)
                     //       since 4-(i-1) == 4-i+ 1 = 5-i, 5-i references the next older one
-                    if ( interpolate_ticks >= m_last_messages_ring_count ) {
+                    if ( interpolate_ticks < m_last_messages_ring_count ) {
                         msgA = m_last_messages_ring[(m_last_messages_ring_pos_last + 4 - interpolate_ticks) & 3];
                         msgB = m_last_messages_ring[(m_last_messages_ring_pos_last + 5 - interpolate_ticks) & 3];
                         interpolate_factor = delta_ticks - Mathf.Floor(delta_ticks);
@@ -485,7 +485,6 @@ namespace GameMod {
                         // delta_t is currently relative to the most recent element we have,
                         // but we need it relative to msgA
                         delta_t += Time.fixedDeltaTime * (m_last_messages_ring_count-1);
-                        return;
                     }
                 } else {
                     // extrapolation case
