@@ -252,6 +252,7 @@ namespace GameMod {
                 for (j=0; j<B.m_num_snapshots; j++) {
                     if (A.m_snapshots[i].m_net_id.Value == B.m_snapshots[j].m_net_id.Value) {
                         InterpolatePlayerSnapshot(ref C.m_snapshots[C.m_num_snapshots++], A.m_snapshots[i], B.m_snapshots[j], t);
+                        continue;
                     }
                 }
             }
@@ -271,7 +272,7 @@ namespace GameMod {
                 ExtrapolatePlayerSnapshot(ref C.m_snapshots[C.m_num_snapshots++], B.m_snapshots[i], t);
             }
 
-            C.m_timestamp += t;
+            C.m_timestamp = B.m_timestamp + t;
             return C;
         }
 
