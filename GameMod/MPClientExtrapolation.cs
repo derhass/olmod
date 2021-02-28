@@ -395,14 +395,37 @@ namespace GameMod {
             return null;
         }
 
+        // Deal with the respawn. Return true if the player should not be moved around
+        private static bool HandlePlayerRespawn(Player player, NewPlayerSnapshot snapshot)
+        {
+            // this logic was in vanilla Player.LerpRemotePlayer()
+            if (player.m_lerp_wait_for_respawn_pos) {
+                float num = Vector3.Distance(snapshot.m_pos, player.m_lerp_respawn_pos);
+                float num2 = Vector3.Distance(snapshot.m_pos, player.m_lerp_death_pos);
+                if (num >= num2) {
+                    // still special case for respawning
+                    return true;
+                }
+
+                player.m_lerp_wait_for_respawn_pos = false;
+            }
+            return false;
+        }
+
         public static void interpolatePlayer(Player player, NewPlayerSnapshot A, NewPlayerSnapshot B, float t)
         {
+            if (HandlePlayerRespawn(player,A)) {
+                return;
+            }
             player.c_player_ship.c_transform.localPosition = Vector3.LerpUnclamped(A.m_pos, B.m_pos, t);
             player.c_player_ship.c_transform.rotation = Quaternion.SlerpUnclamped(A.m_rot, B.m_rot, t);
             player.c_player_ship.c_mesh_collider_trans.localPosition = player.c_player_ship.c_transform.localPosition;
         }
 
         public static void extrapolatePlayer(Player player, NewPlayerSnapshot snapshot, float t){
+            if (HandlePlayerRespawn(player,snapshot)) {
+                return;
+            }
             player.c_player_ship.c_transform.localPosition = Vector3.LerpUnclamped(snapshot.m_pos, snapshot.m_pos+snapshot.m_vel, t);
             player.c_player_ship.c_transform.rotation = Quaternion.SlerpUnclamped(snapshot.m_rot, snapshot.m_rot*Quaternion.Euler(snapshot.m_vrot), t);
             player.c_player_ship.c_mesh_collider_trans.localPosition = player.c_player_ship.c_transform.localPosition;
@@ -508,6 +531,7 @@ namespace GameMod {
             {
                 if (player != null && !player.isLocalPlayer && !player.m_spectator)
                 {
+                    // do the actual interpolation or extrapolation, as calculated above
                     if (do_interpolation) {
                         NewPlayerSnapshot A = GetPlayerSnapshot(msgA, player);
                         NewPlayerSnapshot B = GetPlayerSnapshot(msgB, player);
