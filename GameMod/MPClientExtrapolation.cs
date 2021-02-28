@@ -399,13 +399,13 @@ namespace GameMod {
 
         public static void updatePlayerPositions()
         {
-            // float now = NetworkMatch.m_match_elapsed_seconds; // wholycow uses a different time base
-            float now = Time.time;
+            float now = Time.time; // needs to be the same time source we use for m_last_update_time
             NewPlayerSnapshotToClientMessage msgA = null; // interpolation: start 
             NewPlayerSnapshotToClientMessage msgB = null; // interpolation: end, extrapolation start:
             float interpolate_factor = 0.0f;              // interpolation: factor in [0,1]
             float delta_t = 0.0f;
-            int interpolate_frames = 0;
+            int interpolate_ticks = 0;
+            bool do_interpolation = false;
 
             // find out which case we have, and get the relevant snapshot message(s)
             lock (m_last_messages_lock) {
@@ -414,26 +414,45 @@ namespace GameMod {
                     Debug.LogFormat("having snapshot from {0} represents {1}", m_last_messages_ring[(m_last_messages_ring_pos_last + 4 - xxx)&3].m_timestamp, m_last_update_time - xxx* Time.fixedDeltaTime);
                 }
                 */
+                if (m_last_messages_ring_count < 1) {
+                    // we do not have any snapshot messages...
+                    return;
+                }
 
                 delta_t = now + MPClientExtrapolation.GetShipExtrapolationTime() - m_last_update_time;
-                // if we want interpolation, add this as negative offset
-                // we use 0 as the base point which exacty matches the state of the last received message
-                // (as whollycow's code also did)
+                // if we want interpolation, add this as a _negative) offset
+                // we use delta_t=0  as the base for from which we extrapolate into the future
                 delta_t -=  Menus.mms_ship_max_interpolate_frames * Time.fixedDeltaTime;
-                // time difference in physics frames 
-                float delta_frames = delta_t / Time.fixedDeltaTime;
-                interpolate_frames = -(int)Mathf.Floor(delta_frames);
+                // time difference in physics ticks
+                float delta_ticks = delta_t / Time.fixedDeltaTime;
+                // the number of frames we need to interpolate into
+                // <= 0 means no interpolation at all,
+                // 1 would mean we use the second most recent and the most recent snapshot, and so on...
+                interpolate_ticks = -(int)Mathf.Floor(delta_ticks);
+                // do we need to do interpolation?
+                do_interpolation = (interpolate_ticks > 0);
 
-                if (interpolate_frames > 0) {
-                    // we need interpolate_frames + 1 frames in the buffer
-                    if ( interpolate_frames >= m_last_messages_ring_count ) {
+                if (do_interpolation) {
+                    // we need interpolate_ticks + 1 elements in the ring buffer
+                    // NOTE: in the code below, the index [(m_last_messages_ring_pos_last + 4 - i) &3]
+                    //       effectively acceses the i-ith most recent element (i starting by 0)
+                    //       since 4-(i-1) == 4-i+ 1 = 5-i, 5-i references the next older one
+                    if ( interpolate_ticks >= m_last_messages_ring_count ) {
+                        msgA = m_last_messages_ring[(m_last_messages_ring_pos_last + 4 - interpolate_ticks) & 3];
+                        msgB = m_last_messages_ring[(m_last_messages_ring_pos_last + 5 - interpolate_ticks) & 3];
+                        interpolate_factor = delta_ticks - Mathf.Floor(delta_ticks);
+                    } else {
                         // not enough packets received so far
-                        // TODO: this is wrong: we could to extrapolation into the past
+                        // "extrapolate" into the past
+                        do_interpolation = false;
+                        // get the oldest snapshot we have
+                        msgB =  m_last_messages_ring[(m_last_messages_ring_pos_last + 5 - m_last_messages_ring_count) & 3];
+                        // offset the time for the extrapolation
+                        // delta_t is currently relative to the most recent element we have,
+                        // but we need it relative to msgA
+                        delta_t += Time.fixedDeltaTime * (m_last_messages_ring_count-1);
                         return;
                     }
-                    msgA = m_last_messages_ring[(m_last_messages_ring_pos_last + 4 - interpolate_frames) & 3];
-                    msgB = m_last_messages_ring[(m_last_messages_ring_pos_last + 5 - interpolate_frames) & 3];
-                    interpolate_factor = delta_frames - Mathf.Floor(delta_frames);
                 } else {
                     // extrapolation case
                     // use the most recently received snapshot
@@ -443,8 +462,8 @@ namespace GameMod {
             m_last_frame_time = now;
 
             /*
-            Debug.LogFormat("At: {0} Setting: {1} IntFrames: {2}, dt: {3}, IntFact {4}",now,Menus.mms_ship_max_interpolate_frames, interpolate_frames, delta_t, interpolate_factor);
-            if (interpolate_frames > 0) {
+            Debug.LogFormat("At: {0} Setting: {1} IntFrames: {2}, dt: {3}, IntFact {4}",now,Menus.mms_ship_max_interpolate_frames, interpolate_ticks, delta_t, interpolate_factor);
+            if (interpolate_ticks > 0) {
                 Debug.LogFormat("Using A from {0}", msgA.m_timestamp);
                 Debug.LogFormat("Using B from {0}", msgB.m_timestamp);
             } else {
@@ -455,7 +474,12 @@ namespace GameMod {
             // keep statistics
             m_compensation_sum += delta_t;
             m_compensation_count++;
-            m_compensation_interpol_count += (interpolate_frames > 0)?1:0;
+            // NOTE: one can't replace(interpolate_ticks > 0) by do_interpolation here,
+            //       because even in the (interpolate_ticks > 0) case the code above could
+            //       have reset do_interpolation to false because we technically want
+            //       the "extrapolation" into the past thing, but we don't want to count that
+            //       as extrapolation...
+            m_compensation_interpol_count += (interpolate_ticks > 0)?1:0;
             if (Time.time >= m_compensation_last + 5.0 && m_compensation_count > 0) {
                 Debug.LogFormat("ship lag compensation over last {0} frames: {1}ms / {2} physics ticks, {3} interpolation ({4}%)",
                                 m_compensation_count, 1000.0f* (m_compensation_sum/ m_compensation_count),
@@ -473,7 +497,7 @@ namespace GameMod {
             {
                 if (player != null && !player.isLocalPlayer && !player.m_spectator)
                 {
-                    if (interpolate_frames > 0) {
+                    if (do_interpolation) {
                         NewPlayerSnapshot A = GetPlayerSnapshot(msgA, player);
                         NewPlayerSnapshot B = GetPlayerSnapshot(msgB, player);
                         if(A != null && B != null){
