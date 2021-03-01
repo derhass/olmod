@@ -224,6 +224,11 @@ namespace GameMod {
             MPPlayerStateDump.buf.AddNewEnqueue(ref msg);
             MPPlayerStateDump.buf.AddNewTimeSync(0, m_last_update_time, 0.0f);
             lock (m_last_messages_lock) {
+                // the update rate we expect is 60Hz if we're not running at a different time scale
+                // the server will send _less_ packages more far apart in time during a timebomb
+                // sequence, differences can be up to +8ms (timescale reaches 0.7)
+                float scaledDeltaTime = Time.fixedDeltaTime / Time.timeScale;
+
                 if  (m_last_messages_ring_count == 0) {
                     // first packet
                     EnqueueToRing(msg);
@@ -234,10 +239,10 @@ namespace GameMod {
                     // the update rate we expect is 60Hz if we're not running at a different time scale
                     // the server will send _less_ packages more far apart in time during a timebomb
                     // sequence, differences can be up to +8ms (timescale reaches 0.7)
-                    m_last_update_time += Time.fixedDeltaTime / Time.timeScale;
+                    m_last_update_time += scaledDeltaTime;
                 }
                 // check if the time base is still plausible
-                float delta = (Time.realtimeSinceStartup - m_last_update_time)/ Time.fixedDeltaTime; // in ticks
+                float delta = (Time.realtimeSinceStartup - m_last_update_time) / scaledDeltaTime; // in ticks
                 MPPlayerStateDump.buf.AddNewTimeSync(1, m_last_update_time, delta);
                 // allow a sliding window to catch up for latency jitter
                 float frameSoftSyncLimit = 2.0f; ///hard-sync if we're off by more than that many physics ticks
@@ -249,7 +254,7 @@ namespace GameMod {
                 } else {
                     // soft resync
                     float smoothing_factor = 0.1f;
-                    m_last_update_time += smoothing_factor * delta * Time.fixedDeltaTime;
+                    m_last_update_time += smoothing_factor * delta * scaledDeltaTime;
                     MPPlayerStateDump.buf.AddNewTimeSync(3, m_last_update_time, delta);
                 }
             } // end lock
@@ -351,7 +356,7 @@ namespace GameMod {
                 // correct the amount of prediction by the current timescale
                 delta_t *= Time.timeScale;
                 // time difference in physics ticks
-                float delta_ticks = delta_t / Time.fixedDeltaTime;
+                float delta_ticks = delta_t / Time.fixedDeltaTime; // the Time.fixedDeltaTime here is still correct even if timeScale != 1
                 // the number of frames we need to interpolate into
                 // <= 0 means no interpolation at all,
                 // 1 would mean we use the second most recent and the most recent snapshot, and so on...
@@ -377,7 +382,7 @@ namespace GameMod {
                         // offset the time for the extrapolation
                         // delta_t is currently relative to the most recent element we have,
                         // but we need it relative to msgA
-                        delta_t += Time.fixedDeltaTime * (m_last_messages_ring_count-1);
+                        delta_t += Time.fixedDeltaTime * Time.timeScale * (m_last_messages_ring_count-1);
                     }
                 } else {
                     // extrapolation case
