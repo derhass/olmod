@@ -14,6 +14,7 @@ namespace GameMod {
 	public class MPPlayerStateDump {
 		public enum Command : uint {
 			NONE = 0,
+			// Version 1
 			ENQUEUE,
 			UPDATE_BEGIN,
 			UPDATE_END,
@@ -26,8 +27,13 @@ namespace GameMod {
 			LERP_PARAM,
 			INTERPOLATE_PATH_01,
 			INTERPOLATE_PATH_12,
+			// Version 2
+			NEW_ENQUEUE,
+			NEW_TIME_SYNC,
+			NEW_INTERPOLATE,
 			// always add new commands at the end!
-		}	
+		}
+
 		public class Buffer {
 			private FileStream fs;
 			private MemoryStream ms;
@@ -55,12 +61,12 @@ namespace GameMod {
 					Stop();
 				}
 				try {
-        				string basePath = Path.Combine(Application.persistentDataPath, "playerstatedump");
+					string basePath = Path.Combine(Application.persistentDataPath, "playerstatedump");
 					String name = basePath + matchCount + ".olmd";
 					Debug.Log("MPPlayerStateDump: dump started to " + name);
 					fs = File.Create(name);
 					ms.Position = 0;
-					bw.Write((uint)1); // file format version
+					bw.Write((uint)2); // file format version
 					bw.Write((uint)0); // size of extra header, reserved for later versions
 					matchCount++;
 					go = true;
@@ -107,6 +113,33 @@ namespace GameMod {
 				bw.Write(s.m_rot.y);
 				bw.Write(s.m_rot.z);
 				bw.Write(s.m_rot.w);
+			}
+
+			private void WriteNewPlayerSnapshot(ref NewPlayerSnapshot s)
+			{
+				bw.Write(s.m_net_id.Value);
+				bw.Write(s.m_pos.x);
+				bw.Write(s.m_pos.y);
+				bw.Write(s.m_pos.z);
+				bw.Write(s.m_rot.x);
+				bw.Write(s.m_rot.y);
+				bw.Write(s.m_rot.z);
+				bw.Write(s.m_rot.w);
+				bw.Write(s.m_vel.x);
+				bw.Write(s.m_vel.y);
+				bw.Write(s.m_vel.x);
+				bw.Write(s.m_vrot.x);
+				bw.Write(s.m_vrot.y);
+				bw.Write(s.m_vrot.z);
+			}
+
+			private void WriteNewPlayerSnapshotMessage(ref NewPlayerSnapshotToClientMessage m)
+			{
+				bw.Write(m.m_server_timestamp);
+				bw.Write(m.m_num_snapshots);
+				for (int i=0; i<m.m_num_snapshots; i++) {
+					WriteNewPlayerSnapshot(ref m.m_snapshots[i]);
+				}
 			}
 
 			public void AddCommand(uint cmd) {
@@ -304,11 +337,72 @@ namespace GameMod {
 				}
 			}
 
+			public void AddNewEnqueue(ref NewPlayerSnapshotToClientMessage msg)
+			{
+				if (!go) {
+					return;
+				}
+				mtx.WaitOne();
+				try {
+					bw.Write((uint)Command.NEW_ENQUEUE);
+					bw.Write(Time.realtimeSinceStartup);
+					bw.Write(Time.time);
+					WriteNewPlayerSnapshotMessage(ref msg);
+					Flush(false);
+				} catch (Exception e) {
+					Debug.Log("MPPlayerStateDump: failed to dump new snapshot: " + e);
+				} finally {
+					mtx.ReleaseMutex();
+				}
+			}
+
+			public void AddNewInterpolate()
+			{
+				if (!go) {
+					return;
+				}
+				mtx.WaitOne();
+				try {
+					bw.Write((uint)Command.NEW_INTERPOLATE);
+					bw.Write(Time.realtimeSinceStartup);
+					bw.Write(Time.time);
+					bw.Write(Time.unscaledTime);
+					bw.Write(Time.timeScale);
+					bw.Write(NetworkMatch.m_match_elapsed_seconds);
+					Flush(false);
+				} catch (Exception e) {
+					Debug.Log("MPPlayerStateDump: failed to dump new interpolate: " + e);
+				} finally {
+					mtx.ReleaseMutex();
+				}
+			}
+
+			public void AddNewTimeSync(uint place, float last_update_time, float delta)
+			{
+				if (!go) {
+					return;
+				}
+				mtx.WaitOne();
+				try {
+					bw.Write((uint)Command.NEW_TIME_SYNC);
+					bw.Write(place);
+					bw.Write(Time.realtimeSinceStartup);
+					bw.Write(Time.time);
+					bw.Write(last_update_time);
+					bw.Write(delta);
+					Flush(false);
+				} catch (Exception e) {
+					Debug.Log("MPPlayerStateDump: failed to dump new time sync: " + e);
+				} finally {
+					mtx.ReleaseMutex();
+				}
+			}
+
+
 		}
 
 		public static Buffer buf = new Buffer();
 
-    
 		/* these are not working as I had hoped...
 		[HarmonyPatch(typeof(NetworkMatch), "InitBeforeEachMatch")]
 		class MPPlayerStateDump_InitBeforeEachMatch {
@@ -357,7 +451,7 @@ namespace GameMod {
 			}
 		}
 
-        	public static void EnqueueBuffer(PlayerSnapshotToClientMessage msg) {
+		public static void EnqueueBuffer(PlayerSnapshotToClientMessage msg) {
 			buf.AddSnapshot(ref msg);
 		}
 
@@ -365,10 +459,10 @@ namespace GameMod {
 
 		[HarmonyPatch(typeof(Client), "UpdateInterpolationBuffer")]
 		class MPPlayerStateDump_UpdateInterpolationBuffer {
-		        static void Prefix() {
+			static void Prefix() {
 				buf.AddUpdateBegin(Time.time,Client.m_InterpolationStartTime);
 			}
-		        static void Postfix() {
+			static void Postfix() {
 				buf.AddUpdateEnd(Client.m_InterpolationStartTime);
 			}
 		}
@@ -377,26 +471,26 @@ namespace GameMod {
 		/*
 		[HarmonyPatch(typeof(Client), "InterpolateRemotePlayers")]
 		class MPPlayerStateDump_InterpolateRemotePlayers {
-		        static void Prefix() {
-            			int ping = GameManager.m_local_player.m_avg_ping_ms;
+			static void Prefix() {
+						int ping = GameManager.m_local_player.m_avg_ping_ms;
 				buf.AddInterpolateBegin(Time.time, ping);
 			}
-		        static void Postfix() {
+			static void Postfix() {
 				buf.AddCommand((uint)Command.INTERPOLATE_END);
 			}
-        	}
+			}
 		*/
 
 		/*
 		[HarmonyPatch(typeof(Player), "LerpRemotePlayer")]
 		class MPPlayerStateDump_LerpRemotePlayer {
-		        static void Prefix(Player __instance, ref PlayerSnapshot A, ref PlayerSnapshot B, float t) {
+			static void Prefix(Player __instance, ref PlayerSnapshot A, ref PlayerSnapshot B, float t) {
 				buf.AddLerpBegin(__instance.m_lerp_wait_for_respawn_pos,ref A,ref B,t);
 			}
-		        static void Postfix(Player __instance) {
+			static void Postfix(Player __instance) {
 				buf.AddLerpEnd(__instance.m_lerp_wait_for_respawn_pos);
 			}
-        	}
+		}
 		*/
 	}
 }
