@@ -10,6 +10,7 @@ namespace OlmodPlayerDumpState {
 
 enum Command {
 	NONE = 0,
+	// Version 1
 	ENQUEUE,
 	UPDATE_BEGIN,
 	UPDATE_END,
@@ -22,6 +23,10 @@ enum Command {
 	LERP_PARAM,
 	INTERPOLATE_PATH_01,
 	INTERPOLATE_PATH_12,
+	//Version 2
+	NEW_ENQUEUE,
+	NEW_TIME_SYNC,
+	NEW_INTERPOLATE,
 
 	// alwways add new commands here
 	COMMAND_END_MARKER

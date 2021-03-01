@@ -36,6 +36,7 @@ const Player* GameState::FindPlayer(uint32_t id) const
 Interpreter::Interpreter(ResultProcessor& rp, const char *outputPath) :
 	resultProcessor(rp),
 	file(NULL),
+	fileVersion(0),
 	fileName(NULL),
 	outputDir(outputPath),
 	process(false)
@@ -81,16 +82,16 @@ bool Interpreter::OpenFile(const char *filename)
 	fileName = filename;
 	log.Log(Logger::DEBUG, "open: opened '%s'",filename);
 
-	uint32_t version = ReadUint();
+	fileVersion = ReadUint();
 	uint32_t hdrExtraSize = ReadUint();
 	if (!file) {
 		log.Log(Logger::ERROR, "open: failed to read header of '%s'",fileName);
 		return false;
 	}
-	log.Log(Logger::DEBUG, "version: %u",(unsigned)version);
+	log.Log(Logger::DEBUG, "version: %u",(unsigned)fileVersion);
 
-	if (version != 1) {
-		log.Log(Logger::ERROR, "open: version of '%s' not supported: %u",fileName,(unsigned)version);
+	if (fileVersion < 1 || fileVersion > 2) {
+		log.Log(Logger::ERROR, "open: version of '%s' not supported: %u",fileName,(unsigned)fileVersion);
 		return false;
 	}
 	if (hdrExtraSize) {
@@ -154,6 +155,35 @@ void Interpreter::ReadPlayerSnapshot(PlayerSnapshot& s)
 	s.state.rot.v[1] = ReadFloat();
 	s.state.rot.v[2] = ReadFloat();
 	s.state.rot.v[3] = ReadFloat();
+	s.state.vel[0] = 0.0f;
+	s.state.vel[1] = 0.0f;
+	s.state.vel[2] = 0.0f;
+	s.state.vrot[0] = 0.0f;
+	s.state.vrot[1] = 0.0f;
+	s.state.vrot[2] = 0.0f;
+	s.state.message_timestamp = -1.0f;
+	if (!file) {
+		log.Log(Logger::WARN, "failed to read PlayerSnapshot");
+	}
+}
+
+void Interpreter::ReadNewPlayerSnapshot(PlayerSnapshot& s, float ts)
+{
+	s.id = ReadUint();
+	s.state.pos[0] = ReadFloat();
+	s.state.pos[1] = ReadFloat();
+	s.state.pos[2] = ReadFloat();
+	s.state.rot.v[0] = ReadFloat();
+	s.state.rot.v[1] = ReadFloat();
+	s.state.rot.v[2] = ReadFloat();
+	s.state.rot.v[3] = ReadFloat();
+	s.state.vel[0] = ReadFloat();
+	s.state.vel[1] = ReadFloat();
+	s.state.vel[2] = ReadFloat();
+	s.state.vrot[0] = ReadFloat();
+	s.state.vrot[1] = ReadFloat();
+	s.state.vrot[2] = ReadFloat();
+	s.state.message_timestamp = 1.0f;
 	if (!file) {
 		log.Log(Logger::WARN, "failed to read PlayerSnapshot");
 	}
@@ -162,9 +192,25 @@ void Interpreter::ReadPlayerSnapshot(PlayerSnapshot& s)
 uint32_t Interpreter::ReadPlayerSnapshotMessage(PlayerSnapshotMessage& s)
 {
 	uint32_t i, num = ReadUint();
+	s.message_timestamp = -1.0f;
+	s.recv_timestamp = -1.0f;
 	s.snapshot.resize(num);
 	for (i=0; i<num; i++) {
 		ReadPlayerSnapshot(s.snapshot[i]);
+	}
+
+	return num;
+}
+
+uint32_t Interpreter::ReadNewPlayerSnapshotMessage(PlayerSnapshotMessage& s)
+{
+	uint32_t i;
+	s.message_timestamp = ReadFloat();
+	s.recv_timestamp = -1.0f;
+	uint32_t num = ReadUint();
+	s.snapshot.resize(num);
+	for (i=0; i<num; i++) {
+		ReadNewPlayerSnapshot(s.snapshot[i], s.message_timestamp);
 	}
 
 	return num;
@@ -214,6 +260,27 @@ void Interpreter::SimulateInterpolation()
 	}
 }
 
+void Interpreter::UpdatePlayerAtEnqueue(int idx, float ts)
+{
+	if (file) {
+		Player& p = gameState.GetPlayer(currentSnapshots.snapshot[idx].id);
+		p.mostRecentState = currentSnapshots.snapshot[idx].state;
+		if (p.firstSeen < 0.0f) {
+			p.firstSeen = ts;
+		}
+		p.lastSeen = ts;
+		bool isNew;
+		ResultProcessorChannel *rpc = resultProcessor.GetChannel(p.id, 1, isNew);
+		if (isNew) {
+			rpc->SetLogger(&log);
+			rpc->SetName("raw_buffers");
+			rpc->StartStream(GetOutputDir());
+			log.Log(Logger::INFO,"created new result process channel '%s'", rpc->GetName());
+		}
+		rpc->Add(currentSnapshots.snapshot[idx]);
+	}
+}
+
 void Interpreter::ProcessEnqueue()
 {
 	float ts = ReadFloat();
@@ -221,23 +288,22 @@ void Interpreter::ProcessEnqueue()
 	log.Log(Logger::DEBUG, "got ENQUEUE at %fs for %u players", ts, (unsigned)num);
 	for (i=0; i<num; i++) {
 		currentSnapshots.snapshot[i].state.timestamp = ts;
-		if (file) {
-			Player& p = gameState.GetPlayer(currentSnapshots.snapshot[i].id);
-			p.mostRecentState = currentSnapshots.snapshot[i].state;
-			if (p.firstSeen < 0.0f) {
-				p.firstSeen = ts;
-			}
-			p.lastSeen = ts;
-			bool isNew;
-			ResultProcessorChannel *rpc = resultProcessor.GetChannel(p.id, 1, isNew);
-			if (isNew) {
-				rpc->SetLogger(&log);
-				rpc->SetName("raw_buffers");
-				rpc->StartStream(GetOutputDir());
-				log.Log(Logger::INFO,"created new result process channel '%s'", rpc->GetName());
-			}
-			rpc->Add(currentSnapshots.snapshot[i]);
-		}
+		UpdatePlayerAtEnqueue(i, ts);
+	}
+	log.Log(Logger::DEBUG_DETAIL, currentSnapshots);
+	SimulateBufferEnqueue();
+}
+
+void Interpreter::ProcessNewEnqueue()
+{
+	float rts = ReadFloat();
+	float ts = ReadFloat();
+	uint32_t i, num = ReadNewPlayerSnapshotMessage(currentSnapshots);
+	log.Log(Logger::DEBUG, "got NEW ENQUEUE at %fs for %u players", ts, (unsigned)num);
+	currentSnapshots.recv_timestamp = rts;
+	for (i=0; i<num; i++) {
+		currentSnapshots.snapshot[i].state.timestamp = rts;
+		UpdatePlayerAtEnqueue(i, rts);
 	}
 	log.Log(Logger::DEBUG_DETAIL, currentSnapshots);
 	SimulateBufferEnqueue();
@@ -392,6 +458,29 @@ void Interpreter::ProcessLerpParam()
 	log.Log(Logger::DEBUG, "got LERP PARAMETER %f", param);
 }
 
+void Interpreter::ProcessNewTimeSync()
+{
+	uint32_t place = ReadUint();
+	float rts = ReadFloat();
+	float ts = ReadFloat();
+	float update_time = ReadFloat();
+	float delta = ReadFloat();
+
+	log.Log(Logger::DEBUG, "got NEW_TIME_SYNC: Place %u: update_time is now %f, delta %f at rts%f ts%f",
+		(unsigned)place, update_time, delta, rts, ts);
+}
+
+void Interpreter::ProcessNewInterpolate()
+{
+	float rts = ReadFloat();
+	float ts = ReadFloat();
+	float uts = ReadFloat();
+	float scale = ReadFloat();
+	float match = ReadFloat();
+	log.Log(Logger::DEBUG, "got NEW_INTERPOLATE rts %f ts %f uts %f match %f timeScale %f",
+		rts,ts,uts,match,scale);
+}
+
 bool Interpreter::ProcessCommand()
 {
 	if (!file || feof(file) || ferror(file)) {
@@ -438,6 +527,15 @@ bool Interpreter::ProcessCommand()
 		case INTERPOLATE_PATH_12:
 			log.Log(Logger::DEBUG, "got INTERPOLATE_PATH_12");
 			break;
+		case NEW_ENQUEUE:
+			ProcessNewEnqueue();
+			break;
+		case NEW_TIME_SYNC:
+			ProcessNewTimeSync();
+			break;
+		case NEW_INTERPOLATE:
+			ProcessNewInterpolate();
+			break;
 		default:
 			if (file) {
 				log.Log(Logger::ERROR, "INVALID COMMAND 0x%x", (unsigned)cmd);
@@ -463,6 +561,8 @@ void Interpreter::CloseFile()
 
 bool Interpreter::ProcessFile(const char *filename)
 {
+
+	fileVersion = 0;
 
 	if (!OpenFile(filename)) {
 		return false;

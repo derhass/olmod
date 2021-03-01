@@ -12,7 +12,12 @@ namespace OlmodPlayerDumpState {
 struct PlayerState {
 	float pos[3];
 	CQuaternion rot;
-	float timestamp;
+	float timestamp; // not transmitted
+	
+	// in new protocol for 0.3.6RC3
+	float vel[3];
+	float vrot[3]; // euler angles;
+	float message_timestamp; // not directly transmitted, but in the parent message
 
 	void Invalidate()
 	{
@@ -25,7 +30,17 @@ struct PlayerState {
 		rot.v[2] = 0.0f;
 		rot.v[3] = 1.0f;
 
-		timestamp = -1;
+		timestamp = -1.0f;
+
+		vel[0]=0.0f;
+		vel[1]=0.0f;
+		vel[2]=0.0f;
+
+		vrot[0]=0.0f;
+		vrot[1]=0.0f;
+		vrot[2]=0.0f;
+
+		message_timestamp = -1.0f;
 	}
 };
 
@@ -40,6 +55,8 @@ struct PlayerSnapshot {
 };
 
 struct PlayerSnapshotMessage {
+	float message_timestamp;
+	float recv_timestamp;
 	std::vector<PlayerSnapshot> snapshot;
 };
 

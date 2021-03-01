@@ -35,6 +35,7 @@ class Interpreter {
 		ResultProcessor& resultProcessor;
 		GameState gameState;
 		std::FILE *file;
+		uint32_t fileVersion;
 		const char *fileName;
 		const char *outputDir;
 		bool process;
@@ -51,12 +52,17 @@ class Interpreter {
 		float ReadFloat();
 		void ReadPlayerSnapshot(PlayerSnapshot& s);
 		uint32_t ReadPlayerSnapshotMessage(PlayerSnapshotMessage& s);
+		void ReadNewPlayerSnapshot(PlayerSnapshot& s, float ts);
+		uint32_t ReadNewPlayerSnapshotMessage(PlayerSnapshotMessage& s);
 
 	        void SimulateBufferEnqueue();
 		void SimulateBufferUpdate();
 		void SimulateInterpolation();
 
+		void UpdatePlayerAtEnqueue(int idx, float ts);
+
 		void ProcessEnqueue();
+		void ProcessNewEnqueue();
 		void ProcessUpdateBegin();
 		void ProcessUpdateEnd();
 		void ProcessInterpolateBegin();
@@ -65,6 +71,8 @@ class Interpreter {
 		void ProcessLerpEnd();
 		void ProcessUpdateBufferContents();
 		void ProcessLerpParam();
+		void ProcessNewTimeSync();
+		void ProcessNewInterpolate();
 
 		bool ProcessCommand();
 

@@ -109,10 +109,13 @@ void Logger::Log(LogLevel l, const PlayerState& s, int indent)
 
 	char buf[32];
 	MakeIndent(buf, sizeof(buf), indent);
-	Log(l, "%spos (%f %f %f) rot (%f %f %f %f) timestamp %fs",
+	Log(l, "%spos (%f %f %f) rot (%f %f %f %f) vel(%f %f %f) vrot(%f %f %f) timestamp %fs msgtimestamp %fs",
 		buf, s.pos[0], s.pos[1], s.pos[2],
 		s.rot.v[0], s.rot.v[1], s.rot.v[2], s.rot.v[3],
-		s.timestamp);
+		s.vel[0],s.vel[1],s.vel[2],
+		s.vrot[0],s.vrot[1],s.vrot[2],
+		s.timestamp,
+		s.message_timestamp);
 }
 
 void Logger::Log(LogLevel l, const PlayerSnapshot& s, int indent)
@@ -135,7 +138,7 @@ void Logger::Log(LogLevel l, const PlayerSnapshotMessage& msg, int indent)
 
 	char buf[32];
 	MakeIndent(buf, sizeof(buf), indent);
-	Log(l, "%sPlayerSnapshotMessage %u players", buf, (unsigned)msg.snapshot.size());
+	Log(l, "%sPlayerSnapshotMessage %u players msgtimestamp %fs recvts %fs", buf, (unsigned)msg.snapshot.size(),msg.message_timestamp,msg.recv_timestamp);
 	for (size_t i=0; i<msg.snapshot.size(); i++) {
 		Log(l,msg.snapshot[i], indent+2);
 	}
