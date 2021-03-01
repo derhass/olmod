@@ -166,7 +166,7 @@ namespace GameMod {
         // ship interpolation OR extrapolation for clients
         public static float m_last_update_time;
         public static float m_last_frame_time;
-        public static double m_time_offset; // how much our client's Time.time deviates from Time.realTime
+        public static float m_time_offset; // how much our client's Time.time deviates from the real time ssource, during timebombs
 
         // simple statistic
         public static float m_compensation_sum;
@@ -201,7 +201,7 @@ namespace GameMod {
         // resets all history data and metadata we keep
         public static void ResetForNewMatch()
         {
-            m_time_offset = 0.0;
+            m_time_offset = 0.0f;
             lock (m_last_messages_lock) {
                 ClearRing();
                 m_last_update_time = Time.time;
@@ -245,7 +245,7 @@ namespace GameMod {
                     // hard resync
                     Debug.LogFormat("hard resync by {0} frames", delta);
                     m_last_update_time = Time.realtimeSinceStartup;
-                    m_time_offset = 0.0;
+                    m_time_offset = 0.0f;
                     MPPlayerStateDump.buf.AddNewTimeSync(2, m_last_update_time, delta);
                 } else {
                     // soft resync
@@ -315,12 +315,30 @@ namespace GameMod {
             MPPlayerStateDump.buf.AddNewInterpolate();
             // keep our game clock synchronized to the real time clock 
             // (timebombs slow down the time via Time.timeScale)
+            // after the time scale, we have some offset left ...
+            // during timescale, the server runs in normal time and sends new ship
+            // positions which move with the ships in normal time,
+            // the client shows them displayed slowed down due to it's local
+            // time.Time being scaled. The client has to recover _somehow_
+            // Originall vanilla game seems to get away by this via the original 5 frame
+            // interpolation scheme.
+            // However, we need to resync to the server
+            // a timebomb is a total of 120ms desync, work it off
             if (Mathf.Abs(Time.timeScale - 1.0f) > 0.001f) {
-                // game time not running as normal
-                // accumulate the differences in double precision
-                m_time_offset +=  (double)Time.deltaTime - (double)Time.unscaledDeltaTime;
+                // game time not running as normal,
+                // accumulate the offset
+                m_time_offset +=  Time.deltaTime - Time.unscaledDeltaTime;
+            } else if (m_time_offset > 0.001f) {
+                m_time_offset = Mathf.Max(m_time_offset - 0.5f * Time.deltaTime, 0.0f);
+            } else if (m_time_offset < 0.001f) {
+                m_time_offset = Mathf.Min(m_time_offset + 0.5f * Time.deltaTime, 0.0f);
+            } else {
+                m_time_offset = 0.0f;
             }
-            double now = (double)Time.realtimeSinceStartup + m_time_offset; // needs to be the same time source we use for m_last_update_time
+            // now needs to be the same time source we use for m_last_update_time
+            // and unscaledTime is just the realtimeSinceStartup quantized to the
+            // start point of the current frame
+            float now = Time.unscaledTime + m_time_offset;
             NewPlayerSnapshotToClientMessage msgA = null; // interpolation: start
             NewPlayerSnapshotToClientMessage msgB = null; // interpolation: end, extrapolation start
             float interpolate_factor = 0.0f;              // interpolation: factor in [0,1]
@@ -340,7 +358,7 @@ namespace GameMod {
                     return;
                 }
 
-                delta_t = (float) (now + (double)MPClientExtrapolation.GetShipExtrapolationTime() - (double)m_last_update_time);
+                delta_t = now + MPClientExtrapolation.GetShipExtrapolationTime() - m_last_update_time;
                 // if we want interpolation, add this as a _negative) offset
                 // we use delta_t=0  as the base for from which we extrapolate into the future
                 delta_t -=  Menus.mms_ship_max_interpolate_frames * Time.fixedDeltaTime;
@@ -379,7 +397,7 @@ namespace GameMod {
                     msgB = m_last_messages_ring[m_last_messages_ring_pos_last];
                 }
             } // lock
-            m_last_frame_time = (float)now;
+            m_last_frame_time = now;
 
             /*
             Debug.LogFormat("At: {0} Setting: {1} IntFrames: {2}, dt: {3}, IntFact {4}",now,Menus.mms_ship_max_interpolate_frames, interpolate_ticks, delta_t, interpolate_factor);
