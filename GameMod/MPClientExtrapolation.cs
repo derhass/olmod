@@ -166,6 +166,7 @@ namespace GameMod {
         // ship interpolation OR extrapolation for clients
         public static float m_last_update_time;
         public static float m_last_frame_time;
+        public static double m_time_offset; // how much our client's Time.time deviates from Time.realTime
 
         // simple statistic
         public static float m_compensation_sum;
@@ -200,6 +201,7 @@ namespace GameMod {
         // resets all history data and metadata we keep
         public static void ResetForNewMatch()
         {
+            m_time_offset = 0.0;
             lock (m_last_messages_lock) {
                 ClearRing();
                 m_last_update_time = Time.time;
@@ -227,21 +229,23 @@ namespace GameMod {
                 if  (m_last_messages_ring_count == 0) {
                     // first packet
                     EnqueueToRing(msg);
-                    m_last_update_time = Time.time;
+                    m_last_update_time = Time.realtimeSinceStartup;
+                    m_time_offset = 0.0f;
                 } else {
                     // next in sequence, as we expected
                     EnqueueToRing(msg);
                     m_last_update_time += Time.fixedDeltaTime;
                 }
                 // check if the time base is still plausible
-                float delta = (Time.time - m_last_update_time)/ Time.fixedDeltaTime; // in ticks
+                float delta = (Time.realtimeSinceStartup - m_last_update_time)/ Time.fixedDeltaTime; // in ticks
                 MPPlayerStateDump.buf.AddNewTimeSync(1, m_last_update_time, delta);
                 // allow a sliding window to catch up for latency jitter
                 float frameSoftSyncLimit = 2.0f; ///hard-sync if we're off by more than that many physics ticks
                 if (delta < -frameSoftSyncLimit || delta > frameSoftSyncLimit) {
                     // hard resync
                     Debug.LogFormat("hard resync by {0} frames", delta);
-                    m_last_update_time = Time.time;
+                    m_last_update_time = Time.realtimeSinceStartup;
+                    m_time_offset = 0.0;
                     MPPlayerStateDump.buf.AddNewTimeSync(2, m_last_update_time, delta);
                 } else {
                     // soft resync
@@ -309,7 +313,14 @@ namespace GameMod {
         public static void updatePlayerPositions()
         {
             MPPlayerStateDump.buf.AddNewInterpolate();
-            float now = Time.time; // needs to be the same time source we use for m_last_update_time
+            // keep our game clock synchronized to the real time clock 
+            // (timebombs slow down the time via Time.timeScale)
+            if (Mathf.Abs(Time.timeScale - 1.0f) > 0.001f) {
+                // game time not running as normal
+                // accumulate the differences in double precision
+                m_time_offset +=  (double)Time.deltaTime - (double)Time.unscaledDeltaTime;
+            }
+            double now = (double)Time.realtimeSinceStartup + m_time_offset; // needs to be the same time source we use for m_last_update_time
             NewPlayerSnapshotToClientMessage msgA = null; // interpolation: start
             NewPlayerSnapshotToClientMessage msgB = null; // interpolation: end, extrapolation start
             float interpolate_factor = 0.0f;              // interpolation: factor in [0,1]
@@ -329,7 +340,7 @@ namespace GameMod {
                     return;
                 }
 
-                delta_t = now + MPClientExtrapolation.GetShipExtrapolationTime() - m_last_update_time;
+                delta_t = (float) (now + (double)MPClientExtrapolation.GetShipExtrapolationTime() - (double)m_last_update_time);
                 // if we want interpolation, add this as a _negative) offset
                 // we use delta_t=0  as the base for from which we extrapolate into the future
                 delta_t -=  Menus.mms_ship_max_interpolate_frames * Time.fixedDeltaTime;
@@ -368,7 +379,7 @@ namespace GameMod {
                     msgB = m_last_messages_ring[m_last_messages_ring_pos_last];
                 }
             } // lock
-            m_last_frame_time = now;
+            m_last_frame_time = (float)now;
 
             /*
             Debug.LogFormat("At: {0} Setting: {1} IntFrames: {2}, dt: {3}, IntFact {4}",now,Menus.mms_ship_max_interpolate_frames, interpolate_ticks, delta_t, interpolate_factor);
