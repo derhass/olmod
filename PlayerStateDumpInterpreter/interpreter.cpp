@@ -593,8 +593,8 @@ void Interpreter::ProcessNewPlayerResult()
 	ReadPlayerSnapshot(p);
 	p.state.timestamp=ts;
 	p.state.realTimestamp=rts; // TODO encode now somewhere
-	log.Log(Logger::DEBUG, "got NEW_PLAYER_RESULT for player %u: mtype %u rts %f ts %f now %f match %f timeScale %f",
-		(unsigned)p.id,(unsigned)mtype,rts,ts,now,p.id);
+	log.Log(Logger::DEBUG, "got NEW_PLAYER_RESULT for player %u: mtype %u rts %f ts %f now %f",
+		(unsigned)p.id,(unsigned)mtype,rts,ts,now);
 
 	bool isNew;
 	ResultProcessorChannel *rpc = resultProcessor.GetChannel(p.id, 3, isNew);
