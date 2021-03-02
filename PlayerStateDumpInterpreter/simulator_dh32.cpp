@@ -136,10 +136,10 @@ bool Derhass32::DoInterpolation(const InterpolationCycle& interpolationInfo, Int
 		return false;
 	}
 
-	delta_t = now + GetShipExtrapolationTime() - m_last_update_time;
+	delta_t = now + interpolationInfo.timeScale * GetShipExtrapolationTime() - m_last_update_time;
 	// if we want interpolation, add this as a _negative) offset
 	// we use delta_t=0  as the base for from which we extrapolate into the future
-	delta_t -= mms_ship_max_interpolate_frames * fixedDeltaTime;
+	delta_t -= mms_ship_max_interpolate_frames * (fixedDeltaTime * interpolationInfo.timeScale);
 	// time difference in physics ticks
 	float delta_ticks = delta_t / fixedDeltaTime;
 	// the number of frames we need to interpolate into

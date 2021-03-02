@@ -172,7 +172,7 @@ bool Derhass33::DoInterpolation(const InterpolationCycle& interpolationInfo, Int
 			// offset the time for the extrapolation
 			// delta_t is currently relative to the most recent element we have,
 			// but we need it relative to msgA
-			delta_t += fixedDeltaTime * interpolationInfo.timeScale * (m_last_messages_ring_count-1);
+			delta_t += fixedDeltaTime * /*interpolationInfo.timeScale */ (m_last_messages_ring_count-1);
 			instrp[INSTR_EXTRAPOLATE_PAST].count++;
 		}
 	} else {
