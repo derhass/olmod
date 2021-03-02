@@ -27,6 +27,7 @@ enum Command {
 	NEW_ENQUEUE,
 	NEW_TIME_SYNC,
 	NEW_INTERPOLATE,
+	NEW_PLAYER_RESULT,
 
 	// alwways add new commands here
 	COMMAND_END_MARKER
@@ -35,7 +36,7 @@ enum Command {
 struct UpdateBufferContents {
 	float timestamp;
 	int size;
-	uint before;
+	uint32_t before;
 	PlayerSnapshotMessage A;
 	PlayerSnapshotMessage B;
 	PlayerSnapshotMessage C;
@@ -67,6 +68,12 @@ struct InterpolationCycle {
 	int ping;
 	std::vector<LerpCycle> lerps;
 	UpdateBufferContents interpol;
+	// Version 2
+	float realTimestamp;
+	float unscaledTimestamp;
+	float matchTimestamp;
+	float timeScale;	
+
 
 	InterpolationCycle() :
 		valid(false)
@@ -79,6 +86,20 @@ struct InterpolationCycle {
 			}
 		}
 		return NULL;
+	}
+};
+
+struct NewTimesync {
+	float realTimestamp;
+	float timestamp;
+	float last_update_time;
+	float delta;
+
+	void Invalidate() {
+		realTimestamp = -1.0f;
+		timestamp = -1.0f;
+		last_update_time = -1.0f;
+		delta = -1.0f;
 	}
 };
 

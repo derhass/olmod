@@ -18,6 +18,7 @@ struct PlayerState {
 	float vel[3];
 	float vrot[3]; // euler angles;
 	float message_timestamp; // not directly transmitted, but in the parent message
+	float realTimestamp; // not transmitted
 
 	void Invalidate()
 	{
@@ -40,6 +41,7 @@ struct PlayerState {
 		vrot[1]=0.0f;
 		vrot[2]=0.0f;
 
+		realTimestamp = -1.0f;
 		message_timestamp = -1.0f;
 	}
 };

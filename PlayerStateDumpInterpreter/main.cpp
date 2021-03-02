@@ -2,6 +2,9 @@
 #include "simulator_original.h"
 #include "simulator_36rc2.h"
 #include "simulator_dh1.h"
+#include "simulator_cow1.h"
+#include "simulator_dh32.h"
+#include "simulator_dh33.h"
 
 #include <clocale>
 
@@ -26,6 +29,7 @@ int main(int argc, char **argv)
 	interpreter.AddSimulator(sOVL);
 	sOVL.SetLogging(levelSim,  dir);
 
+	/*
 	OlmodPlayerDumpState::Simulator::Olmod36RC2 sOlmod36RC2(rp);
 	sOlmod36RC2.Configure("max=0;scale=0;ping=0;");
 	interpreter.AddSimulator(sOlmod36RC2);
@@ -50,6 +54,32 @@ int main(int argc, char **argv)
 	sDH1c.Configure("max=1000;scale=100;ping=34;");
 	interpreter.AddSimulator(sDH1c);
 	sDH1c.SetLogging(levelSim,  dir);
+	*/
+
+	OlmodPlayerDumpState::Simulator::Cow1 sCow1(rp);
+	sCow1.Configure("max=0;scale=0;ping=0;");
+	interpreter.AddSimulator(sCow1);
+	sCow1.SetLogging(levelSim,  dir);
+
+	OlmodPlayerDumpState::Simulator::Derhass32 sDH32(rp);
+	sDH32.Configure("max=0;scale=0;ping=0;interpol=2;");
+	interpreter.AddSimulator(sDH32);
+	sDH32.SetLogging(levelSim,  dir);
+
+	OlmodPlayerDumpState::Simulator::Derhass32 sDH32b(rp);
+	sDH32b.Configure("max=0;scale=0;ping=0;interpol=0;");
+	interpreter.AddSimulator(sDH32b);
+	sDH32b.SetLogging(levelSim,  dir);
+
+	OlmodPlayerDumpState::Simulator::Derhass33 sDH33(rp);
+	sDH33.Configure("max=0;scale=0;ping=0;interpol=2;");
+	interpreter.AddSimulator(sDH33);
+	sDH33.SetLogging(levelSim,  dir);
+
+	OlmodPlayerDumpState::Simulator::Derhass33 sDH33b(rp);
+	sDH33b.Configure("max=0;scale=0;ping=0;interpol=0;");
+	interpreter.AddSimulator(sDH33b);
+	sDH33b.SetLogging(levelSim,  dir);
 
 	int exit_code = !interpreter.ProcessFile((argc > 1)?argv[1]:"playerstatedump0.olmd");
 	return exit_code;

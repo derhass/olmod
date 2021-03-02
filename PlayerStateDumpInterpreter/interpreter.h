@@ -16,6 +16,8 @@
 
 namespace OlmodPlayerDumpState {
 
+const uint32_t NewTimesyncCount = 4;
+
 class ResultProcessor;
 
 struct GameState {
@@ -24,7 +26,16 @@ struct GameState {
 	float m_InterpolationStartTime;
 	int ping;
 
+	//Version 2
+	float timeScale;
+	NewTimesync timeSync[NewTimesyncCount];
+	NewTimesync timeSyncAfter;
+	float lastRealTimestamp;
+	float lastTimestamp;
+	float lastMatchTimestamp;
+
 	GameState();
+	void Reset();
 	Player& GetPlayer(uint32_t id);
 	const Player* FindPlayer(uint32_t id) const;
 };
@@ -73,6 +84,7 @@ class Interpreter {
 		void ProcessLerpParam();
 		void ProcessNewTimeSync();
 		void ProcessNewInterpolate();
+		void ProcessNewPlayerResult();
 
 		bool ProcessCommand();
 

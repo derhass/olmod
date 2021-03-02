@@ -240,8 +240,10 @@ bool Derhass1::LerpRemotePlayer(PlayerSnapshot& p, size_t idx, const Interpolati
 	float rot_lookahead = lookahead * .5f;
 
 	lerp(A.state.pos,B.state.pos,p.state.pos,t + lookahead);
+	lerp(A.state.vel,B.state.vel,p.state.vel,t + lookahead);
 	slerp(A.state.rot, B.state.rot,p.state.rot,t + rot_lookahead);
 	p.state.timestamp = interpolationInfo.timestamp;
+	p.state.realTimestamp = interpolationInfo.realTimestamp;
 
 	const LerpCycle *lc = interpolationInfo.FindLerp(p.id);
 	if (lc) {

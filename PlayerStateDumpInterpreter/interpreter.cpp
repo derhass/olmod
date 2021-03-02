@@ -6,10 +6,29 @@
 namespace OlmodPlayerDumpState {
 
 GameState::GameState() :
-	playersCycle(0),
-	m_InterpolationStartTime(-1.0f),
-	ping(0)
-{}
+	playersCycle(0)
+{
+	Reset();
+}
+
+void GameState::Reset()
+{
+	playersCycle++;
+	players.clear();
+
+	m_InterpolationStartTime = -1.0f;
+	ping = 0;
+	timeScale = 1.0;
+
+	for (uint32_t i=0; i<NewTimesyncCount; i++) {
+		timeSync[i].Invalidate();
+	}
+	timeSyncAfter.Invalidate();
+
+	lastRealTimestamp = -1.0f;
+	lastTimestamp = -1.0f;
+	lastMatchTimestamp = -1.0f;
+}
 
 Player& GameState::GetPlayer(uint32_t id)
 {
@@ -161,6 +180,8 @@ void Interpreter::ReadPlayerSnapshot(PlayerSnapshot& s)
 	s.state.vrot[0] = 0.0f;
 	s.state.vrot[1] = 0.0f;
 	s.state.vrot[2] = 0.0f;
+	s.state.timestamp = -1.0f;
+	s.state.realTimestamp = -1.0f;
 	s.state.message_timestamp = -1.0f;
 	if (!file) {
 		log.Log(Logger::WARN, "failed to read PlayerSnapshot");
@@ -183,7 +204,9 @@ void Interpreter::ReadNewPlayerSnapshot(PlayerSnapshot& s, float ts)
 	s.state.vrot[0] = ReadFloat();
 	s.state.vrot[1] = ReadFloat();
 	s.state.vrot[2] = ReadFloat();
-	s.state.message_timestamp = 1.0f;
+	s.state.timestamp = -1.0f;
+	s.state.realTimestamp = -1.0f;
+	s.state.message_timestamp = -1.0f;
 	if (!file) {
 		log.Log(Logger::WARN, "failed to read PlayerSnapshot");
 	}
@@ -291,6 +314,7 @@ void Interpreter::ProcessEnqueue()
 		UpdatePlayerAtEnqueue(i, ts);
 	}
 	log.Log(Logger::DEBUG_DETAIL, currentSnapshots);
+	gameState.lastTimestamp = ts;
 	SimulateBufferEnqueue();
 }
 
@@ -299,13 +323,16 @@ void Interpreter::ProcessNewEnqueue()
 	float rts = ReadFloat();
 	float ts = ReadFloat();
 	uint32_t i, num = ReadNewPlayerSnapshotMessage(currentSnapshots);
-	log.Log(Logger::DEBUG, "got NEW ENQUEUE at %fs for %u players", ts, (unsigned)num);
+	log.Log(Logger::DEBUG, "got NEW ENQUEUE at rts%fs ts%fs for %u players", rts, ts, (unsigned)num);
 	currentSnapshots.recv_timestamp = rts;
 	for (i=0; i<num; i++) {
-		currentSnapshots.snapshot[i].state.timestamp = rts;
-		UpdatePlayerAtEnqueue(i, rts);
+		currentSnapshots.snapshot[i].state.realTimestamp = rts;
+		currentSnapshots.snapshot[i].state.timestamp = ts;
+		UpdatePlayerAtEnqueue(i, ts);
 	}
 	log.Log(Logger::DEBUG_DETAIL, currentSnapshots);
+	gameState.lastTimestamp = ts;
+	gameState.lastRealTimestamp = rts;
 	SimulateBufferEnqueue();
 }
 
@@ -324,6 +351,7 @@ void Interpreter::ProcessUpdateEnd()
 	update.m_InterpolationStartTime_after = ReadFloat();
 
 	log.Log(Logger::DEBUG, "got UPDATE_END interpolStart: %fs", update.m_InterpolationStartTime_after);
+	gameState.lastTimestamp = update.timestamp;
 	if (update.valid) {
 		SimulateBufferUpdate();
 	}
@@ -339,11 +367,18 @@ void Interpreter::ProcessInterpolateBegin()
 	gameState.ping = interpolation.ping;
 	log.Log(Logger::DEBUG, "got INTERPOLATE_BEGIN at %fs ping %d", interpolation.timestamp, interpolation.ping);
 	interpolation.lerps.clear();
+
+	// we don't have these v2 data
+	interpolation.realTimestamp = -1.0f;
+	interpolation.unscaledTimestamp = -1.0f;
+	interpolation.matchTimestamp = -1.0f;
+	interpolation.timeScale = -1.0f;
 }
 
 void Interpreter::ProcessInterpolateEnd()
 {
 	log.Log(Logger::DEBUG, "got INTERPOLATE_END");
+	gameState.lastTimestamp = interpolation.timestamp;
 	if (interpolation.valid) {
 		SimulateInterpolation();
 	}
@@ -468,6 +503,18 @@ void Interpreter::ProcessNewTimeSync()
 
 	log.Log(Logger::DEBUG, "got NEW_TIME_SYNC: Place %u: update_time is now %f, delta %f at rts%f ts%f",
 		(unsigned)place, update_time, delta, rts, ts);
+
+	if (place < NewTimesyncCount) {
+		NewTimesync &n = gameState.timeSync[place];
+		n.realTimestamp = rts;
+		n.timestamp = ts;
+		n.last_update_time = update_time;
+		n.delta = delta;
+
+		if (place > 1) {
+			gameState.timeSyncAfter = n;
+		}
+	}
 }
 
 void Interpreter::ProcessNewInterpolate()
@@ -479,6 +526,86 @@ void Interpreter::ProcessNewInterpolate()
 	float match = ReadFloat();
 	log.Log(Logger::DEBUG, "got NEW_INTERPOLATE rts %f ts %f uts %f match %f timeScale %f",
 		rts,ts,uts,match,scale);
+
+	interpolation.timestamp = ts;
+	interpolation.realTimestamp = rts;
+	interpolation.unscaledTimestamp = uts;
+	interpolation.matchTimestamp = match;
+	interpolation.timeScale = scale;
+
+	interpolation.valid = true;
+	interpolation.ping = 30.0f; // TODO made this up...
+	gameState.ping = interpolation.ping;
+	gameState.timeScale = scale;
+
+	interpolation.valid=true;
+
+	// Fake date for V1: update cycle
+	update.valid = true;
+	update.timestamp = ts;
+	update.before.timestamp = -1.0f;
+	update.after.timestamp = -1.0f;
+	update.m_InterpolationStartTime_before = -1.0f;
+	update.m_InterpolationStartTime_after = -1.0f;
+	gameState.lastTimestamp = ts;
+	gameState.lastRealTimestamp = rts;
+	gameState.lastMatchTimestamp = match;
+
+	if (update.valid) {
+		SimulateBufferUpdate();
+	}
+	update.valid = false;
+
+	// Fake data for V1: LERP cycles
+	interpolation.lerps.clear();
+	PlayerMap::iterator it;
+	for (it = gameState.players.begin(); it != gameState.players.end(); it++) {
+		Player& p=it->second;
+		LerpCycle c;
+		c.waitForRespawn_before = 0;
+		c.waitForRespawn_after = 0;
+		c.A.id = p.id;
+		c.A.state.Invalidate();
+		c.B.id = p.id;
+		c.B.state.Invalidate();
+		c.A.state.timestamp = -1.0f; /// we do not know
+		c.B.state.timestamp = -1.0f; /// we do not know
+		c.t=0.0f;
+		interpolation.lerps.push_back(c);
+		p.waitForRespawnReset = 0;
+		p.waitForRespawn=c.waitForRespawn_before;
+		p.origState.Invalidate();
+	}
+
+	if (interpolation.valid) {
+		SimulateInterpolation();
+	}
+	interpolation.valid=false;
+}
+
+void Interpreter::ProcessNewPlayerResult()
+{
+	PlayerSnapshot p;
+	uint32_t mtype = ReadUint();
+	float rts = ReadFloat();
+	float ts = ReadFloat();
+	float now = ReadFloat();
+	ReadPlayerSnapshot(p);
+	p.state.timestamp=ts;
+	p.state.realTimestamp=rts; // TODO encode now somewhere
+	log.Log(Logger::DEBUG, "got NEW_PLAYER_RESULT for player %u: mtype %u rts %f ts %f now %f match %f timeScale %f",
+		(unsigned)p.id,(unsigned)mtype,rts,ts,now,p.id);
+
+	bool isNew;
+	ResultProcessorChannel *rpc = resultProcessor.GetChannel(p.id, 3, isNew);
+	if (isNew) {
+		rpc->SetLogger(&log);
+		rpc->SetName("captured_results");
+		rpc->StartStream(GetOutputDir());
+		log.Log(Logger::INFO,"created new result process channel '%s'", rpc->GetName());
+	}
+	rpc->Add(p);
+	log.Log(Logger::DEBUG_DETAIL, p);
 }
 
 bool Interpreter::ProcessCommand()
@@ -536,6 +663,9 @@ bool Interpreter::ProcessCommand()
 		case NEW_INTERPOLATE:
 			ProcessNewInterpolate();
 			break;
+		case NEW_PLAYER_RESULT:
+			ProcessNewPlayerResult();
+			break;
 		default:
 			if (file) {
 				log.Log(Logger::ERROR, "INVALID COMMAND 0x%x", (unsigned)cmd);
@@ -570,6 +700,7 @@ bool Interpreter::ProcessFile(const char *filename)
 
 	process = true;
 	resultProcessor.Clear();
+	gameState.Reset();
 
 	for (SimulatorSet::iterator it=simulators.begin(); it!=simulators.end(); it++) {
 		SimulatorBase *sim = (*it);

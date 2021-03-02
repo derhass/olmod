@@ -70,7 +70,7 @@ bool ResultProcessorChannelBase::StartStream(const char *dir)
 		if (fStream) {
 			log->Log(Logger::INFO,"rpc %s: streaming to '%s'", name.c_str(), str.str().c_str());
 		} else {
-			log->Log(Logger::WARN,"rpc $s: failed to stream to '%s'", name.c_str(),str.str().c_str());
+			log->Log(Logger::WARN,"rpc %s: failed to stream to '%s'", name.c_str(),str.str().c_str());
 		}
 	}
 	return (fStream != NULL);
@@ -112,7 +112,7 @@ void ResultProcessorChannel::StreamOut(const PlayerState& s, size_t idx)
 	float yawPitchRoll[3];
 
 	s.rot.ToEuler(yawPitchRoll);
-	fprintf(fStream, "%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f",
+	fprintf(fStream, "%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f",
 			s.timestamp,
 			s.pos[0],
 			s.pos[1],
@@ -121,6 +121,7 @@ void ResultProcessorChannel::StreamOut(const PlayerState& s, size_t idx)
 			s.rot.v[1],
 			s.rot.v[2],
 			s.rot.v[3],
+			s.realTimestamp,
 			s.vel[0],
 			s.vel[1],
 			s.vel[2]
@@ -133,6 +134,7 @@ void ResultProcessorChannel::StreamOut(const PlayerState& s, size_t idx)
 	if (resultProcessor.dumpDeltaPos && idx != (size_t)-1 && idx > 0) {
 		const PlayerState b=data[idx-1];
 		fprintf(fStream, "\t%f",s.timestamp-b.timestamp);
+		fprintf(fStream, "\t%f",s.realTimestamp-b.realTimestamp);
 		for (int k=0; k<3; k++) {
 			fprintf(fStream, "\t%f",s.pos[k]-b.pos[k]);
 			
@@ -227,7 +229,9 @@ void ResultProcessorAuxChannel::Add(const PlayerState& s)
 void ResultProcessorAuxChannel::FlushCurrent()
 {
 	if (currentData.size() > 0) {
-		StreamOut();
+		if (fStream) {
+			StreamOut();
+		}
 		currentData.clear();
 	}
 }
