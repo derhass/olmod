@@ -382,7 +382,7 @@ namespace GameMod {
                         // offset the time for the extrapolation
                         // delta_t is currently relative to the most recent element we have,
                         // but we need it relative to msgA
-                        delta_t += Time.fixedDeltaTime * Time.timeScale * (m_last_messages_ring_count-1);
+                        delta_t += Time.fixedDeltaTime * (m_last_messages_ring_count-1);
                     }
                 } else {
                     // extrapolation case
