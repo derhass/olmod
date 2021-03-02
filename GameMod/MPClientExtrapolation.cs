@@ -434,11 +434,13 @@ namespace GameMod {
                         NewPlayerSnapshot B = GetPlayerSnapshot(msgB, player);
                         if(A != null && B != null){
                             interpolatePlayer(player, A, B, interpolate_factor);
+                            MPPlayerStateDump.buf.AddNewPlayerResult(0,now,A.m_net_id.Value,player.c_player_ship.c_transform.localPosition,player.c_player_ship.c_transform.rotation);
                         }
                     } else {
                         NewPlayerSnapshot snapshot = GetPlayerSnapshot(msgB, player);
                         if(snapshot != null){
                             extrapolatePlayer(player, snapshot, delta_t);
+                            MPPlayerStateDump.buf.AddNewPlayerResult(1,now,snapshot.m_net_id.Value,player.c_player_ship.c_transform.localPosition,player.c_player_ship.c_transform.rotation);
                         }
                     }
                 }

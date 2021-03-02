@@ -31,6 +31,7 @@ namespace GameMod {
 			NEW_ENQUEUE,
 			NEW_TIME_SYNC,
 			NEW_INTERPOLATE,
+			NEW_PLAYER_RESULT,
 			// always add new commands at the end!
 		}
 
@@ -393,6 +394,34 @@ namespace GameMod {
 					Flush(false);
 				} catch (Exception e) {
 					Debug.Log("MPPlayerStateDump: failed to dump new time sync: " + e);
+				} finally {
+					mtx.ReleaseMutex();
+				}
+			}
+
+			public void AddNewPlayerResult(uint mtype, float now, uint id, Vector3 pos, Quaternion rot)
+			{
+				if (!go) {
+					return;
+				}
+				mtx.WaitOne();
+				try {
+					bw.Write((uint)Command.NEW_PLAYER_RESULT);
+					bw.Write(mtype);
+					bw.Write(Time.realtimeSinceStartup);
+					bw.Write(Time.time);
+					bw.Write(now);
+					bw.Write(id);
+					bw.Write(pos.x);
+					bw.Write(pos.y);
+					bw.Write(pos.z);
+					bw.Write(rot.x);
+					bw.Write(rot.y);
+					bw.Write(rot.z);
+					bw.Write(rot.w);
+					Flush(false);
+				} catch (Exception e) {
+					Debug.Log("MPPlayerStateDump: failed to dump new player result: " + e);
 				} finally {
 					mtx.ReleaseMutex();
 				}
