@@ -221,36 +221,33 @@ namespace GameMod {
         // guareded by a lock.
         public static void AddNewPlayerSnapshot(NewPlayerSnapshotToClientMessage msg)
         {
+            // the update rate we expect is 60Hz if we're not running at a different time scale
+            // the server will send _less_ packages more far apart in time during a timebomb
+            // sequence, differences can be up to +8ms (timescale reaches 0.7)
+            float scaledDeltaTime = Time.fixedDeltaTime / Time.timeScale;
+
             lock (m_last_messages_lock) {
                 if  (m_last_messages_ring_count == 0) {
                     // first packet
                     EnqueueToRing(msg);
-                    m_last_update_time = Time.time;
+                    m_last_update_time = Time.realtimeSinceStartup;
                 } else {
                     // next in sequence, as we expected
                     EnqueueToRing(msg);
-                    // this assumes the server sends 60Hz
-                    // during time dilation (timebombs!) this is not true,
-                    // it will actually send data packets _worth_ of 16.67ms real time, spread out
-                    // to longer intervals such as 24 ms.
-                    // However, this is not a problem, since the reference clock we sync to
-                    // is Time.time which has the timeScale already applied.
-                    // That means the 24ms tick will be seen as 16.67 in Time.time,
-                    // and everything cancles itself out nicely
-                    m_last_update_time += Time.fixedDeltaTime;
+                    m_last_update_time += scaledDeltaTime;
                 }
                 // check if the time base is still plausible
-                float delta = (Time.time - m_last_update_time)/ Time.fixedDeltaTime; // in ticks
+                float delta = (Time.realtimeSinceStartup - m_last_update_time)/ scaledDeltaTime; // in ticks
                 // allow a sliding window to catch up for latency jitter
                 float frameSoftSyncLimit = 2.0f; ///hard-sync if we're off by more than that many physics ticks
                 if (delta < -frameSoftSyncLimit || delta > frameSoftSyncLimit) {
                     // hard resync
                     Debug.LogFormat("hard resync by {0} frames", delta);
-                    m_last_update_time = Time.time;
+                    m_last_update_time = Time.realtimeSinceStartup;
                 } else {
                     // soft resync
                     float smoothing_factor = 0.1f;
-                    m_last_update_time += smoothing_factor * delta * Time.fixedDeltaTime;
+                    m_last_update_time += smoothing_factor * delta * scaledDeltaTime;
                 }
             } // end lock
         }
@@ -311,7 +308,20 @@ namespace GameMod {
         // Called per frame, moves ships along their interpolation/extrapolation motions
         public static void updatePlayerPositions()
         {
-            float now = Time.time; // needs to be the same time source we use for m_last_update_time
+            // "now" needs to use the same time source as m_last_update_time
+            // and unscaledTime is just the realtimeSinceStartup quantized to the
+            // start point of the current frame
+            //
+            // NOTE: Time.unscaledTime and Time.time drift off from each other
+            //       whenever we run timseScale != 1 (Timebombs!)
+            //       This is NOT a problem here. During the timebomb situation,
+            //       the server sent's _less_ packets more far apart, which still
+            //       represent 16.67ms worth of position change in _unscaled_ real time
+            //
+            //       The AddNewPlayerSnapshot() function already takes timeScale into
+            //       account when updating m_last_update_time.
+            float now = Time.unscaledTime;
+
             NewPlayerSnapshotToClientMessage msgA = null; // interpolation: start
             NewPlayerSnapshotToClientMessage msgB = null; // interpolation: end, extrapolation start
             float interpolate_factor = 0.0f;              // interpolation: factor in [0,1]
@@ -331,13 +341,18 @@ namespace GameMod {
                     return;
                 }
 
-                // NOTE: now and m_last_update_time indirectly have timeScale already applied, as they are based on Time.time
-                //       we need to adjust just the ping and the mms_ship_max_interpolate_frames offset...
-                //       Also note that the server still sends the unscaled velocities.
-                delta_t = now + Time.timeScale * MPClientExtrapolation.GetShipExtrapolationTime() - m_last_update_time;
+                // We need to adjust just the ping and the mms_ship_max_interpolate_frames offset...
+                delta_t = now + MPClientExtrapolation.GetShipExtrapolationTime() - m_last_update_time;
                 // if we want interpolation, add this as a _negative_ offset
                 // we use delta_t=0  as the base for from which we extrapolate into the future
                 delta_t -= (Menus.mms_lag_compensation_ship_added_lag / 1000f) * Time.timeScale;
+
+                // The time base we use for "now" and "m_last_update_time" does include timeScale,
+                // it always runs at realtime. We need to take the timeScale into account here
+                // by adjuisting the amoutn of interpolation / extrapolation we do in total.
+                // Note that the server still sends data packets with _unscaled_ velocities...
+                delta_t *= Time.timeScale;
+
                 // it might sound absurd, but after this point, the Time.fixedDeltaTime is correct
                 // and MUST NOT be scaled by timeScale. The data packets do contain 16.67ms of
                 // movement each, we already have taken the time dilation into account above...
