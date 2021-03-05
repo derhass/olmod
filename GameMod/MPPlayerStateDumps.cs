@@ -360,7 +360,7 @@ namespace GameMod {
 				}
 			}
 
-			public void AddNewInterpolate()
+			public void AddNewInterpolate(int ping, float extrapol)
 			{
 				if (!go) {
 					return;
@@ -373,6 +373,8 @@ namespace GameMod {
 					bw.Write(Time.unscaledTime);
 					bw.Write(Time.timeScale);
 					bw.Write(NetworkMatch.m_match_elapsed_seconds);
+					bw.Write(ping);
+					bw.Write(extrapol);
 					Flush(false);
 				} catch (Exception e) {
 					Debug.Log("MPPlayerStateDump: failed to dump new interpolate: " + e);

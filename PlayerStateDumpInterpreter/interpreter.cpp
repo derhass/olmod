@@ -535,6 +535,13 @@ void Interpreter::ProcessNewInterpolate()
 	float uts = ReadFloat();
 	float scale = ReadFloat();
 	float match = ReadFloat();
+	int ping = 0;
+	float extrapol = 0.0f;
+	if (fileVersion >= 3) {
+		ping = ReadInt();
+		extrapol = ReadFloat();
+	}
+	(void)extrapol; // TODO: dump this somewhere, aux channel maybe??? 
 	log.Log(Logger::DEBUG, "got NEW_INTERPOLATE rts %f ts %f uts %f match %f timeScale %f",
 		rts,ts,uts,match,scale);
 
@@ -545,7 +552,7 @@ void Interpreter::ProcessNewInterpolate()
 	interpolation.timeScale = scale;
 
 	interpolation.valid = true;
-	interpolation.ping = 30.0f; // TODO made this up...
+	interpolation.ping = ping;
 	gameState.ping = interpolation.ping;
 	gameState.timeScale = scale;
 

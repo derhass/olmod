@@ -316,7 +316,7 @@ namespace GameMod {
         // Called per frame, moves ships along their interpolation/extrapolation motions
         public static void updatePlayerPositions()
         {
-            MPPlayerStateDump.buf.AddNewInterpolate();
+            MPPlayerStateDump.buf.AddNewInterpolate(GameManager.m_local_player.m_avg_ping_ms, MPClientExtrapolation.GetShipExtrapolationTime());
             float now = Time.time; // needs to be the same time source we use for m_last_update_time
             NewPlayerSnapshotToClientMessage msgA = null; // interpolation: start
             NewPlayerSnapshotToClientMessage msgB = null; // interpolation: end, extrapolation start
