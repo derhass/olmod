@@ -109,7 +109,7 @@ bool Interpreter::OpenFile(const char *filename)
 	}
 	log.Log(Logger::DEBUG, "version: %u",(unsigned)fileVersion);
 
-	if (fileVersion < 1 || fileVersion > 2) {
+	if (fileVersion < 1 || fileVersion > 3) {
 		log.Log(Logger::ERROR, "open: version of '%s' not supported: %u",fileName,(unsigned)fileVersion);
 		return false;
 	}
@@ -322,6 +322,17 @@ void Interpreter::ProcessNewEnqueue()
 {
 	float rts = ReadFloat();
 	float ts = ReadFloat();
+	float uts = -1.0f;
+	float timeScale = -1.0f;
+	float mts = -1.0f;
+	if (fileVersion >= 3) {
+		uts =ReadFloat();
+		timeScale=ReadFloat();
+		mts = ReadFloat();
+		gameState.lastMatchTimestamp = mts;
+		gameState.timeScale = timeScale;
+	}
+	(void)uts;
 	uint32_t i, num = ReadNewPlayerSnapshotMessage(currentSnapshots);
 	log.Log(Logger::DEBUG, "got NEW ENQUEUE at rts%fs ts%fs for %u players", rts, ts, (unsigned)num);
 	currentSnapshots.recv_timestamp = rts;
