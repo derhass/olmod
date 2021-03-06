@@ -88,6 +88,7 @@ class SimulatorBase {
 		void SetSuffix(const char* suffix = NULL);
 
 		void Configure(const char *options);
+		const char *GetFullName() const {return fullName.c_str();}
 };
 
 typedef std::vector<SimulatorBase*> SimulatorSet;
