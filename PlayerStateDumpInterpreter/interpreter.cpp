@@ -334,7 +334,7 @@ void Interpreter::ProcessNewEnqueue()
 	}
 	(void)uts;
 	uint32_t i, num = ReadNewPlayerSnapshotMessage(currentSnapshots);
-	log.Log(Logger::DEBUG, "got NEW ENQUEUE at rts%fs ts%fs for %u players", rts, ts, (unsigned)num);
+	log.Log(Logger::DEBUG, "got NEW ENQUEUE at rts%fs ts%fs for %u players, matchts:%f messagets:%f", rts, ts, (unsigned)num,mts,currentSnapshots.message_timestamp);
 	currentSnapshots.recv_timestamp = rts;
 	for (i=0; i<num; i++) {
 		currentSnapshots.snapshot[i].state.realTimestamp = rts;
@@ -542,8 +542,8 @@ void Interpreter::ProcessNewInterpolate()
 		extrapol = ReadFloat();
 	}
 	(void)extrapol; // TODO: dump this somewhere, aux channel maybe??? 
-	log.Log(Logger::DEBUG, "got NEW_INTERPOLATE rts %f ts %f uts %f match %f timeScale %f",
-		rts,ts,uts,match,scale);
+	log.Log(Logger::DEBUG, "got NEW_INTERPOLATE rts %f ts %f uts %f match %f timeScale %f ping %d",
+		rts,ts,uts,match,scale,ping);
 
 	interpolation.timestamp = ts;
 	interpolation.realTimestamp = rts;
