@@ -56,7 +56,7 @@ class Derhass32 : public Cow1 {
 		void ResetForNewMatch();
 		void AddNewPlayerSnapshot(const PlayerSnapshotMessage& msg);
 
-		virtual void DoBufferEnqueue(const PlayerSnapshotMessage& msg);
+		virtual void DoBufferEnqueue(const PlayerSnapshotMessage& msg, const EnqueueInfo& enqueueInfo);
 		virtual bool DoInterpolation(const InterpolationCycle& interpolationInfo, InterpolationResults& results);
 
 		virtual void interpolatePlayer(const PlayerSnapshot& A, const PlayerSnapshot& B, PlayerSnapshot& result, float t);

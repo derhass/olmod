@@ -107,9 +107,9 @@ void Derhass32::AddNewPlayerSnapshot(const PlayerSnapshotMessage& msg)
 	rpcAux[AUX_BUFFER_UPDATE]->FlushCurrent();
 }
 
-void Derhass32::DoBufferEnqueue(const PlayerSnapshotMessage& msg)
+void Derhass32::DoBufferEnqueue(const PlayerSnapshotMessage& msg, const EnqueueInfo& enqueueInfo)
 {
-	SimulatorBase::DoBufferEnqueue(msg);
+	SimulatorBase::DoBufferEnqueue(msg, enqueueInfo);
 	AddNewPlayerSnapshot(msg);
 }
 

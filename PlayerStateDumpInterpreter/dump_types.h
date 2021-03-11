@@ -33,6 +33,17 @@ enum Command {
 	COMMAND_END_MARKER
 };
 
+struct EnqueueInfo {
+	float timestamp;
+	float realTimestamp;
+	float unscaledTimestamp;
+	float matchTimestamp;
+	float timeScale;
+	int wasOld;
+
+	void Clear();
+};
+
 struct UpdateBufferContents {
 	float timestamp;
 	int size;

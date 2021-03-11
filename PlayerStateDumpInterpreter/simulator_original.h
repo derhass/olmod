@@ -47,7 +47,7 @@ class Original : public SimulatorBase {
 		PlayerSnapshotMessage PendingSnapshotDequeue();
 
 
-		virtual void DoBufferEnqueue(const PlayerSnapshotMessage& msg);
+		virtual void DoBufferEnqueue(const PlayerSnapshotMessage& msg, const EnqueueInfo& enqueueInfo);
 		virtual void DoBufferUpdate(const UpdateCycle& updateInfo);
 		virtual bool DoInterpolation(const InterpolationCycle& interpolationInfo, InterpolationResults& results);
 		bool LerpRemotePlayer(PlayerSnapshot& p, size_t idx, const InterpolationCycle& interpolationInfo, const PlayerSnapshot&A, const PlayerSnapshot& B, float t);

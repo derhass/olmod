@@ -67,7 +67,7 @@ namespace GameMod {
 					Debug.Log("MPPlayerStateDump: dump started to " + name);
 					fs = File.Create(name);
 					ms.Position = 0;
-					bw.Write((uint)3); // file format version
+					bw.Write((uint)4); // file format version
 					bw.Write((uint)0); // size of extra header, reserved for later versions
 					matchCount++;
 					go = true;
@@ -338,7 +338,7 @@ namespace GameMod {
 				}
 			}
 
-			public void AddNewEnqueue(ref NewPlayerSnapshotToClientMessage msg)
+			public void AddNewEnqueue(ref NewPlayerSnapshotToClientMessage msg, bool wasOld)
 			{
 				if (!go) {
 					return;
@@ -351,6 +351,8 @@ namespace GameMod {
 					bw.Write(Time.unscaledTime);
 					bw.Write(Time.timeScale);
 					bw.Write(NetworkMatch.m_match_elapsed_seconds);
+                    int iWasOld = (wasOld)?1:0;
+                    bw.Write(iWasOld);
 					WriteNewPlayerSnapshotMessage(ref msg);
 					Flush(false);
 				} catch (Exception e) {

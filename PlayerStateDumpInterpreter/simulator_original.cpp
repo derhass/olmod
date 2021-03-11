@@ -64,9 +64,9 @@ PlayerSnapshotMessage Original::PendingSnapshotDequeue()
 	return msg;
 }
 
-void Original::DoBufferEnqueue(const PlayerSnapshotMessage& msg)
+void Original::DoBufferEnqueue(const PlayerSnapshotMessage& msg, const EnqueueInfo& enqueueInfo)
 {
-	SimulatorBase::DoBufferEnqueue(msg);
+	SimulatorBase::DoBufferEnqueue(msg, enqueueInfo);
 	m_PendingPlayerSnapshotMesages.push(msg);
 }
 

@@ -107,9 +107,9 @@ void Olmod36RC3::AddNewPlayerSnapshot(const PlayerSnapshotMessage& msg)
 	rpcAux[AUX_BUFFER_UPDATE]->FlushCurrent();
 }
 
-void Olmod36RC3::DoBufferEnqueue(const PlayerSnapshotMessage& msg)
+void Olmod36RC3::DoBufferEnqueue(const PlayerSnapshotMessage& msg, const EnqueueInfo& enqueueInfo)
 {
-	SimulatorBase::DoBufferEnqueue(msg);
+	SimulatorBase::DoBufferEnqueue(msg, enqueueInfo);
 	AddNewPlayerSnapshot(msg);
 }
 

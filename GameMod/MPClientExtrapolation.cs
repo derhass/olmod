@@ -233,7 +233,7 @@ namespace GameMod {
         // guareded by a lock.
         public static void AddNewPlayerSnapshot(NewPlayerSnapshotToClientMessage msg, bool wasOld = false)
         {
-            MPPlayerStateDump.buf.AddNewEnqueue(ref msg);
+            MPPlayerStateDump.buf.AddNewEnqueue(ref msg, wasOld);
             MPPlayerStateDump.buf.AddNewTimeSync(0, m_last_update_time, 0.0f);
             lock (m_last_messages_lock) {
                 if (m_last_messages_ring_count == 0) {

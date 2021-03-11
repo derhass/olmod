@@ -92,7 +92,7 @@ void SimulatorBase::Start()
 	ClearInstrumentationPoints(instrp, INSTR_COUNT);
 }
 
-void SimulatorBase::DoBufferEnqueue(const PlayerSnapshotMessage& msg)
+void SimulatorBase::DoBufferEnqueue(const PlayerSnapshotMessage& msg, const EnqueueInfo& enqueueInfo)
 {
 	log.Log(Logger::INFO, "BufferEnqueue for %u players", (unsigned)msg.snapshot.size());
 	instrp[INSTR_ENQUEUE].count++;

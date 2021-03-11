@@ -59,12 +59,12 @@ PlayerSnapshot* Cow1::GetPlayerSnapshot(uint32_t playerId, PlayerSnapshotMessage
 	return NULL;
 }
 
-void Cow1::DoBufferEnqueue(const PlayerSnapshotMessage& msg)
+void Cow1::DoBufferEnqueue(const PlayerSnapshotMessage& msg, const EnqueueInfo& enqueueInfo)
 {
-	SimulatorBase::DoBufferEnqueue(msg);
+	SimulatorBase::DoBufferEnqueue(msg, enqueueInfo);
 
 	m_last_update = msg;
-	m_last_update_time = ip->GetGameState().lastMatchTimestamp; // TODO: we don't have the correct one...
+	m_last_update_time = ip->GetGameState().lastMatchTimestamp; // we don't have the correct one in older fileVersions...
 }
 
 void Cow1::DoBufferUpdate(const UpdateCycle& updateInfo)

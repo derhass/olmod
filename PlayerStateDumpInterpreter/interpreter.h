@@ -51,6 +51,7 @@ class Interpreter {
 		const char *outputDir;
 		bool process;
 		PlayerSnapshotMessage currentSnapshots;
+		EnqueueInfo enqueue;
 		UpdateCycle update;
 		InterpolationCycle interpolation;
 		SimulatorSet simulators;

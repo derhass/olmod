@@ -5,6 +5,16 @@
 
 namespace OlmodPlayerDumpState {
 
+void EnqueueInfo::Clear()
+{
+	timestamp = -1.0f;
+	realTimestamp = -1.0f;
+	unscaledTimestamp = -1.0f;
+	matchTimestamp = -1.0f;
+	timeScale = -1.0f;
+	wasOld = 0;
+}
+
 GameState::GameState() :
 	playersCycle(0)
 {
@@ -109,7 +119,7 @@ bool Interpreter::OpenFile(const char *filename)
 	}
 	log.Log(Logger::DEBUG, "version: %u",(unsigned)fileVersion);
 
-	if (fileVersion < 1 || fileVersion > 3) {
+	if (fileVersion < 1 || fileVersion > 4) {
 		log.Log(Logger::ERROR, "open: version of '%s' not supported: %u",fileName,(unsigned)fileVersion);
 		return false;
 	}
@@ -246,7 +256,7 @@ void Interpreter::SimulateBufferEnqueue()
 	for (SimulatorSet::iterator it=simulators.begin(); it!=simulators.end(); it++) {
 		SimulatorBase *sim = (*it);
 		sim->SyncGamestate(gameState);
-		sim->DoBufferEnqueue(currentSnapshots);
+		sim->DoBufferEnqueue(currentSnapshots, enqueue);
 	}
 }
 
@@ -306,44 +316,49 @@ void Interpreter::UpdatePlayerAtEnqueue(int idx, float ts)
 
 void Interpreter::ProcessEnqueue()
 {
-	float ts = ReadFloat();
+	enqueue.Clear();
+	enqueue.timestamp = ReadFloat();
+	enqueue.wasOld = 1;
 	uint32_t i, num = ReadPlayerSnapshotMessage(currentSnapshots);
-	log.Log(Logger::DEBUG, "got ENQUEUE at %fs for %u players", ts, (unsigned)num);
+	log.Log(Logger::DEBUG, "got ENQUEUE at %fs for %u players", enqueue.timestamp, (unsigned)num);
 	for (i=0; i<num; i++) {
-		currentSnapshots.snapshot[i].state.timestamp = ts;
-		UpdatePlayerAtEnqueue(i, ts);
+		currentSnapshots.snapshot[i].state.timestamp = enqueue.timestamp;
+		UpdatePlayerAtEnqueue(i, enqueue.timestamp);
 	}
 	log.Log(Logger::DEBUG_DETAIL, currentSnapshots);
-	gameState.lastTimestamp = ts;
+	gameState.lastTimestamp = enqueue.timestamp;
 	SimulateBufferEnqueue();
 }
 
 void Interpreter::ProcessNewEnqueue()
 {
-	float rts = ReadFloat();
-	float ts = ReadFloat();
-	float uts = -1.0f;
-	float timeScale = -1.0f;
-	float mts = -1.0f;
+	enqueue.Clear();
+	enqueue.realTimestamp = ReadFloat();
+	enqueue.timestamp = ReadFloat();
 	if (fileVersion >= 3) {
-		uts =ReadFloat();
-		timeScale=ReadFloat();
-		mts = ReadFloat();
-		gameState.lastMatchTimestamp = mts;
-		gameState.timeScale = timeScale;
+		enqueue.unscaledTimestamp = ReadFloat();
+		enqueue.timeScale=ReadFloat();
+		enqueue.matchTimestamp = ReadFloat();
+		gameState.lastMatchTimestamp = enqueue.matchTimestamp;
+		gameState.timeScale = enqueue.timeScale;
 	}
-	(void)uts;
+	if (fileVersion >= 4) {
+		enqueue.wasOld = ReadInt();
+	}
 	uint32_t i, num = ReadNewPlayerSnapshotMessage(currentSnapshots);
-	log.Log(Logger::DEBUG, "got NEW ENQUEUE at rts%fs ts%fs for %u players, matchts:%f messagets:%f", rts, ts, (unsigned)num,mts,currentSnapshots.message_timestamp);
-	currentSnapshots.recv_timestamp = rts;
+	log.Log(Logger::DEBUG, "got NEW ENQUEUE at rts%fs ts%fs for %u players, matchts:%f messagets:%f, wasOld:%d", 
+		enqueue.realTimestamp, enqueue.timestamp, (unsigned)num, 
+		enqueue.matchTimestamp,currentSnapshots.message_timestamp,
+		enqueue.wasOld);
+	currentSnapshots.recv_timestamp = enqueue.realTimestamp;
 	for (i=0; i<num; i++) {
-		currentSnapshots.snapshot[i].state.realTimestamp = rts;
-		currentSnapshots.snapshot[i].state.timestamp = ts;
-		UpdatePlayerAtEnqueue(i, ts);
+		currentSnapshots.snapshot[i].state.realTimestamp = enqueue.realTimestamp;
+		currentSnapshots.snapshot[i].state.timestamp = enqueue.timestamp;
+		UpdatePlayerAtEnqueue(i, enqueue.timestamp);
 	}
 	log.Log(Logger::DEBUG_DETAIL, currentSnapshots);
-	gameState.lastTimestamp = ts;
-	gameState.lastRealTimestamp = rts;
+	gameState.lastTimestamp = enqueue.timestamp;
+	gameState.lastRealTimestamp = enqueue.realTimestamp;
 	SimulateBufferEnqueue();
 }
 

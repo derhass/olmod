@@ -23,7 +23,7 @@ class Cow1 : public SimulatorBase {
 		
 		int GetPing();
 		virtual float GetShipExtrapolationTime();
-		virtual void DoBufferEnqueue(const PlayerSnapshotMessage& msg);
+		virtual void DoBufferEnqueue(const PlayerSnapshotMessage& msg, const EnqueueInfo& enqueueInfo);
 		virtual void DoBufferUpdate(const UpdateCycle& updateInfo);
 		virtual bool DoInterpolation(const InterpolationCycle& interpolationInfo, InterpolationResults& results);
 

@@ -66,7 +66,7 @@ class SimulatorBase {
 		virtual void UpdateWaitForRespawn(uint32_t id, uint32_t doReset, size_t idx);
 
 		virtual void Start();
-		virtual void DoBufferEnqueue(const PlayerSnapshotMessage& msg);
+		virtual void DoBufferEnqueue(const PlayerSnapshotMessage& msg, const EnqueueInfo& enqueueInfo);
 		virtual void DoBufferUpdate(const UpdateCycle& updateInfo);
 		virtual bool DoInterpolation(const InterpolationCycle& interpolationInfo, InterpolationResults& results);
 		virtual void ProcessResults(const InterpolationCycle& interpolationInfo, InterpolationResults& results);
