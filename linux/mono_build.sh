@@ -47,6 +47,7 @@ mcs \
     -r:../GameMod/0Harmony.dll \
     -target:library \
     -sdk:2 \
+    -optimize+ \
     -out:GameMod.dll \
     ../GameMod/*.cs \
     ../GameMod/*/*.cs
