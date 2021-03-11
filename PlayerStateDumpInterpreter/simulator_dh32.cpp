@@ -35,14 +35,34 @@ const char *Derhass32::GetBaseName() const
 	return "derhass32";
 }
 
-void Derhass32::EnqueueToRing(const PlayerSnapshotMessage& msg)
+void Derhass32::EnqueueToRing(const PlayerSnapshotMessage& msg, bool wasOld)
 {
 	m_last_messages_ring_pos_last = (m_last_messages_ring_pos_last + 1) & 3;
 	m_last_messages_ring[m_last_messages_ring_pos_last] = msg;
 	if (m_last_messages_ring_count < 4) {
 		m_last_messages_ring_count++;
 	}
-	log.Log(Logger::DEBUG, "adding %f at %f, have %d", msg.message_timestamp, ip->GetGameState().lastTimestamp, m_last_messages_ring_count);
+	if (wasOld) {
+		PlayerSnapshotMessage& newMsg = m_last_messages_ring[(m_last_messages_ring_pos_last + 4) & 3];
+		const PlayerSnapshotMessage& lastMsg = m_last_messages_ring[(m_last_messages_ring_pos_last + 3) & 3];
+		for (size_t i=0; i<newMsg.snapshot.size(); i++) {
+			PlayerSnapshot *newSnapshot=&newMsg.snapshot[i];
+			const PlayerSnapshot *last=NULL;
+			for (size_t j=0; j<lastMsg.snapshot.size(); j++) {
+				if (lastMsg.snapshot[j].id == newSnapshot->id) {
+					last = &lastMsg.snapshot[j];
+					break;
+				}
+			}
+			if (last) {
+				newSnapshot->state.vel[0] = (newSnapshot->state.pos[0] - last->state.pos[0]) / fixedDeltaTime;
+				newSnapshot->state.vel[1] = (newSnapshot->state.pos[1] - last->state.pos[1]) / fixedDeltaTime;
+				newSnapshot->state.vel[2] = (newSnapshot->state.pos[2] - last->state.pos[2]) / fixedDeltaTime;
+				// TODO: rotations
+			}
+		}
+	}
+	log.Log(Logger::DEBUG, "adding %f at %f, wasOld: %d, have %d", msg.message_timestamp, ip->GetGameState().lastTimestamp, wasOld, m_last_messages_ring_count);
 }
 
 // Clear the contents of the ring buffer
@@ -71,7 +91,7 @@ void Derhass32::ResetForNewMatch()
 // This function adds the message into the ring buffer, and
 // also implements the time sync algorithm between the message sequence and
 // the local render time.
-void Derhass32::AddNewPlayerSnapshot(const PlayerSnapshotMessage& msg)
+void Derhass32::AddNewPlayerSnapshot(const PlayerSnapshotMessage& msg, bool wasOld)
 {
 	const GameState& gs=ip->GetGameState();
 	rpcAux[AUX_BUFFER_UPDATE]->Add(gs.lastTimestamp);
@@ -79,11 +99,11 @@ void Derhass32::AddNewPlayerSnapshot(const PlayerSnapshotMessage& msg)
 	rpcAux[AUX_BUFFER_UPDATE]->Add(m_last_update_time);
 	if  (m_last_messages_ring_count == 0) {
 		// first packet
-		EnqueueToRing(msg);
+		EnqueueToRing(msg, false);
 		m_last_update_time = gs.lastTimestamp;
 	} else {
 		// next in sequence, as we expected
-		EnqueueToRing(msg);
+		EnqueueToRing(msg, wasOld);
 		m_last_update_time += fixedDeltaTime;
 	}
 	// check if the time base is still plausible
@@ -110,7 +130,7 @@ void Derhass32::AddNewPlayerSnapshot(const PlayerSnapshotMessage& msg)
 void Derhass32::DoBufferEnqueue(const PlayerSnapshotMessage& msg, const EnqueueInfo& enqueueInfo)
 {
 	SimulatorBase::DoBufferEnqueue(msg, enqueueInfo);
-	AddNewPlayerSnapshot(msg);
+	AddNewPlayerSnapshot(msg, enqueueInfo.wasOld);
 }
 
 // Called per frame, moves ships along their interpolation/extrapolation motions

@@ -51,10 +51,10 @@ class Derhass32 : public Cow1 {
 
 		virtual const char *GetBaseName() const;
 
-		void EnqueueToRing(const PlayerSnapshotMessage& msg);
+		void EnqueueToRing(const PlayerSnapshotMessage& msg, bool wasOld);
 		void ClearRing();
 		void ResetForNewMatch();
-		void AddNewPlayerSnapshot(const PlayerSnapshotMessage& msg);
+		void AddNewPlayerSnapshot(const PlayerSnapshotMessage& msg, bool wasOld);
 
 		virtual void DoBufferEnqueue(const PlayerSnapshotMessage& msg, const EnqueueInfo& enqueueInfo);
 		virtual bool DoInterpolation(const InterpolationCycle& interpolationInfo, InterpolationResults& results);
