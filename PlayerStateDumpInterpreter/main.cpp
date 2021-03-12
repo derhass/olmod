@@ -5,6 +5,7 @@
 #include "simulator_dh1.h"
 #include "simulator_cow1.h"
 #include "simulator_dh32.h"
+#include "simulator_dh32b.h"
 #include "simulator_dh33.h"
 
 #include <clocale>
@@ -50,6 +51,10 @@ int main(int argc, char **argv)
 	interpreter.AddSimulator(sOlmod36RC3b);
 	sOlmod36RC3b.SetLogging(levelSim,  dir);
 
+	OlmodPlayerDumpState::Simulator::Derhass32b sDH32b(rp);
+	sDH32b.Configure("max=100;scale=100;ping=100;lag=0;");
+	interpreter.AddSimulator(sDH32b);
+	sDH32b.SetLogging(levelSim,  dir);
 	/*
 	OlmodPlayerDumpState::Simulator::Derhass1 sDH1(rp);
 	sDH1.Configure("max=0;scale=0;ping=0;");
