@@ -51,10 +51,20 @@ int main(int argc, char **argv)
 	interpreter.AddSimulator(sOlmod36RC3b);
 	sOlmod36RC3b.SetLogging(levelSim,  dir);
 
+	OlmodPlayerDumpState::Simulator::Olmod36RC3 sOlmod36RC3c(rp);
+	sOlmod36RC3c.Configure("max=120;scale=50;ping=-2000;lag=0;");
+	interpreter.AddSimulator(sOlmod36RC3c);
+	sOlmod36RC3c.SetLogging(levelSim,  dir);
+
 	OlmodPlayerDumpState::Simulator::Derhass32b sDH32b(rp);
 	sDH32b.Configure("max=100;scale=100;ping=100;lag=0;");
 	interpreter.AddSimulator(sDH32b);
 	sDH32b.SetLogging(levelSim,  dir);
+
+	OlmodPlayerDumpState::Simulator::Derhass32b sDH32bb(rp);
+	sDH32bb.Configure("max=120;scale=50;ping=-2000;lag=0;");
+	interpreter.AddSimulator(sDH32bb);
+	sDH32bb.SetLogging(levelSim,  dir);
 	/*
 	OlmodPlayerDumpState::Simulator::Derhass1 sDH1(rp);
 	sDH1.Configure("max=0;scale=0;ping=0;");

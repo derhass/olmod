@@ -18,6 +18,9 @@ class Derhass32b : public Cow1 {
 			INSTR_INTERPOLATE_23,
 			INSTR_EXTRAPOLATE,
 			INSTR_EXTRAPOLATE_PAST,
+			INSTR_SKIP_DETECTED,
+			INSTR_SKIPPED_FRAMES,
+
 
 			INSTR_COUNT
 		} InstrumentationPointEnums;
@@ -47,6 +50,7 @@ class Derhass32b : public Cow1 {
 		int m_last_messages_ring_count;	     // number of elements in the ring buffer
 		int m_last_messages_ring_pos_last;   // position of the last added element
 		int m_new_message_count;
+		float m_last_message_time;
 
 		float fixedDeltaTime;
 

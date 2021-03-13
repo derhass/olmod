@@ -24,6 +24,8 @@ Derhass32b::Derhass32b(ResultProcessor& rp) :
 	instrp[INSTR_INTERPOLATE_23].name = "DH32_INTERPOLATE_23";
 	instrp[INSTR_EXTRAPOLATE].name = "DH32_EXTRAPOLATE";
 	instrp[INSTR_EXTRAPOLATE_PAST].name = "DH32_EXTRAPOLATE_PAST";
+	instrp[INSTR_SKIP_DETECTED].name = "DH32B_SKIP_DETECTED";
+	instrp[INSTR_SKIPPED_FRAMES].name = "DH32B_SKIPPED_FRAMES";
 }
 
 Derhass32b::~Derhass32b()
@@ -71,6 +73,7 @@ void Derhass32b::ClearRing()
 	m_last_messages_ring_pos_last = 3;
 	m_last_messages_ring_count = 0;
 	m_new_message_count = 0;
+	m_last_message_time = 0.0f;
 }
 
 // Prepare for a new match
@@ -102,8 +105,18 @@ void Derhass32b::AddNewPlayerSnapshot(const PlayerSnapshotMessage& msg, bool was
 	} else {
 		// next in sequence, as we expected
 		EnqueueToRing(msg, wasOld);
-		m_new_message_count++;
+		const PlayerSnapshotMessage& lastMsg = m_last_messages_ring[(m_last_messages_ring_pos_last + 3) & 3];
+		float delta = (msg.message_timestamp - lastMsg.message_timestamp) / fixedDeltaTime;
+		if (delta < 1.26f) {
+			m_new_message_count++;
+		} else {
+			instrp[INSTR_SKIP_DETECTED].count++;
+			instrp[INSTR_SKIPPED_FRAMES].count+=((unsigned)(delta + 0.75f)-1);
+			m_new_message_count += (int)(delta + 0.75f);
+		}
 	}
+	m_last_message_time = gs.lastTimestamp;
+	//ApplyTimeSync();
 }
 
 void Derhass32b::ApplyTimeSync()
@@ -111,6 +124,7 @@ void Derhass32b::ApplyTimeSync()
 	if (m_new_message_count < 1) {
 		return;
 	}
+
 	const GameState& gs=ip->GetGameState();
 	rpcAux[AUX_BUFFER_UPDATE]->Add(gs.lastTimestamp);
 	rpcAux[AUX_BUFFER_UPDATE]->Add(gs.lastRealTimestamp);
@@ -119,17 +133,17 @@ void Derhass32b::ApplyTimeSync()
 	m_new_message_count = 0;
 
 	// check if the time base is still plausible
-	float delta = (gs.lastTimestamp - m_last_update_time) / fixedDeltaTime; // in ticks
+	float delta = (m_last_message_time - m_last_update_time) / fixedDeltaTime; // in ticks
 	// allow a sliding window to catch up for latency jitter
-	float frameSoftSyncLimit = 3.0f; ///hard-sync if we're off by more than that many physics ticks
+	float frameSoftSyncLimit = 2.0f; ///hard-sync if we're off by more than that many physics ticks
 	rpcAux[AUX_BUFFER_UPDATE]->Add(m_last_update_time);
 	rpcAux[AUX_BUFFER_UPDATE]->Add(delta);
 	if (delta < -frameSoftSyncLimit || delta > frameSoftSyncLimit) {
 		// hard resync
 		float correction = (delta < 0.0f)?std::ceil(delta):std::floor(delta);
 		log.Log(Logger::WARN, "hard resync by %f frames, corr: %f", delta, correction);
-		//m_last_update_time = gs.lastTimestamp;
-		m_last_update_time += correction * fixedDeltaTime;
+		m_last_update_time = m_last_message_time; //gs.lastTimestamp;
+		//m_last_update_time += correction * fixedDeltaTime;
 		instrp[INSTR_HARD_SYNC].count++;
 	} else {
 		// soft resync
