@@ -171,6 +171,7 @@ namespace GameMod {
         public static float m_compensation_sum;
         public static int m_compensation_count;
         public static int m_compensation_interpol_count;
+        public static int m_skipped_count;
         public static float m_compensation_last;
 
         // simple ring buffer, use size 4 which is a power of two, so the % 4 becomes simple & 3
@@ -226,6 +227,7 @@ namespace GameMod {
             m_compensation_sum = 0.0f;
             m_compensation_count = 0;
             m_compensation_interpol_count = 0;
+            m_skipped_count = 0;
             m_compensation_last = Time.time;
         }
 
@@ -365,6 +367,7 @@ namespace GameMod {
                             EnqueueToRing(msg);
                         }
                         m_unsynced_messages_count += deltaFrames;
+                        m_skipped_count += (deltaFrames - 1);
                     }
                 }
                 m_last_message_time = Time.time;
@@ -562,14 +565,16 @@ namespace GameMod {
             //       as extrapolation...
             m_compensation_interpol_count += (interpolate_ticks > 0)?1:0;
             if (Time.time >= m_compensation_last + 5.0 && m_compensation_count > 0) {
-                Debug.LogFormat("ship lag compensation over last {0} frames: {1}ms / {2} physics ticks, {3} interpolation ({4}%)",
+                Debug.LogFormat("ship lag compensation over last {0} frames: {1}ms / {2} physics ticks, {3} interpolation ({4}%) {5}",
                                 m_compensation_count, 1000.0f* (m_compensation_sum/ m_compensation_count),
                                 (m_compensation_sum/m_compensation_count)/Time.fixedDeltaTime,
                                 m_compensation_interpol_count,
-                                100.0f*((float)m_compensation_interpol_count/(float)m_compensation_count));
+                                100.0f*((float)m_compensation_interpol_count/(float)m_compensation_count),
+                                m_skipped_count);
                 m_compensation_sum = 0.0f;
                 m_compensation_count = 0;
                 m_compensation_interpol_count = 0;
+                m_skipped_count = 0;
                 m_compensation_last = Time.time;
             }
 
