@@ -229,6 +229,73 @@ namespace GameMod {
             m_compensation_last = Time.time;
         }
 
+        // interpolate a single NewPlayerSnapshot (including the extra fields besides pos and rot)!
+        // this is used for generating synthetic snapshot messages in case we detected missing packets
+        private static void InterpolatePlayerSnapshot(ref NewPlayerSnapshot C, NewPlayerSnapshot A, NewPlayerSnapshot B, float t)
+        {
+            C.m_pos = Vector3.LerpUnclamped(A.m_pos, B.m_pos, t);
+            C.m_rot = Quaternion.SlerpUnclamped(A.m_rot, B.m_rot, t);
+            C.m_vel = Vector3.LerpUnclamped(A.m_vel, B.m_vel, t);
+            Quaternion A_vrot = Quaternion.Euler(A.m_vrot);
+            Quaternion B_vrot = Quaternion.Euler(C.m_vrot);
+            Quaternion C_vrot = Quaternion.SlerpUnclamped(A_vrot,B_vrot, t);
+            C.m_vrot = C_vrot.eulerAngles;
+            C.m_net_id = A.m_net_id;
+        }
+
+        // extrapolate a single NewPlayerSnapshot (including the extra fields besides pos and rot)!
+        // this is used for generating synthetic snapshot messages in case we detected missing packets
+        private static void ExtrapolatePlayerSnapshot(ref NewPlayerSnapshot C, NewPlayerSnapshot B, float t)
+        {
+            C.m_pos = Vector3.LerpUnclamped(B.m_pos, B.m_pos + B.m_vel, t);
+            C.m_rot = Quaternion.SlerpUnclamped(B.m_rot, B.m_rot * Quaternion.Euler(B.m_vrot), t);
+            // assume the rest stays the same
+            C.m_vel = B.m_vel;
+            C.m_vrot = B.m_vrot;
+            C.m_net_id = B.m_net_id;
+        }
+
+        // interpolate a whole NewPlayerSnapshotToClientMessage
+        // interpolate between A and B, t is the relative factor between both
+        // If a player is not in both messages, it will not be in the resulting messages
+        // this is used for generating synthetic snapshot messages in case we detected missing packets
+        private static NewPlayerSnapshotToClientMessage InterpolatePlayerSnapshotMessage(NewPlayerSnapshotToClientMessage A, NewPlayerSnapshotToClientMessage B, float t)
+        {
+            NewPlayerSnapshotToClientMessage C = new NewPlayerSnapshotToClientMessage();
+            int i,j;
+
+            C.m_num_snapshots = 0;
+
+            for (i=0; i<A.m_num_snapshots; i++) {
+                for (j=0; j<B.m_num_snapshots; j++) {
+                    if (A.m_snapshots[i].m_net_id.Value == B.m_snapshots[j].m_net_id.Value) {
+                        InterpolatePlayerSnapshot(ref C.m_snapshots[C.m_num_snapshots++], A.m_snapshots[i], B.m_snapshots[j], t);
+                        continue;
+                    }
+                }
+            }
+
+            C.m_server_timestamp = (1.0f - t) * A.m_server_timestamp + t*B.m_server_timestamp;
+            return C;
+        }
+
+        // extrapolate a whole NewPlayerSnapshotToClientMessage
+        // extrapolate from B into t seconds into the future, t can be negative
+        // this is used for generating synthetic snapshot messages in case we detected missing packets
+        private static NewPlayerSnapshotToClientMessage ExtrapolatePlayerSnapshotMessage(NewPlayerSnapshotToClientMessage B, float t)
+        {
+            NewPlayerSnapshotToClientMessage C = new NewPlayerSnapshotToClientMessage();
+            int i;
+
+            for (i=0; i<B.m_num_snapshots; i++) {
+                ExtrapolatePlayerSnapshot(ref C.m_snapshots[C.m_num_snapshots++], B.m_snapshots[i], t);
+            }
+
+            C.m_server_timestamp = B.m_server_timestamp + t;
+            return C;
+        }
+
+
         // add a AddNewPlayerSnapshot(NewPlayerSnapshotToClientMessage
         // this should be called as soon as possible after the message arrives
         // This function adds the message into the ring buffer, and
@@ -246,9 +313,58 @@ namespace GameMod {
                     m_last_update_time = Time.time;
                     m_unsynced_messages_count = 0;
                 } else {
-                    // next in sequence, as we expected
-                    EnqueueToRing(msg, wasOld);
-                    m_unsynced_messages_count++;
+                    int deltaFrames;
+                    if (wasOld) {
+                        // we do not have server timestamps
+                        deltaFrames = 1;
+                    } else {
+                        deltaFrames = (int)((msg.m_server_timestamp - m_last_message_server_time) / Time.fixedDeltaTime + 0.5f);
+                    }
+
+                    if (deltaFrames < -60 || deltaFrames > 60) {
+                        Debug.LogFormat("detected {0} missing snapshots: FULL RESYNC",  deltaFrames - 1);
+                        // we are more than +/- 1 second off from the server
+                        // completely re-sync
+                        ClearRing();
+                        EnqueueToRing(msg, false);
+                        m_last_update_time = Time.time;
+                        m_unsynced_messages_count = 0;
+                    } else if (deltaFrames <= 1) {
+                        // next in sequence, as we expected
+                        EnqueueToRing(msg, wasOld);
+                        m_unsynced_messages_count++;
+                    } else if (deltaFrames > 1) {
+                        Debug.LogFormat("detected {0} missing snapshots",  deltaFrames - 1);
+                        // this is the slow path
+                        // we actually do the creation of missing packets here
+                        // one per received new snapshot, so that the per-frame
+                        // update code path can stay simple
+                        NewPlayerSnapshotToClientMessage lastMsg = m_last_messages_ring[m_last_messages_ring_pos_last];
+                        if (deltaFrames == 2) {
+                            // there is one missing snapshot
+                            EnqueueToRing(InterpolatePlayerSnapshotMessage(lastMsg,msg,0.5f));
+                            EnqueueToRing(msg);
+                        } else if (deltaFrames == 3) {
+                            // there are two missing snapshots
+                            EnqueueToRing(InterpolatePlayerSnapshotMessage(lastMsg,msg,0.3333f));
+                            EnqueueToRing(InterpolatePlayerSnapshotMessage(lastMsg,msg,0.6667f));
+                            EnqueueToRing(msg);
+                        } else if (deltaFrames ==  4) {
+                            // there are three missing snapshots
+                            EnqueueToRing(InterpolatePlayerSnapshotMessage(lastMsg,msg,0.25f));
+                            EnqueueToRing(InterpolatePlayerSnapshotMessage(lastMsg,msg,0.5f));
+                            EnqueueToRing(InterpolatePlayerSnapshotMessage(lastMsg,msg,0.75f));
+                            EnqueueToRing(msg);
+                        } else {
+                            // there are more than 3 missing snapshots,
+                            // just take the completely new data in
+                            EnqueueToRing(ExtrapolatePlayerSnapshotMessage(msg, -3.0f * Time.fixedDeltaTime));
+                            EnqueueToRing(ExtrapolatePlayerSnapshotMessage(msg, -2.0f * Time.fixedDeltaTime));
+                            EnqueueToRing(ExtrapolatePlayerSnapshotMessage(msg, -1.0f * Time.fixedDeltaTime));
+                            EnqueueToRing(msg);
+                        }
+                        m_unsynced_messages_count += deltaFrames;
+                    }
                 }
                 m_last_message_time = Time.time;
                 m_last_message_server_time = msg.m_server_timestamp;
