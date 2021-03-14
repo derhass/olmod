@@ -33,6 +33,12 @@ enum Command {
 	COMMAND_END_MARKER
 };
 
+enum SnapshotVersion {
+	SNAPSHOT_VANILLA = 0,
+	SNAPSHOT_VELOCITY,
+	SNAPSHOT_VELOCITY_TIMESTAMP
+};
+
 struct EnqueueInfo {
 	float timestamp;
 	float realTimestamp;
@@ -40,6 +46,7 @@ struct EnqueueInfo {
 	float matchTimestamp;
 	float timeScale;
 	int wasOld;
+	SnapshotVersion snapshotVersion;
 
 	void Clear();
 };

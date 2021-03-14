@@ -12,9 +12,11 @@ namespace Simulator {
 Derhass32b::Derhass32b(ResultProcessor& rp) :
 	Cow1(rp),
 	mms_ship_lag_added(0.0f),
+	assumeVersion(-1),
 	fixedDeltaTime(1.0f/60.0f)
 {
 	cfg.Add(ConfigParam(mms_ship_lag_added,"ship_lag_added", "lag"));
+	cfg.Add(ConfigParam(assumeVersion,"assume_snapshot_version", "sver"));
 
 	instrp[INSTR_HARD_SYNC].name = "DH32_HARD_SYNC";
 	instrp[INSTR_SOFT_SYNC].name = "DH32_SOFT_SYNC";
@@ -39,14 +41,14 @@ const char *Derhass32b::GetBaseName() const
 	return "derhass32";
 }
 
-void Derhass32b::EnqueueToRing(const PlayerSnapshotMessage& msg, bool wasOld)
+void Derhass32b::EnqueueToRing(const PlayerSnapshotMessage& msg, bool estimateVelocities)
 {
 	m_last_messages_ring_pos_last = (m_last_messages_ring_pos_last + 1) & 3;
 	m_last_messages_ring[m_last_messages_ring_pos_last] = msg;
 	if (m_last_messages_ring_count < 4) {
 		m_last_messages_ring_count++;
 	}
-	if (wasOld) {
+	if (estimateVelocities) {
 		PlayerSnapshotMessage& newMsg = m_last_messages_ring[(m_last_messages_ring_pos_last + 4) & 3];
 		const PlayerSnapshotMessage& lastMsg = m_last_messages_ring[(m_last_messages_ring_pos_last + 3) & 3];
 		for (size_t i=0; i<newMsg.snapshot.size(); i++) {
@@ -66,7 +68,7 @@ void Derhass32b::EnqueueToRing(const PlayerSnapshotMessage& msg, bool wasOld)
 			}
 		}
 	}
-	log.Log(Logger::DEBUG, "adding %f at %f, wasOld: %d, have %d", msg.message_timestamp, ip->GetGameState().lastTimestamp, wasOld, m_last_messages_ring_count);
+	log.Log(Logger::DEBUG, "adding %f at %f, estimateVel: %d, have %d", msg.message_timestamp, ip->GetGameState().lastTimestamp, estimateVelocities?1:0, m_last_messages_ring_count);
 }
 
 // Clear the contents of the ring buffer
@@ -174,7 +176,7 @@ void Derhass32b::ResetForNewMatch()
 // This function adds the message into the ring buffer, and
 // also implements the time sync algorithm between the message sequence and
 // the local render time.
-void Derhass32b::AddNewPlayerSnapshot(const PlayerSnapshotMessage& msg, bool wasOld)
+void Derhass32b::AddNewPlayerSnapshot(const PlayerSnapshotMessage& msg, SnapshotVersion version)
 {
 	const GameState& gs=ip->GetGameState();
 	if  (m_last_messages_ring_count == 0) {
@@ -183,8 +185,9 @@ void Derhass32b::AddNewPlayerSnapshot(const PlayerSnapshotMessage& msg, bool was
 		m_last_update_time = gs.lastTimestamp;
 		m_unsynced_messages_count = 0;
 	} else {
+		bool estimateVelocities = (version == SNAPSHOT_VANILLA);
 		int deltaFrames;
-		if (wasOld) {
+		if (version != SNAPSHOT_VELOCITY_TIMESTAMP) {
 			// we do not have server timestamps
 			deltaFrames = 1;
 		} else {
@@ -196,7 +199,7 @@ void Derhass32b::AddNewPlayerSnapshot(const PlayerSnapshotMessage& msg, bool was
 		if (deltaFrames == 1) {
 			// FAST PATH
 			// next in sequence, as we expected
-			EnqueueToRing(msg, wasOld);
+			EnqueueToRing(msg, estimateVelocities);
 			m_unsynced_messages_count++;
 		} else if (deltaFrames > 1) {
 			// SLOW PATH:
@@ -293,7 +296,8 @@ void Derhass32b::ApplyTimeSync()
 void Derhass32b::DoBufferEnqueue(const PlayerSnapshotMessage& msg, const EnqueueInfo& enqueueInfo)
 {
 	SimulatorBase::DoBufferEnqueue(msg, enqueueInfo);
-	AddNewPlayerSnapshot(msg, enqueueInfo.wasOld);
+	SnapshotVersion version = (assumeVersion < 0) ? enqueueInfo.snapshotVersion : (SnapshotVersion)assumeVersion;
+	AddNewPlayerSnapshot(msg, version);
 }
 
 // Called per frame, moves ships along their interpolation/extrapolation motions

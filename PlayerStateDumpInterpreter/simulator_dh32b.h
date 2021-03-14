@@ -39,6 +39,7 @@ class Derhass32b : public Cow1 {
 
 	protected:
 		float mms_ship_lag_added;
+		int assumeVersion;
 
 		// simple statistic
 		float m_compensation_sum;
@@ -60,7 +61,7 @@ class Derhass32b : public Cow1 {
 
 		virtual const char *GetBaseName() const;
 
-		void EnqueueToRing(const PlayerSnapshotMessage& msg, bool wasOld);
+		void EnqueueToRing(const PlayerSnapshotMessage& msg, bool estimateVelocities);
 		void ClearRing();
 
 		void InterpolatePlayerSnapshot(PlayerSnapshot& C, const PlayerSnapshot& A, const PlayerSnapshot& B, float t);
@@ -68,7 +69,7 @@ class Derhass32b : public Cow1 {
 		PlayerSnapshotMessage InterpolatePlayerSnapshotMessage(const PlayerSnapshotMessage& A, const PlayerSnapshotMessage& B, float t);
 		PlayerSnapshotMessage ExtrapolatePlayerSnapshotMessage(const PlayerSnapshotMessage& B, float t);
 		void ResetForNewMatch();
-		void AddNewPlayerSnapshot(const PlayerSnapshotMessage& msg, bool wasOld);
+		void AddNewPlayerSnapshot(const PlayerSnapshotMessage& msg, SnapshotVersion version);
 		void ApplyTimeSync();
 
 		virtual void DoBufferEnqueue(const PlayerSnapshotMessage& msg, const EnqueueInfo& enqueueInfo);

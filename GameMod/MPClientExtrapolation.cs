@@ -312,7 +312,7 @@ namespace GameMod {
         // guareded by a lock.
         public static void AddNewPlayerSnapshot(NewPlayerSnapshotToClientMessage msg, MPNoPositionCompression.SnapshotVersion version)
         {
-            MPPlayerStateDump.buf.AddNewEnqueue(ref msg, wasOld);
+            MPPlayerStateDump.buf.AddNewEnqueue(ref msg, (uint)version);
             lock (m_last_messages_lock) {
                 if (m_last_messages_ring_count == 0) {
                     // first packet
