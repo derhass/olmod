@@ -193,21 +193,13 @@ void Derhass32b::AddNewPlayerSnapshot(const PlayerSnapshotMessage& msg, bool was
 			deltaFrames = (int)((msg.message_timestamp - m_last_message_server_time) / fixedDeltaTime + 0.5f);
 		}
 
-		if (deltaFrames < -60 || deltaFrames > 60) {
-			log.Log(Logger::WARN, "detected %d missing snapshots: FULL RESYNC",  deltaFrames - 1);
-			// we are more than +/- 1 second off from the server
-			// completely re-sync
-			ClearRing();
-			EnqueueToRing(msg, false);
-			m_last_update_time = gs.lastTimestamp;
-			m_unsynced_messages_count = 0;
-		} else if (deltaFrames <= 1) {
+		if (deltaFrames == 1) {
+			// FAST PATH
 			// next in sequence, as we expected
 			EnqueueToRing(msg, wasOld);
 			m_unsynced_messages_count++;
 		} else if (deltaFrames > 1) {
-			log.Log(Logger::WARN, "detected %d missing snapshots",  deltaFrames - 1);
-			// this is the slow path
+			// SLOW PATH:
 			// we actually do the creation of missing packets here
 			// one per received new snapshot, so that the per-frame
 			// update code path can stay simple
@@ -235,11 +227,27 @@ void Derhass32b::AddNewPlayerSnapshot(const PlayerSnapshotMessage& msg, bool was
 				EnqueueToRing(ExtrapolatePlayerSnapshotMessage(msg, -1.0f * fixedDeltaTime), false);
 				EnqueueToRing(msg, false);
 			}
+			log.Log(Logger::WARN, "detected %d missing snapshots",  deltaFrames - 1);
 			m_unsynced_messages_count += deltaFrames;
 			m_missing_packets_count += (deltaFrames - 1);
 			instrp[INSTR_SKIP_DETECTED].count++;
 			instrp[INSTR_SKIPPED_FRAMES].count+=(deltaFrames - 1);
-                }
+                } else if (deltaFrames < -180) {
+			// the message is more than 3 seconds old!
+			// This should never happen, and if it does, something really weird
+			// is going on, so we better completely re-sync with the server,
+			// better safe than sorry!
+			ClearRing();
+			EnqueueToRing(msg, false);
+			m_last_update_time = gs.lastTimestamp;
+			m_unsynced_messages_count = 0;
+			instrp[INSTR_UNPLAUSIBE_TIMESTAMP].count++;
+			log.Log(Logger::WARN, "unplausible packet from the past: %d frames behind, FULL RESYNC", -deltaFrames);
+		} else {
+			log.Log(Logger::WARN, "ignoring duplicated packet from the past: %d frames behind", -deltaFrames);
+			instrp[INSTR_DUPED_FRAMES].count++;
+			m_duplicated_packets_count++;
+		}
 	}
 	m_last_message_time = gs.lastTimestamp;
 	m_last_message_server_time = msg.message_timestamp;
