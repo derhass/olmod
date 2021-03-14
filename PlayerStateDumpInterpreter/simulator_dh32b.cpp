@@ -38,7 +38,7 @@ Derhass32b::~Derhass32b()
 
 const char *Derhass32b::GetBaseName() const
 {
-	return "derhass32";
+	return "derhass32b1";
 }
 
 void Derhass32b::EnqueueToRing(const PlayerSnapshotMessage& msg, bool estimateVelocities)
