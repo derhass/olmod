@@ -233,12 +233,6 @@ namespace GameMod {
             m_missing_packets_count= 0;
             m_ignored_packets_count = 0;
             m_compensation_last = Time.time;
-
-            // assume the server sends no realiable timestamps in the NewPlayerSnapshotToClientMessage
-            // If the server, does send reliable ones, this will be updated by MPTweaks
-            // "nocompress.reliable_timestamps" later on
-            Debug.Log("assuming unreliable timestamps");
-            MPNoPositionCompression.NewSnapshotVersion = MPNoPositionCompression.SnapshotVersion.VELOCITY;
         }
 
         // interpolate a single NewPlayerSnapshot (including the extra fields besides pos and rot)!
