@@ -354,8 +354,8 @@ namespace GameMod {
                     // 0 and 1 is already used in older versions for the bool
                     //int iWasOld = (wasOld)?1:0;
                     //bw.Write(iWasOld);
-                    version += 2;
-                    bw.Write(version+2);
+                    version += 4; // ARGH, I'm an idiot, meant +2
+                    bw.Write(version);
 					WriteNewPlayerSnapshotMessage(ref msg);
 					Flush(false);
 				} catch (Exception e) {

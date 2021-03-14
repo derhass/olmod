@@ -346,22 +346,22 @@ void Interpreter::ProcessNewEnqueue()
 	}
 	if (fileVersion >= 4) {
 		uint32_t value = ReadUint();
-		if (value < 2) {
+		if (value < 4) {
 			enqueue.wasOld = (int)value;
 			if (value) {
 				enqueue.snapshotVersion = SNAPSHOT_VELOCITY;
 			}
 		} else {
-			SnapshotVersion ver = (SnapshotVersion)(value-2);
+			SnapshotVersion ver = (SnapshotVersion)(value-4);
 			enqueue.wasOld = (ver == SNAPSHOT_VANILLA);
 			enqueue.snapshotVersion = ver;
 		}
 	}
 	uint32_t i, num = ReadNewPlayerSnapshotMessage(currentSnapshots);
-	log.Log(Logger::DEBUG, "got NEW ENQUEUE at rts%fs ts%fs for %u players, matchts:%f messagets:%f, wasOld:%d", 
+	log.Log(Logger::DEBUG, "got NEW ENQUEUE at rts%fs ts%fs for %u players, matchts:%f messagets:%f, version:%u", 
 		enqueue.realTimestamp, enqueue.timestamp, (unsigned)num, 
 		enqueue.matchTimestamp,currentSnapshots.message_timestamp,
-		enqueue.wasOld);
+		(unsigned)enqueue.snapshotVersion);
 	currentSnapshots.recv_timestamp = enqueue.realTimestamp;
 	for (i=0; i<num; i++) {
 		currentSnapshots.snapshot[i].state.realTimestamp = enqueue.realTimestamp;
