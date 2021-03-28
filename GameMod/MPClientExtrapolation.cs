@@ -587,7 +587,7 @@ namespace GameMod {
             //       as extrapolation...
             m_compensation_interpol_count += (interpolate_ticks > 0)?1:0;
             if (Time.time >= m_compensation_last + 5.0 && m_compensation_count > 0) {
-                Debug.LogFormat("ship lag compensation over last {0} frames: {1}ms / {2} physics ticks, {3} interpolation ({4}%) packets: {5} received / {6} missing / {7} old ignored",
+                Debug.LogFormat("lag comp {0} frames: {1}ms / {2} ticks, {3} interp ({4}%) packets: {5} recv / {6} mis / {7} ign",
                                 m_compensation_count, 1000.0f* (m_compensation_sum/ m_compensation_count),
                                 (m_compensation_sum/m_compensation_count)/Time.fixedDeltaTime,
                                 m_compensation_interpol_count,
