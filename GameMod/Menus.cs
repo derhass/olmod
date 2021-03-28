@@ -2,6 +2,7 @@
 using Overload;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Reflection.Emit;
 using UnityEngine;
 
@@ -28,10 +29,22 @@ namespace GameMod
             set { _mms_scale_respawn_time = value; }
         }
         public static bool mms_classic_spawns { get; set; }
+        public static bool mms_always_cloaked { get; set; }
+        public static bool mms_allow_smash { get; set; }
 
         public static string GetMMSRearViewPIP()
         {
             return MenuManager.GetToggleSetting(Convert.ToInt32(RearView.MPMenuManagerEnabled));
+        }
+
+        public static string GetMMSAlwaysCloaked()
+        {
+            return MenuManager.GetToggleSetting(Convert.ToInt32(mms_always_cloaked));
+        }
+
+        public static string GetMMSAllowSmash()
+        {
+            return MenuManager.GetToggleSetting(Convert.ToInt32(mms_allow_smash));
         }
 
         public static string GetMMSScaleRespawnTime()
@@ -116,6 +129,7 @@ namespace GameMod
         public static int mms_lag_compensation = 3;
         public static int mms_lag_compensation_strength = 2;
         public static int mms_lag_compensation_use_interpolation = 0;
+        public static string mms_mp_projdata_fn = "STOCK";
     }
 
 
@@ -142,12 +156,20 @@ namespace GameMod
             position.y = col_top - 250f;
             uie.SelectAndDrawStringOptionItem(Loc.LS("ALLOW REAR VIEW CAMERA"), position, 11, Menus.GetMMSRearViewPIP(), Loc.LS("CLIENTS CAN CHOOSE TO HAVE REAR VIEW"), 1f, false);
             position.y += 62f;
+            uie.SelectAndDrawStringOptionItem(Loc.LS("ALWAYS CLOAKED"), position, 15, Menus.GetMMSAlwaysCloaked(), Loc.LS("SHIPS ARE ALWAYS CLOAKED"), 1f, false);
+            position.y += 62f;
             uie.SelectAndDrawStringOptionItem(Loc.LS("SCALE RESPAWN TO TEAM SIZE"), position, 12, Menus.GetMMSScaleRespawnTime(), Loc.LS("AUTOMATICALLY SCALE RESPAWN TIME TO TEAM SIZE (e.g. 4 = 4 seconds)"), 1f, !(MenuManager.mms_mode == ExtMatchMode.TEAM_ANARCHY || MenuManager.mms_mode == ExtMatchMode.CTF || MenuManager.mms_mode == ExtMatchMode.MONSTERBALL));
             position.y += 62f;
             uie.SelectAndDrawStringOptionItem(Loc.LS("CLASSIC SPAWNS"), position, 13, Menus.GetMMSClassicSpawns(), Loc.LS("SPAWN WITH IMPULSE+ DUALS AND FALCONS"), 1f, false);
             position.y += 62f;
             uie.SelectAndDrawStringOptionItem(Loc.LS("CTF CARRIER BOOSTING"), position, 14, Menus.GetMMSCtfCarrierBoost(), Loc.LS("FLAG CARRIER CAN USE BOOST IN CTF"), 1f, false);
             position.y += 62f;
+            uie.SelectAndDrawStringOptionItem(Loc.LS("PROJECTILE DATA"), position, 16, Menus.mms_mp_projdata_fn == "STOCK" ? "STOCK" : System.IO.Path.GetFileName(Menus.mms_mp_projdata_fn), string.Empty, 1f, false);
+            position.y += 62f;
+            if (DateTime.Now > new DateTime(2021, 4, 2)) {
+                uie.SelectAndDrawStringOptionItem(Loc.LS("ALLOW SMASH ATTACK"), position, 17, Menus.GetMMSAllowSmash(), Loc.LS("ALLOWS PLAYERS TO USE THE SMASH ATTACK"), 1f, false);
+                position.y += 62f;
+            }
         }
 
         private static void AdjustAdvancedPositionCenterColumn(ref Vector2 position)
@@ -243,29 +265,54 @@ namespace GameMod
         {
             if (MenuManager.m_menu_sub_state == MenuSubState.ACTIVE &&
                 (UIManager.PushedSelect(100) || UIManager.PushedDir()) &&
-                MenuManager.m_menu_micro_state == 3 &&
-                UIManager.m_menu_selection == 12)
+                MenuManager.m_menu_micro_state == 3)
             {
-                Menus.mms_scale_respawn_time = !Menus.mms_scale_respawn_time;
-                MenuManager.PlayCycleSound(1f, (float)UIManager.m_select_dir);
-            }
-
-            if (MenuManager.m_menu_sub_state == MenuSubState.ACTIVE &&
-                (UIManager.PushedSelect(100) || UIManager.PushedDir()) &&
-                MenuManager.m_menu_micro_state == 3 &&
-                UIManager.m_menu_selection == 13)
-            {
-                Menus.mms_classic_spawns = !Menus.mms_classic_spawns;
-                MenuManager.PlayCycleSound(1f, (float)UIManager.m_select_dir);
-            }
-
-            if (MenuManager.m_menu_sub_state == MenuSubState.ACTIVE &&
-                (UIManager.PushedSelect(100) || UIManager.PushedDir()) &&
-                MenuManager.m_menu_micro_state == 3 &&
-                UIManager.m_menu_selection == 14)
-            {
-                Menus.mms_ctf_boost = !Menus.mms_ctf_boost;
-                MenuManager.PlayCycleSound(1f, (float)UIManager.m_select_dir);
+                switch (UIManager.m_menu_selection)
+                {
+                    case 12:
+                        Menus.mms_scale_respawn_time = !Menus.mms_scale_respawn_time;
+                        MenuManager.PlayCycleSound(1f, (float)UIManager.m_select_dir);
+                        break;
+                    case 13:
+                        Menus.mms_classic_spawns = !Menus.mms_classic_spawns;
+                        MenuManager.PlayCycleSound(1f, (float)UIManager.m_select_dir);
+                        break;
+                    case 14:
+                        Menus.mms_ctf_boost = !Menus.mms_ctf_boost;
+                        MenuManager.PlayCycleSound(1f, (float)UIManager.m_select_dir);
+                        break;
+                    case 15:
+                        Menus.mms_always_cloaked = !Menus.mms_always_cloaked;
+                        MenuManager.PlayCycleSound(1f, (float)UIManager.m_select_dir);
+                        break;
+                    case 16:
+                        if (UIManager.PushedSelect(100))
+                        {
+                            var files = new string[] { "STOCK" }.AddRangeToArray(Directory.GetFiles(Config.OLModDir, "projdata-*.txt"));
+                            for (int i = 0; i < files.Length; i++)
+                            {
+                                uConsole.Log(files[i] + ": " + files.Length.ToString());
+                                if (Menus.mms_mp_projdata_fn == files[i])
+                                {
+                                    if (i + 1 < files.Length)
+                                    {
+                                        Menus.mms_mp_projdata_fn = files[i + 1];
+                                    }
+                                    else
+                                    {
+                                        Menus.mms_mp_projdata_fn = files[0];
+                                    }
+                                    break;
+                                }
+                            }
+                            MenuManager.PlayCycleSound(1f, 1f);
+                        }
+                        break;
+                    case 17:
+                        Menus.mms_allow_smash = !Menus.mms_allow_smash;
+                        MenuManager.PlayCycleSound(1f, (float)UIManager.m_select_dir);
+                        break;
+                }
             }
         }
     }

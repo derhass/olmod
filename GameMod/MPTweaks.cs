@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Reflection.Emit;
 using Harmony;
 using Overload;
 using UnityEngine;
@@ -87,6 +88,13 @@ namespace GameMod {
             {
                 MPPickupCheck.PickupCheck = valBool;
                 return Boolean.TrueString;
+            }
+            if (key == "nocompress.reliable_timestamps" && bool.TryParse(value, out bool valTimestamps))
+            {
+                //Debug.LogFormat("MPTweaks: server sends reliable timestamps: {0}",(valTimestamps)?1:0);
+                var oldValue = (MPNoPositionCompression.NewSnapshotVersion == MPNoPositionCompression.SnapshotVersion.VELOCITY_TIMESTAMP)?Boolean.TrueString:Boolean.FalseString;
+                MPNoPositionCompression.NewSnapshotVersion = (valTimestamps)?MPNoPositionCompression.SnapshotVersion.VELOCITY_TIMESTAMP:MPNoPositionCompression.SnapshotVersion.VELOCITY;
+                return oldValue;
             }
             return null;
         }
@@ -173,6 +181,7 @@ namespace GameMod {
                 tweaks.Add("ctf.returntimer", CTF.ReturnTimeAmountDefault.ToStringInvariantCulture());
             if (!MPCustomModeFile.PickupCheck)
                 tweaks.Add("item.pickupcheck", Boolean.FalseString);
+            tweaks.Add("nocompress.reliable_timestamps", Boolean.TrueString);
             if (tweaks.Any())
             {
                 Debug.LogFormat("MPTweaks: sending tweaks {0}", tweaks.Join());
@@ -348,6 +357,21 @@ namespace GameMod {
             }
             if (clientInfo.Capabilities.ContainsKey("ModPrivateData")) {
                 MPModPrivateDataTransfer.SendTo(connId);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Doubles the time allotted to wait for a client to start the match.
+    /// </summary>
+    [HarmonyPatch(typeof(NetworkMatch), "CanLaunchCountdown")]
+    class MPTweaks_NetworkMatch_CanLaunchCountdown {
+        static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> codes) {
+            foreach (var code in codes) {
+                if (code.opcode == OpCodes.Ldc_R4) {
+                    code.operand = 60f;
+                }
+                yield return code;
             }
         }
     }
