@@ -65,6 +65,11 @@ int main(int argc, char **argv)
 	sDH32bb.Configure("max=120;scale=50;ping=-2000;lag=0;");
 	interpreter.AddSimulator(sDH32bb);
 	sDH32bb.SetLogging(levelSim,  dir);
+
+	OlmodPlayerDumpState::Simulator::Derhass32b sDH32bc(rp);
+	sDH32bc.Configure("max=0;scale=0;ping=0;lag=34;");
+	interpreter.AddSimulator(sDH32bc);
+	sDH32bc.SetLogging(levelSim,  dir);
 	/*
 	OlmodPlayerDumpState::Simulator::Derhass1 sDH1(rp);
 	sDH1.Configure("max=0;scale=0;ping=0;");

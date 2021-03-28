@@ -13,6 +13,7 @@ void EnqueueInfo::Clear()
 	matchTimestamp = -1.0f;
 	timeScale = -1.0f;
 	wasOld = 0;
+	snapshotVersion = SNAPSHOT_VELOCITY;
 }
 
 GameState::GameState() :
@@ -319,6 +320,7 @@ void Interpreter::ProcessEnqueue()
 	enqueue.Clear();
 	enqueue.timestamp = ReadFloat();
 	enqueue.wasOld = 1;
+	enqueue.snapshotVersion = SNAPSHOT_VANILLA;
 	uint32_t i, num = ReadPlayerSnapshotMessage(currentSnapshots);
 	log.Log(Logger::DEBUG, "got ENQUEUE at %fs for %u players", enqueue.timestamp, (unsigned)num);
 	for (i=0; i<num; i++) {
@@ -343,13 +345,23 @@ void Interpreter::ProcessNewEnqueue()
 		gameState.timeScale = enqueue.timeScale;
 	}
 	if (fileVersion >= 4) {
-		enqueue.wasOld = ReadInt();
+		uint32_t value = ReadUint();
+		if (value < 4) {
+			enqueue.wasOld = (int)value;
+			if (value) {
+				enqueue.snapshotVersion = SNAPSHOT_VELOCITY;
+			}
+		} else {
+			SnapshotVersion ver = (SnapshotVersion)(value-4);
+			enqueue.wasOld = (ver == SNAPSHOT_VANILLA);
+			enqueue.snapshotVersion = ver;
+		}
 	}
 	uint32_t i, num = ReadNewPlayerSnapshotMessage(currentSnapshots);
-	log.Log(Logger::DEBUG, "got NEW ENQUEUE at rts%fs ts%fs for %u players, matchts:%f messagets:%f, wasOld:%d", 
+	log.Log(Logger::DEBUG, "got NEW ENQUEUE at rts%fs ts%fs for %u players, matchts:%f messagets:%f, version:%u", 
 		enqueue.realTimestamp, enqueue.timestamp, (unsigned)num, 
 		enqueue.matchTimestamp,currentSnapshots.message_timestamp,
-		enqueue.wasOld);
+		(unsigned)enqueue.snapshotVersion);
 	currentSnapshots.recv_timestamp = enqueue.realTimestamp;
 	for (i=0; i<num; i++) {
 		currentSnapshots.snapshot[i].state.realTimestamp = enqueue.realTimestamp;

@@ -338,7 +338,7 @@ namespace GameMod {
 				}
 			}
 
-			public void AddNewEnqueue(ref NewPlayerSnapshotToClientMessage msg, bool wasOld)
+			public void AddNewEnqueue(ref NewPlayerSnapshotToClientMessage msg, uint version)
 			{
 				if (!go) {
 					return;
@@ -351,8 +351,11 @@ namespace GameMod {
 					bw.Write(Time.unscaledTime);
 					bw.Write(Time.timeScale);
 					bw.Write(NetworkMatch.m_match_elapsed_seconds);
-                    int iWasOld = (wasOld)?1:0;
-                    bw.Write(iWasOld);
+                    // 0 and 1 is already used in older versions for the bool
+                    //int iWasOld = (wasOld)?1:0;
+                    //bw.Write(iWasOld);
+                    version += 4; // ARGH, I'm an idiot, meant +2
+                    bw.Write(version);
 					WriteNewPlayerSnapshotMessage(ref msg);
 					Flush(false);
 				} catch (Exception e) {

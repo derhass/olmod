@@ -11,10 +11,12 @@ namespace Simulator {
 
 Derhass32b::Derhass32b(ResultProcessor& rp) :
 	Cow1(rp),
-	mms_ship_max_interpolate_frames(0),
+	mms_ship_lag_added(0.0f),
+	assumeVersion(-1),
 	fixedDeltaTime(1.0f/60.0f)
 {
-	cfg.Add(ConfigParam(mms_ship_max_interpolate_frames,"interpolate_frames", "interpol"));
+	cfg.Add(ConfigParam(mms_ship_lag_added,"ship_lag_added", "lag"));
+	cfg.Add(ConfigParam(assumeVersion,"assume_snapshot_version", "sver"));
 
 	instrp[INSTR_HARD_SYNC].name = "DH32_HARD_SYNC";
 	instrp[INSTR_SOFT_SYNC].name = "DH32_SOFT_SYNC";
@@ -26,6 +28,8 @@ Derhass32b::Derhass32b(ResultProcessor& rp) :
 	instrp[INSTR_EXTRAPOLATE_PAST].name = "DH32_EXTRAPOLATE_PAST";
 	instrp[INSTR_SKIP_DETECTED].name = "DH32B_SKIP_DETECTED";
 	instrp[INSTR_SKIPPED_FRAMES].name = "DH32B_SKIPPED_FRAMES";
+	instrp[INSTR_DUPED_FRAMES].name = "DH32B_DUPED_FRAMES";
+	instrp[INSTR_UNPLAUSIBE_TIMESTAMP].name = "DH32B_UNPLAUSIBLE_TIMESTAMP";
 }
 
 Derhass32b::~Derhass32b()
@@ -34,17 +38,17 @@ Derhass32b::~Derhass32b()
 
 const char *Derhass32b::GetBaseName() const
 {
-	return "derhass32";
+	return "derhass32b1";
 }
 
-void Derhass32b::EnqueueToRing(const PlayerSnapshotMessage& msg, bool wasOld)
+void Derhass32b::EnqueueToRing(const PlayerSnapshotMessage& msg, bool estimateVelocities)
 {
 	m_last_messages_ring_pos_last = (m_last_messages_ring_pos_last + 1) & 3;
 	m_last_messages_ring[m_last_messages_ring_pos_last] = msg;
 	if (m_last_messages_ring_count < 4) {
 		m_last_messages_ring_count++;
 	}
-	if (wasOld) {
+	if (estimateVelocities) {
 		PlayerSnapshotMessage& newMsg = m_last_messages_ring[(m_last_messages_ring_pos_last + 4) & 3];
 		const PlayerSnapshotMessage& lastMsg = m_last_messages_ring[(m_last_messages_ring_pos_last + 3) & 3];
 		for (size_t i=0; i<newMsg.snapshot.size(); i++) {
@@ -64,7 +68,7 @@ void Derhass32b::EnqueueToRing(const PlayerSnapshotMessage& msg, bool wasOld)
 			}
 		}
 	}
-	log.Log(Logger::DEBUG, "adding %f at %f, wasOld: %d, have %d", msg.message_timestamp, ip->GetGameState().lastTimestamp, wasOld, m_last_messages_ring_count);
+	log.Log(Logger::DEBUG, "adding %f at %f, estimateVel: %d, have %d", msg.message_timestamp, ip->GetGameState().lastTimestamp, estimateVelocities?1:0, m_last_messages_ring_count);
 }
 
 // Clear the contents of the ring buffer
@@ -72,8 +76,83 @@ void Derhass32b::ClearRing()
 {
 	m_last_messages_ring_pos_last = 3;
 	m_last_messages_ring_count = 0;
-	m_new_message_count = 0;
-	m_last_message_time = 0.0f;
+	m_unsynced_messages_count = 0;
+	m_last_message_time = -1.0f;
+	m_last_message_server_time = -1.0f;
+}
+
+// interpolate a single NewPlayerSnapshot (including the extra fields besides pos and rot)!
+// this is used for generating synthetic snapshot messages in case we detected missing packets
+void Derhass32b::InterpolatePlayerSnapshot(PlayerSnapshot& C, const PlayerSnapshot& A, const PlayerSnapshot& B, float t)
+{
+	C.id = A.id;
+
+	lerp(A.state.pos, B.state.pos, C.state.pos, t);
+	lerp(A.state.vel, B.state.vel, C.state.vel, t);
+	slerp(A.state.rot, B.state.rot, C.state.rot, t);
+	// TODO: vrot
+	C.state.vrot[0] = B.state.vrot[0];
+	C.state.vrot[1] = B.state.vrot[1];
+	C.state.vrot[2] = B.state.vrot[2];
+}
+
+// extrapolate a single NewPlayerSnapshot (including the extra fields besides pos and rot)!
+// this is used for generating synthetic snapshot messages in case we detected missing packets
+void Derhass32b::ExtrapolatePlayerSnapshot(PlayerSnapshot& C, const PlayerSnapshot& B, float t)
+{
+	C.id = B.id;
+	float npos[3];
+	npos[0]=B.state.pos[0] + B.state.vel[0];
+	npos[1]=B.state.pos[1] + B.state.vel[1];
+	npos[2]=B.state.pos[2] + B.state.vel[2];
+
+	lerp(B.state.pos, npos, C.state.pos, t);
+	C.state.vel[0] = B.state.vel[0];
+	C.state.vel[1] = B.state.vel[1];
+	C.state.vel[2] = B.state.vel[2];
+	// TODO: rotation
+	C.state.rot = B.state.rot;
+	C.state.vrot[0] = B.state.vrot[0];
+	C.state.vrot[1] = B.state.vrot[1];
+	C.state.vrot[2] = B.state.vrot[2];
+}
+
+// interpolate a whole NewPlayerSnapshotToClientMessage
+// interpolate between A and B, t is the relative factor between both
+// If a player is not in both messages, it will not be in the resulting messages
+// this is used for generating synthetic snapshot messages in case we detected missing packets
+PlayerSnapshotMessage Derhass32b::InterpolatePlayerSnapshotMessage(const PlayerSnapshotMessage& A, const PlayerSnapshotMessage& B, float t)
+{
+	PlayerSnapshotMessage C = B;
+	size_t i,j;
+
+	for (i=0; i<A.snapshot.size(); i++) {
+		for (j=0; j<B.snapshot.size(); j++) {
+			if (A.snapshot[i].id == B.snapshot[j].id) {
+				InterpolatePlayerSnapshot(C.snapshot[j], A.snapshot[i], B.snapshot[j], t);
+				continue;
+			}
+    		}
+	}
+
+	C.message_timestamp = (1.0f - t) * A.message_timestamp + t*B.message_timestamp;
+	return C;
+}
+
+// extrapolate a whole NewPlayerSnapshotToClientMessage
+// extrapolate from B into t seconds into the future, t can be negative
+// this is used for generating synthetic snapshot messages in case we detected missing packets
+PlayerSnapshotMessage Derhass32b::ExtrapolatePlayerSnapshotMessage(const PlayerSnapshotMessage& B, float t)
+{
+	PlayerSnapshotMessage C = B;
+	size_t j;
+
+	for (j=0; j<B.snapshot.size(); j++) {
+		ExtrapolatePlayerSnapshot(C.snapshot[j], B.snapshot[j], t);
+    	}
+	
+	C.message_timestamp = B.message_timestamp + t;
+	return C;
 }
 
 // Prepare for a new match
@@ -87,6 +166,8 @@ void Derhass32b::ResetForNewMatch()
 	m_compensation_sum = 0.0f;
 	m_compensation_count = 0;
 	m_compensation_interpol_count = 0;
+	m_missing_packets_count = 0;
+	m_duplicated_packets_count = 0;
 	m_compensation_last = ip->GetGameState().lastTimestamp;
 }
 
@@ -95,33 +176,90 @@ void Derhass32b::ResetForNewMatch()
 // This function adds the message into the ring buffer, and
 // also implements the time sync algorithm between the message sequence and
 // the local render time.
-void Derhass32b::AddNewPlayerSnapshot(const PlayerSnapshotMessage& msg, bool wasOld)
+void Derhass32b::AddNewPlayerSnapshot(const PlayerSnapshotMessage& msg, SnapshotVersion version)
 {
 	const GameState& gs=ip->GetGameState();
 	if  (m_last_messages_ring_count == 0) {
 		// first packet
 		EnqueueToRing(msg, false);
 		m_last_update_time = gs.lastTimestamp;
+		m_unsynced_messages_count = 0;
 	} else {
-		// next in sequence, as we expected
-		EnqueueToRing(msg, wasOld);
-		const PlayerSnapshotMessage& lastMsg = m_last_messages_ring[(m_last_messages_ring_pos_last + 3) & 3];
-		float delta = (msg.message_timestamp - lastMsg.message_timestamp) / fixedDeltaTime;
-		if (delta < 1.26f) {
-			m_new_message_count++;
+		bool estimateVelocities = (version == SNAPSHOT_VANILLA);
+		int deltaFrames;
+		if (version != SNAPSHOT_VELOCITY_TIMESTAMP) {
+			// we do not have server timestamps
+			deltaFrames = 1;
 		} else {
+			// determine how many frames ahead this new message is relative to
+			// the last one we have seen
+			deltaFrames = (int)((msg.message_timestamp - m_last_message_server_time) / fixedDeltaTime + 0.5f);
+		}
+
+		if (deltaFrames == 1) {
+			// FAST PATH
+			// next in sequence, as we expected
+			EnqueueToRing(msg, estimateVelocities);
+			m_unsynced_messages_count++;
+		} else if (deltaFrames > 1) {
+			// SLOW PATH:
+			// we actually do the creation of missing packets here
+			// one per received new snapshot, so that the per-frame
+			// update code path can stay simple
+			const PlayerSnapshotMessage& lastMsg = m_last_messages_ring[m_last_messages_ring_pos_last];
+			if (deltaFrames == 2) {
+				// there is one missing snapshot
+				EnqueueToRing(InterpolatePlayerSnapshotMessage(lastMsg,msg,0.5f), false);
+				EnqueueToRing(msg, false);
+			} else if (deltaFrames == 3) {
+				// there are two missing snapshots
+				EnqueueToRing(InterpolatePlayerSnapshotMessage(lastMsg,msg,0.3333f),false);
+				EnqueueToRing(InterpolatePlayerSnapshotMessage(lastMsg,msg,0.6667f),false);
+				EnqueueToRing(msg, false);
+			} else if (deltaFrames ==  4) {
+				// there are three missing snapshots
+				EnqueueToRing(InterpolatePlayerSnapshotMessage(lastMsg,msg,0.25f), false);
+				EnqueueToRing(InterpolatePlayerSnapshotMessage(lastMsg,msg,0.5f),  false);
+				EnqueueToRing(InterpolatePlayerSnapshotMessage(lastMsg,msg,0.75f), false);
+				EnqueueToRing(msg, false);
+			} else {
+				// there are more than 3 missing snapshots,
+				// just take the completely new data in
+				EnqueueToRing(ExtrapolatePlayerSnapshotMessage(msg, -3.0f * fixedDeltaTime), false);
+				EnqueueToRing(ExtrapolatePlayerSnapshotMessage(msg, -2.0f * fixedDeltaTime), false);
+				EnqueueToRing(ExtrapolatePlayerSnapshotMessage(msg, -1.0f * fixedDeltaTime), false);
+				EnqueueToRing(msg, false);
+			}
+			log.Log(Logger::WARN, "detected %d missing snapshots",  deltaFrames - 1);
+			m_unsynced_messages_count += deltaFrames;
+			m_missing_packets_count += (deltaFrames - 1);
 			instrp[INSTR_SKIP_DETECTED].count++;
-			instrp[INSTR_SKIPPED_FRAMES].count+=((unsigned)(delta + 0.75f)-1);
-			m_new_message_count += (int)(delta + 0.75f);
+			instrp[INSTR_SKIPPED_FRAMES].count+=(deltaFrames - 1);
+                } else if (deltaFrames < -180) {
+			// the message is more than 3 seconds old!
+			// This should never happen, and if it does, something really weird
+			// is going on, so we better completely re-sync with the server,
+			// better safe than sorry!
+			ClearRing();
+			EnqueueToRing(msg, false);
+			m_last_update_time = gs.lastTimestamp;
+			m_unsynced_messages_count = 0;
+			instrp[INSTR_UNPLAUSIBE_TIMESTAMP].count++;
+			log.Log(Logger::WARN, "unplausible packet from the past: %d frames behind, FULL RESYNC", -deltaFrames);
+		} else {
+			log.Log(Logger::WARN, "ignoring duplicated packet from the past: %d frames behind", -deltaFrames);
+			instrp[INSTR_DUPED_FRAMES].count++;
+			m_duplicated_packets_count++;
 		}
 	}
 	m_last_message_time = gs.lastTimestamp;
+	m_last_message_server_time = msg.message_timestamp;
 	//ApplyTimeSync();
 }
 
 void Derhass32b::ApplyTimeSync()
 {
-	if (m_new_message_count < 1) {
+	if (m_unsynced_messages_count < 1) {
 		return;
 	}
 
@@ -129,8 +267,8 @@ void Derhass32b::ApplyTimeSync()
 	rpcAux[AUX_BUFFER_UPDATE]->Add(gs.lastTimestamp);
 	rpcAux[AUX_BUFFER_UPDATE]->Add(gs.lastRealTimestamp);
 	rpcAux[AUX_BUFFER_UPDATE]->Add(m_last_update_time);
-	m_last_update_time += m_new_message_count * fixedDeltaTime;
-	m_new_message_count = 0;
+	m_last_update_time += m_unsynced_messages_count * fixedDeltaTime;
+	m_unsynced_messages_count = 0;
 
 	// check if the time base is still plausible
 	float delta = (m_last_message_time - m_last_update_time) / fixedDeltaTime; // in ticks
@@ -158,7 +296,8 @@ void Derhass32b::ApplyTimeSync()
 void Derhass32b::DoBufferEnqueue(const PlayerSnapshotMessage& msg, const EnqueueInfo& enqueueInfo)
 {
 	SimulatorBase::DoBufferEnqueue(msg, enqueueInfo);
-	AddNewPlayerSnapshot(msg, enqueueInfo.wasOld);
+	SnapshotVersion version = (assumeVersion < 0) ? enqueueInfo.snapshotVersion : (SnapshotVersion)assumeVersion;
+	AddNewPlayerSnapshot(msg, version);
 }
 
 // Called per frame, moves ships along their interpolation/extrapolation motions
@@ -188,7 +327,7 @@ bool Derhass32b::DoInterpolation(const InterpolationCycle& interpolationInfo, In
 	delta_t = now + GetShipExtrapolationTime() - m_last_update_time;
 	// if we want interpolation, add this as a _negative) offset
 	// we use delta_t=0  as the base for from which we extrapolate into the future
-	delta_t -= mms_ship_max_interpolate_frames * fixedDeltaTime;
+	delta_t -= mms_ship_lag_added / 1000.0f;
 	// time difference in physics ticks
 	float delta_ticks = delta_t / fixedDeltaTime;
 	// the number of frames we need to interpolate into
@@ -249,14 +388,18 @@ bool Derhass32b::DoInterpolation(const InterpolationCycle& interpolationInfo, In
 	//	   as extrapolation...
 	m_compensation_interpol_count += (interpolate_ticks > 0)?1:0;
 	if (interpolationInfo.timestamp >= m_compensation_last + 5.0 && m_compensation_count > 0) {
-		log.Log(Logger::INFO, "ship lag compensation over last %u frames: %fms / %f physics ticks, %u interpolation (%f%%)",
+		log.Log(Logger::INFO, "ship lag compensation over last %u frames: %fms / %f physics ticks, %u interpolation (%f%%) packets: %d missing / %d duplicates",
 						m_compensation_count, 1000.0f* (m_compensation_sum/ m_compensation_count),
 						(m_compensation_sum/m_compensation_count)/fixedDeltaTime,
 						m_compensation_interpol_count,
-						100.0f*((float)m_compensation_interpol_count/(float)m_compensation_count));
+						100.0f*((float)m_compensation_interpol_count/(float)m_compensation_count),
+						m_missing_packets_count,
+						m_duplicated_packets_count);
 		m_compensation_sum = 0.0f;
 		m_compensation_count = 0;
 		m_compensation_interpol_count = 0;
+		m_missing_packets_count = 0;
+		m_duplicated_packets_count = 0;
 		m_compensation_last = interpolationInfo.timestamp;
 	}
 
