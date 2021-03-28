@@ -80,6 +80,16 @@ namespace GameMod {
             get { return CTF.CarrierBoostEnabled; }
             set { CTF.CarrierBoostEnabled = value; }
         }
+        public static bool AlwaysCloaked {
+            get { return MPAlwaysCloaked.Enabled; }
+            set { MPAlwaysCloaked.Enabled = value; }
+        }
+        public static string CustomProjdata { get; set; }
+
+        public static bool AllowSmash {
+            get { return MPSmash.Enabled; }
+            set { MPSmash.Enabled = value; }
+        }
 
         public static JObject Serialize()
         {
@@ -97,6 +107,9 @@ namespace GameMod {
             jobject["modifierfiltermask"] = ModifierFilterMask;
             jobject["classicspawnsenabled"] = ClassicSpawnsEnabled;
             jobject["ctfcarrierboostenabled"] = CtfCarrierBoostEnabled;
+            jobject["alwayscloaked"] = AlwaysCloaked;
+            jobject["allowsmash"] = AllowSmash;
+            jobject["customprojdata"] = CustomProjdata;
             return jobject;
         }
 
@@ -115,6 +128,9 @@ namespace GameMod {
             ModifierFilterMask = root["modifierfiltermask"].GetInt(255);
             ClassicSpawnsEnabled = root["classicspawnsenabled"].GetBool(false);
             CtfCarrierBoostEnabled = root["ctfcarrierboostenabled"].GetBool(false);
+            AlwaysCloaked = root["alwayscloaked"].GetBool(false);
+            AllowSmash = root["allowsmash"].GetBool(false);
+            CustomProjdata = root["customprojdata"].GetString(string.Empty);
         }
 
         public static string GetModeString(MatchMode mode)
@@ -401,6 +417,25 @@ namespace GameMod {
             MPModPrivateData.ModifierFilterMask = RUtility.BoolArrayToBitmask(MPModifiers.mms_modifier_filter);
             MPModPrivateData.ClassicSpawnsEnabled = Menus.mms_classic_spawns;
             MPModPrivateData.CtfCarrierBoostEnabled = Menus.mms_ctf_boost;
+            MPModPrivateData.AlwaysCloaked = Menus.mms_always_cloaked;
+            MPModPrivateData.AllowSmash = Menus.mms_allow_smash;
+            if (Menus.mms_mp_projdata_fn != "STOCK")
+            {
+                try
+                {
+                    MPModPrivateData.CustomProjdata = System.IO.File.ReadAllText(Menus.mms_mp_projdata_fn);
+                    
+                }
+                catch (Exception ex)
+                {
+                    Debug.Log("Unable to read custom projdata file: " + Menus.mms_mp_projdata_fn);
+                    MPModPrivateData.CustomProjdata = String.Empty;
+                }
+            }
+            else
+            {
+                MPModPrivateData.CustomProjdata = String.Empty;
+            }
 
             var mpd = (PrivateMatchDataMessage)AccessTools.Field(typeof(NetworkMatch), "m_private_data").GetValue(null);
             MPModPrivateData.HasPassword = mpd.m_password.Contains('_');
