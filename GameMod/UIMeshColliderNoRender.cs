@@ -35,6 +35,7 @@ namespace GameMod {
             FieldInfo fieldInfo = renderLayerType.GetField("c_renderer", bindingFlags);
             Renderer r = (Renderer)fieldInfo.GetValue(renderLayer);
             r.enabled = false; // turn it off
+            Debug.Log("Disabling UI collision layer renderer");
         }
     }
 }
