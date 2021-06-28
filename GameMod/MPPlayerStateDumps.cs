@@ -45,8 +45,8 @@ namespace GameMod {
 		}
 
 		public enum PerfProbeLocation : uint {
-			UNITY_UPDATE,
-			UNITY_FIXED_UPDATE,
+			GAMEMANAGER_UPDATE,
+			GAMEMANAGER_FIXED_UPDATE,
 		}
 
 		public class Buffer {
@@ -457,7 +457,7 @@ namespace GameMod {
 				}
 			}
 
-			public void AddPerfProbe(PerfProbeMode loc, uint mode)
+			public void AddPerfProbe(PerfProbeLocation loc, uint mode)
 			{
 				
 				if (!go) {
@@ -582,5 +582,24 @@ namespace GameMod {
 			}
 		}
 		*/
+
+		[HarmonyPatch(typeof(GameManager), "Update")]
+		class MPPlayerStateDump_GameManagerUpdate {
+			static void Prefix() {
+				buf.AddPerfProbe(PerfProbeLocation.GAMEMANAGER_UPDATE, (uint)PerfProbeMode.BEGIN);
+			}
+			static void Postfix() {
+				buf.AddPerfProbe(PerfProbeLocation.GAMEMANAGER_UPDATE, (uint)PerfProbeMode.END);
+			}
+		}
+		[HarmonyPatch(typeof(GameManager), "FixedUpdate")]
+		class MPPlayerStateDump_GameManagerFixedUpdate {
+			static void Prefix() {
+				buf.AddPerfProbe(PerfProbeLocation.GAMEMANAGER_FIXED_UPDATE, (uint)PerfProbeMode.BEGIN);
+			}
+			static void Postfix() {
+				buf.AddPerfProbe(PerfProbeLocation.GAMEMANAGER_FIXED_UPDATE, (uint)PerfProbeMode.END);
+			}
+		}
 	}
 }
