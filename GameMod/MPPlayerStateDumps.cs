@@ -86,6 +86,10 @@ namespace GameMod {
 					bw.Write((uint)4); // file format version
 					bw.Write((uint)0); // size of extra header, reserved for later versions
 					matchCount++;
+					stopWatch.Stop();
+
+					UnityEngine.Debug.LogFormat("MPPlayerStateDump: using {0}-resolution stopwatch, frequency: {1}Hz",
+									((Stopwatch.IsHighResolution)?"high":"low"),Stopwatch.Frequency);
 					stopWatch.Reset();
 					stopWatch.Start();
 					go = true;
