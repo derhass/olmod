@@ -12,7 +12,7 @@ namespace GameMod
 
     public static class PresetData
     {
-        public static bool MPEnabled
+        public static bool ProjDataExists
         {
             get
             {
@@ -22,7 +22,7 @@ namespace GameMod
 
         public static void UpdateLobbyStatus()
         {
-            if (MPEnabled)
+            if (ProjDataExists)
             {
                 MenuManager.AddMpStatus("USING CUSTOM PROJDATA FOR THIS MATCH", 1f, 21);
             }
@@ -57,14 +57,18 @@ namespace GameMod
         }
         public static string GetProjData(TextAsset ta)
         {
-            if (PresetData.MPEnabled)
+            if (PresetData.ProjDataExists)
             {
                 return MPModPrivateData.CustomProjdata;
+            }
+            else if (GameplayManager.IsMultiplayer)
+            {
+                return MPModPrivateData.DEFAULT_PROJ_DATA;
             }
             else
             {
                 // Look for "robotdata.txt" in SP/CM zip files and use if possible
-                if (!GameplayManager.IsMultiplayer && GameplayManager.LevelIsLoaded && GameplayManager.Level.IsAddOn)
+                if (!GameplayManager.IsMultiplayer && GameplayManager.Level.IsAddOn)
                 {
                     string text3 = null;
                     string filepath = Path.Combine(Path.GetDirectoryName(GameplayManager.Level.FilePath), "projdata");
@@ -84,7 +88,7 @@ namespace GameMod
         public static string GetRobotData(TextAsset ta)
         {
             // Look for "robotdata.txt" in SP/CM zip files and use if possible
-            if (!GameplayManager.IsMultiplayer && GameplayManager.LevelIsLoaded && GameplayManager.Level.IsAddOn)
+            if (!GameplayManager.IsMultiplayer && GameplayManager.Level.IsAddOn)
             {
                 string text3 = null;
                 string filepath = Path.Combine(Path.GetDirectoryName(GameplayManager.Level.FilePath), "robotdata");
@@ -135,7 +139,7 @@ namespace GameMod
     {
         static void Postfix(UIElement __instance)
         {
-            if (PresetData.MPEnabled)
+            if (PresetData.ProjDataExists)
             {
                 Vector2 vector = default(Vector2);
                 vector.x = UIManager.UI_LEFT + 110;
@@ -187,8 +191,8 @@ namespace GameMod
     {
         static void LoadCustomPresets()
         {
-            RobotManager.Initialize();
             ProjectileManager.ReadProjPresetData(ProjectileManager.proj_prefabs);
+            RobotManager.ReadPresetData(RobotManager.m_enemy_prefab);
         }
 
         static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> codes)

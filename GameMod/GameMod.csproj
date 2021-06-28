@@ -102,11 +102,14 @@
     <Compile Include="Console.cs" />
     <Compile Include="Controllers.cs" />
     <Compile Include="CTF.cs" />
+    <Compile Include="CustomDoorAutomap.cs" />
     <Compile Include="CustomLevelResources.cs" />
     <Compile Include="DisableTimeCheat.cs" />
+    <Compile Include="ExtendedConfig.cs" />
     <Compile Include="FastLoad.cs" />
     <Compile Include="FrameTime.cs" />
     <Compile Include="GameMod.cs" />
+    <Compile Include="JoystickCurveEditor.cs" />
     <Compile Include="LevelError.cs" />
     <Compile Include="MatchModeRace.cs" />
     <Compile Include="MessageTypes.cs" />
@@ -119,19 +122,25 @@
     <Compile Include="MPCeiling.cs" />
     <Compile Include="MPClassic.cs" />
     <Compile Include="MPClientExtrapolation.cs" />
+    <Compile Include="MPCloak.cs" />
     <Compile Include="MPContinue.cs" />
     <Compile Include="MPCreeperSync.cs" />
     <Compile Include="MPCustomModeFile.cs" />
+    <Compile Include="MPDamageEffects.cs" />
     <Compile Include="MPFixGhostProjectiles.cs" />
     <Compile Include="MPHUDMessage.cs" />
     <Compile Include="MPLongPwd.cs" />
     <Compile Include="MPMatchPresets.cs" />
+    <Compile Include="MPMatchTimeLimits.cs" />
     <Compile Include="MPModifiers.cs" />
     <Compile Include="MPModPrivateData.cs" />
+    <Compile Include="MPMonoDNSFix.cs" />
     <Compile Include="MPNoDupes.cs" />
     <Compile Include="MPNoPositionCompression.cs" />
     <Compile Include="MPPickupCheck.cs" />
     <Compile Include="MPPrimaries.cs" />
+    <Compile Include="MPRespawn.cs" />
+    <Compile Include="MPScores.cs" />
     <Compile Include="MPServerBrowser.cs" />
     <Compile Include="MPSmash.cs" />
     <Compile Include="MPSniperPackets.cs" />
@@ -171,6 +180,9 @@
     <Compile Include="ServerTrackerPost.cs" />
     <Compile Include="Menus.cs" />
     <Compile Include="Shaders.cs" />
+    <Compile Include="UIMeshColliderNoRender.cs" />
+    <Compile Include="VersionHandling\OlmodVersion.cs" />
+    <Compile Include="VersionHandling\PatchVersionInfo.cs" />
     <Compile Include="VSync.cs" />
   </ItemGroup>
   <ItemGroup>
