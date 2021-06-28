@@ -62,8 +62,9 @@ namespace GameMod {
 					Stop();
 				}
 				try {
-					string basePath = Path.Combine(Application.persistentDataPath, "playerstatedump");
-					String name = basePath + matchCount + ".olmd";
+					string basePath = Path.Combine(Application.persistentDataPath, "playerstatedump_");
+					string curDateTime = DateTime.UtcNow.ToString("yyyyMMdd-HHmmss", System.Globalization.CultureInfo.InvariantCulture);
+					string name = basePath + curDateTime + "_" + matchCount + ".olmd";
 					Debug.Log("MPPlayerStateDump: dump started to " + name);
 					fs = File.Create(name);
 					ms.Position = 0;
