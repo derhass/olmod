@@ -4,6 +4,7 @@
 #include "config.h"
 #include "logger.h"
 #include "player_types.h"
+#include "dump_types.h"
 
 #include <string>
 #include <map>
@@ -81,6 +82,7 @@ class ResultProcessorAuxChannel : public ResultProcessorChannelBase {
 		virtual void Add(float value);
 		virtual void Add(const float* values, size_t size);
 		virtual void Add(const PlayerState& s);
+		virtual void Add(const PerfProbe& p);
 		virtual void FlushCurrent();
 };
 

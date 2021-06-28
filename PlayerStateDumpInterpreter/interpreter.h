@@ -7,6 +7,7 @@
 #include "math_helper.h"
 #include "player_types.h"
 #include "simulator_base.h"
+#include "perf_eval_base.h"
 
 #include <string>
 #include <map>
@@ -55,6 +56,7 @@ class Interpreter {
 		UpdateCycle update;
 		InterpolationCycle interpolation;
 		SimulatorSet simulators;
+		PerfEvalSet perfEvals;
 
 		bool OpenFile(const char *filename);
 		void CloseFile();
@@ -62,6 +64,7 @@ class Interpreter {
 		int32_t ReadInt();
 		uint32_t ReadUint();
 		float ReadFloat();
+		double ReadDouble();
 		void ReadPlayerSnapshot(PlayerSnapshot& s);
 		uint32_t ReadPlayerSnapshotMessage(PlayerSnapshotMessage& s);
 		void ReadNewPlayerSnapshot(PlayerSnapshot& s, float ts);
@@ -86,6 +89,7 @@ class Interpreter {
 		void ProcessNewTimeSync();
 		void ProcessNewInterpolate();
 		void ProcessNewPlayerResult();
+		void ProcessPerfProbe();
 
 		bool ProcessCommand();
 
@@ -95,6 +99,10 @@ class Interpreter {
 
 		void AddSimulator(SimulatorBase& simulator);
 		void DropSimulators();
+
+		void AddPerfEval(PerfEvalBase& perfEval);
+		void DropPerfEvals();
+
 		bool ProcessFile(const char *filename);
 
 		Logger& GetLogger() {return log;};

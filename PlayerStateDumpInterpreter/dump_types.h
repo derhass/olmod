@@ -28,6 +28,8 @@ enum Command {
 	NEW_TIME_SYNC,
 	NEW_INTERPOLATE,
 	NEW_PLAYER_RESULT,
+	// Version 3: Perf probes
+	PERF_PROBE,
 
 	// alwways add new commands here
 	COMMAND_END_MARKER
@@ -119,6 +121,29 @@ struct NewTimesync {
 		last_update_time = -1.0f;
 		delta = -1.0f;
 	}
+};
+
+enum PerfProbeLocation: uint32_t {
+	PERF_LOC_GAMEMANAGER_UPDATE=0,
+	PERF_LOC_GAMEMANAGER_FIXED_UPDATE,
+};
+
+enum PerfProbleMode: uint32_t {
+	PERF_MODE_BEGIN=0,
+	PERF_MODE_END,
+	PERF_MODE_GENERIC_START,
+};
+
+struct PerfProbe {
+	uint32_t location;
+	uint32_t mode;
+	double ts;
+	float timeStamp;
+	float fixedTimeStamp;
+	float realTimeStamp;
+
+	void Clear(uint32_t loc = 0, uint32_t m = 0);
+	void Diff(const PerfProbe& a, const PerfProbe& b);
 };
 
 } // namespace OlmodPlayerDumpState 

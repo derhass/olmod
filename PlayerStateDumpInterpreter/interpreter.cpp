@@ -16,6 +16,27 @@ void EnqueueInfo::Clear()
 	snapshotVersion = SNAPSHOT_VELOCITY;
 }
 
+void PerfProbe::Clear(uint32_t loc, uint32_t m)
+{
+	location = loc;
+	mode = m;
+
+	ts = 0.0;
+	timeStamp = 0.0f;
+	fixedTimeStamp = 0.0f;
+	realTimeStamp = 0.0f;
+}
+
+void PerfProbe::Diff(const PerfProbe& a, const PerfProbe& b)
+{
+	location = a.location;
+	mode = b.mode;
+	ts = a.ts - b.ts;
+	timeStamp = a.timeStamp - b.timeStamp;
+	fixedTimeStamp = a.fixedTimeStamp - b.fixedTimeStamp;
+	realTimeStamp = a.realTimeStamp - b.realTimeStamp;
+}
+
 GameState::GameState() :
 	playersCycle(0)
 {
@@ -76,6 +97,8 @@ Interpreter::Interpreter(ResultProcessor& rp, const char *outputPath) :
 Interpreter::~Interpreter()
 {
 	CloseFile();
+	DropSimulators();
+	DropPerfEvals();
 }
 
 void Interpreter::AddSimulator(SimulatorBase& simulator)
@@ -90,8 +113,24 @@ void Interpreter::AddSimulator(SimulatorBase& simulator)
 
 void Interpreter::DropSimulators()
 {
-	log.Log(Logger::DEBUG, "dropping simulator");
+	log.Log(Logger::DEBUG, "dropping simulators");
 	simulators.clear();
+}
+
+void Interpreter::AddPerfEval(PerfEvalBase& perfEval)
+{
+	unsigned int id = (unsigned)perfEvals.size() + 100;
+	perfEvals.push_back(&perfEval);
+	perfEval.ip=this;
+	perfEval.registerID = id;
+	perfEval.UpdateName();
+	log.Log(Logger::DEBUG, "added perfEval '%s'", perfEval.GetName());
+}
+
+void Interpreter::DropPerfEvals()
+{
+	log.Log(Logger::DEBUG, "dropping perfEvals");
+	perfEvals.clear();
 }
 
 bool Interpreter::OpenFile(const char *filename)
@@ -168,6 +207,19 @@ float Interpreter::ReadFloat()
 	if (file) {
 		if (std::fread(&value, sizeof(value), 1, file) != 1) {
 			log.Log(Logger::WARN, "failed to read float");
+			value = 0.0f;
+			CloseFile();
+		}
+	}
+	return value;
+}
+
+double Interpreter::ReadDouble()
+{
+	double value = 0.0f;
+	if (file) {
+		if (std::fread(&value, sizeof(value), 1, file) != 1) {
+			log.Log(Logger::WARN, "failed to read double");
 			value = 0.0f;
 			CloseFile();
 		}
@@ -653,6 +705,25 @@ void Interpreter::ProcessNewPlayerResult()
 	log.Log(Logger::DEBUG_DETAIL, p);
 }
 
+void Interpreter::ProcessPerfProbe()
+{
+	PerfProbe p;
+	p.location = ReadUint();
+	p.mode = ReadUint();
+	p.ts = ReadDouble();
+	p.timeStamp = ReadFloat();
+	p.fixedTimeStamp = ReadFloat();
+	p.realTimeStamp = ReadFloat();
+
+	log.Log(Logger::DEBUG, "got PERF_PROBE: %u %u, ts: %f, time: %f, fixedTime: %f, realTime: %f",
+		(unsigned)p.location,(unsigned)p.mode,
+		p.ts, p.timeStamp, p.fixedTimeStamp, p.realTimeStamp);
+	for (PerfEvalSet::iterator it=perfEvals.begin(); it!=perfEvals.end(); it++) {
+		PerfEvalBase *pe = (*it);
+		pe->DoPerfProbe(p);
+	}
+}
+
 bool Interpreter::ProcessCommand()
 {
 	if (!file || feof(file) || ferror(file)) {
@@ -711,6 +782,9 @@ bool Interpreter::ProcessCommand()
 		case NEW_PLAYER_RESULT:
 			ProcessNewPlayerResult();
 			break;
+		case PERF_PROBE:
+			ProcessPerfProbe();
+			break;
 		default:
 			if (file) {
 				log.Log(Logger::ERROR, "INVALID COMMAND 0x%x", (unsigned)cmd);
@@ -751,6 +825,10 @@ bool Interpreter::ProcessFile(const char *filename)
 		SimulatorBase *sim = (*it);
 		sim->Start();
 	}
+	for (PerfEvalSet::iterator it=perfEvals.begin(); it!=perfEvals.end(); it++) {
+		PerfEvalBase *pe = (*it);
+		pe->Start();
+	}
 
 	// process the file until end or error is reached
 	while (process && ProcessCommand());
@@ -760,6 +838,10 @@ bool Interpreter::ProcessFile(const char *filename)
 	for (SimulatorSet::iterator it=simulators.begin(); it!=simulators.end(); it++) {
 		SimulatorBase *sim = (*it);
 		sim->Finish();
+	}
+	for (PerfEvalSet::iterator it=perfEvals.begin(); it!=perfEvals.end(); it++) {
+		PerfEvalBase *pe = (*it);
+		pe->Finish();
 	}
 	resultProcessor.Finish();
 

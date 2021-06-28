@@ -7,6 +7,7 @@
 #include "simulator_dh32.h"
 #include "simulator_dh32b.h"
 #include "simulator_dh33.h"
+#include "perf_eval_v1.h"
 
 #include <clocale>
 
@@ -14,6 +15,7 @@ int main(int argc, char **argv)
 {
 	OlmodPlayerDumpState::Logger::LogLevel level = OlmodPlayerDumpState::Logger::DEBUG_DETAIL;
 	OlmodPlayerDumpState::Logger::LogLevel levelSim  = level;
+	OlmodPlayerDumpState::Logger::LogLevel levelPerfEval = level;
 	const char *dir = (argc>2)?argv[2]:".";
 
 	std::setlocale(LC_ALL,"C");
@@ -26,7 +28,7 @@ int main(int argc, char **argv)
 	interpreter.GetLogger().SetLogLevel(level);
 	interpreter.GetLogger().SetStdoutStderr(false);
 
-
+#if 0
 	OlmodPlayerDumpState::Simulator::Original sOVL(rp);
 	interpreter.AddSimulator(sOVL);
 	sOVL.SetLogging(levelSim,  dir);
@@ -112,6 +114,13 @@ int main(int argc, char **argv)
 	interpreter.AddSimulator(sDH33b);
 	sDH33b.SetLogging(levelSim,  dir);
 	*/
+#else
+	OlmodPlayerDumpState::PerfEvaluator::V1 peV1(rp);
+	interpreter.AddPerfEval(peV1);
+	peV1.SetLogging(levelPerfEval, dir);
+#endif
+
+
 
 	int exit_code = !interpreter.ProcessFile((argc > 1)?argv[1]:"playerstatedump0.olmd");
 	return exit_code;

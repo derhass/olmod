@@ -226,6 +226,14 @@ void ResultProcessorAuxChannel::Add(const PlayerState& s)
 	Add(s.rot.v,4);
 }
 
+void ResultProcessorAuxChannel::Add(const PerfProbe& p)
+{
+	Add((float)p.ts);
+	Add(p.timeStamp);
+	Add(p.fixedTimeStamp);
+	Add(p.realTimeStamp);
+}
+
 void ResultProcessorAuxChannel::FlushCurrent()
 {
 	if (currentData.size() > 0) {
