@@ -312,7 +312,6 @@ namespace GameMod {
         // guareded by a lock.
         public static void AddNewPlayerSnapshot(NewPlayerSnapshotToClientMessage msg, MPNoPositionCompression.SnapshotVersion version)
         {
-            MPPlayerStateDump.buf.AddNewEnqueue(ref msg, (uint)version);
             lock (m_last_messages_lock) {
                 if (m_last_messages_ring_count == 0) {
                     // first packet
@@ -373,7 +372,7 @@ namespace GameMod {
                         // WEIRD PATH: message from the past older than 3 seconds
                         // this means something completely weird is going on on the network
                         // or on the server, and we better completely re-sync with the server
-                        Debug.LogFormat("detected message {0} frames from the past, FULL RESYNC!",  -deltaFrames);
+                        // Debug.LogFormat("detected message {0} frames from the past, FULL RESYNC!",  -deltaFrames);
                         ClearRing();
                         EnqueueToRing(msg, false);
                         m_last_update_time = Time.time;
@@ -413,7 +412,6 @@ namespace GameMod {
                 // no new messages to process, early out
                 return;
             }
-            MPPlayerStateDump.buf.AddNewTimeSync(0, m_last_update_time, 0.0f);
             // advance our clock by the number of messages received since last time
             // this function was called
             //
@@ -430,19 +428,16 @@ namespace GameMod {
 
             // check if the time base is still plausible
             float delta = (m_last_message_time - m_last_update_time) / Time.fixedDeltaTime; // in ticks
-            MPPlayerStateDump.buf.AddNewTimeSync(1, m_last_update_time, delta);
             // allow a sliding window to catch up for latency jitter
             float frameSoftSyncLimit = 2.0f; ///hard-sync if we're off by more than that many physics ticks
             if (delta < -frameSoftSyncLimit || delta > frameSoftSyncLimit) {
                 // hard resync
-                Debug.LogFormat("hard resync by {0} frames", delta);
+                // Debug.LogFormat("hard resync by {0} frames", delta);
                 m_last_update_time = Time.time;
-                MPPlayerStateDump.buf.AddNewTimeSync(2, m_last_update_time, delta);
             } else {
                 // soft resync
                 float smoothing_factor = 0.1f;
                 m_last_update_time += smoothing_factor * delta * Time.fixedDeltaTime;
-                MPPlayerStateDump.buf.AddNewTimeSync(3, m_last_update_time, delta);
             }
         }
 
@@ -502,7 +497,6 @@ namespace GameMod {
         // Called per frame, moves ships along their interpolation/extrapolation motions
         public static void updatePlayerPositions()
         {
-            MPPlayerStateDump.buf.AddNewInterpolate(GameManager.m_local_player.m_avg_ping_ms, MPClientExtrapolation.GetShipExtrapolationTime());
             float now = Time.time; // needs to be the same time source we use for m_last_update_time
             NewPlayerSnapshotToClientMessage msgA = null; // interpolation: start
             NewPlayerSnapshotToClientMessage msgB = null; // interpolation: end, extrapolation start
@@ -593,12 +587,12 @@ namespace GameMod {
             //       as extrapolation...
             m_compensation_interpol_count += (interpolate_ticks > 0)?1:0;
             if (Time.time >= m_compensation_last + 5.0 && m_compensation_count > 0) {
-                Debug.LogFormat("lag comp {0} frames: {1}ms / {2} ticks, {3} interp ({4}%) packets: {5} recv / {6} mis / {7} ign",
-                                m_compensation_count, 1000.0f* (m_compensation_sum/ m_compensation_count),
-                                (m_compensation_sum/m_compensation_count)/Time.fixedDeltaTime,
-                                m_compensation_interpol_count,
-                                100.0f*((float)m_compensation_interpol_count/(float)m_compensation_count),
-                                m_received_packets_count, m_missing_packets_count, m_ignored_packets_count);
+                // Debug.LogFormat("lag comp {0} frames: {1}ms / {2} ticks, {3} interp ({4}%) packets: {5} recv / {6} mis / {7} ign",
+                //                 m_compensation_count, 1000.0f* (m_compensation_sum/ m_compensation_count),
+                //                 (m_compensation_sum/m_compensation_count)/Time.fixedDeltaTime,
+                //                 m_compensation_interpol_count,
+                //                 100.0f*((float)m_compensation_interpol_count/(float)m_compensation_count),
+                //                 m_received_packets_count, m_missing_packets_count, m_ignored_packets_count);
                 m_compensation_sum = 0.0f;
                 m_compensation_count = 0;
                 m_compensation_interpol_count = 0;
@@ -619,13 +613,11 @@ namespace GameMod {
                         NewPlayerSnapshot B = GetPlayerSnapshot(msgB, player);
                         if(A != null && B != null){
                             interpolatePlayer(player, A, B, interpolate_factor);
-                            MPPlayerStateDump.buf.AddNewPlayerResult(0,now,A.m_net_id.Value,player.c_player_ship.c_transform.localPosition,player.c_player_ship.c_transform.rotation);
                         }
                     } else {
                         NewPlayerSnapshot snapshot = GetPlayerSnapshot(msgB, player);
                         if(snapshot != null){
                             extrapolatePlayer(player, snapshot, delta_t);
-                            MPPlayerStateDump.buf.AddNewPlayerResult(1,now,snapshot.m_net_id.Value,player.c_player_ship.c_transform.localPosition,player.c_player_ship.c_transform.rotation);
                         }
                     }
                 }

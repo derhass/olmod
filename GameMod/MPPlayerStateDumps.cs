@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Reflection.Emit;
 using System.IO;
 using System.Threading;
+using System.Diagnostics;
 using Harmony;
 using Overload;
 using UnityEngine;
@@ -32,7 +33,20 @@ namespace GameMod {
 			NEW_TIME_SYNC,
 			NEW_INTERPOLATE,
 			NEW_PLAYER_RESULT,
+			// Version 3: performance monitoring
+			PERF_PROBE,
 			// always add new commands at the end!
+		}
+
+		public enum PerfProbeMode : uint {
+			BEGIN = 0,
+			END,
+			GENERIC_START,
+		}
+
+		public enum PerfProbeLocation : uint {
+			UNITY_UPDATE,
+			UNITY_FIXED_UPDATE,
 		}
 
 		public class Buffer {
@@ -43,6 +57,7 @@ namespace GameMod {
 			private bool go;
 			private int matchCount;
 			private const long maxMemBuffer = 256 * 1024;
+			private Stopwatch stopWatch = new Stopwatch();
 
 			public Buffer() {
 				mtx = new Mutex();
@@ -62,18 +77,20 @@ namespace GameMod {
 					Stop();
 				}
 				try {
-					string basePath = Path.Combine(Application.persistentDataPath, "playerstatedump_");
+					string basePath = Path.Combine(Application.persistentDataPath, "perfdump_");
 					string curDateTime = DateTime.UtcNow.ToString("yyyyMMdd-HHmmss", System.Globalization.CultureInfo.InvariantCulture);
 					string name = basePath + curDateTime + "_" + matchCount + ".olmd";
-					Debug.Log("MPPlayerStateDump: dump started to " + name);
+					UnityEngine.Debug.Log("MPPlayerStateDump: dump started to " + name);
 					fs = File.Create(name);
 					ms.Position = 0;
 					bw.Write((uint)4); // file format version
 					bw.Write((uint)0); // size of extra header, reserved for later versions
 					matchCount++;
+					stopWatch.Reset();
+					stopWatch.Start();
 					go = true;
 				} catch (Exception e) {
-					Debug.Log("MPPlayerStateDump: failed to initialize buffer file:" + e);
+					UnityEngine.Debug.Log("MPPlayerStateDump: failed to initialize buffer file:" + e);
 				}
 			}
 
@@ -86,9 +103,11 @@ namespace GameMod {
 					bw.Write((uint)Command.FINISH);
 					Flush(true);
 					fs.Close();
-					Debug.Log("MPPlayerStateDump: dump finished");
+					UnityEngine.Debug.Log("MPPlayerStateDump: dump finished");
+					stopWatch.Stop();
+					stopWatch.Reset();
 				} catch (Exception e) {
-					Debug.Log("MPPlayerStateDump: failed to stop: " + e);
+					UnityEngine.Debug.Log("MPPlayerStateDump: failed to stop: " + e);
 				} finally {
 					go = false;
 				}
@@ -97,7 +116,7 @@ namespace GameMod {
 			private void Flush(bool force)
 			{
 				if (force || ms.Position > maxMemBuffer) {
-					Debug.Log("MPPlayerStateDump: dumping " + ms.Position + " bytes");
+					UnityEngine.Debug.Log("MPPlayerStateDump: dumping " + ms.Position + " bytes");
 					ms.SetLength(ms.Position);
 					ms.WriteTo(fs);
 					fs.Flush();
@@ -153,7 +172,7 @@ namespace GameMod {
 					bw.Write(cmd);
 					Flush(false);
 				} catch (Exception e) {
-					Debug.Log("MPPlayerStateDump: failed to dump command: " + e);
+					UnityEngine.Debug.Log("MPPlayerStateDump: failed to dump command: " + e);
 				} finally {
 					mtx.ReleaseMutex();
 				}
@@ -169,7 +188,7 @@ namespace GameMod {
 					bw.Write(timestamp);
 					Flush(false);
 				} catch (Exception e) {
-					Debug.Log("MPPlayerStateDump: failed to dump command: " + e);
+					UnityEngine.Debug.Log("MPPlayerStateDump: failed to dump command: " + e);
 				} finally {
 					mtx.ReleaseMutex();
 				}
@@ -186,7 +205,7 @@ namespace GameMod {
 					bw.Write(interpolTime);
 					Flush(false);
 				} catch (Exception e) {
-					Debug.Log("MPPlayerStateDump: failed to dump update begin: " + e);
+					UnityEngine.Debug.Log("MPPlayerStateDump: failed to dump update begin: " + e);
 				} finally {
 					mtx.ReleaseMutex();
 				}
@@ -202,7 +221,7 @@ namespace GameMod {
 					bw.Write(interpolTime);
 					Flush(false);
 				} catch (Exception e) {
-					Debug.Log("MPPlayerStateDump: failed to dump update end: " + e);
+					UnityEngine.Debug.Log("MPPlayerStateDump: failed to dump update end: " + e);
 				} finally {
 					mtx.ReleaseMutex();
 				}
@@ -224,7 +243,7 @@ namespace GameMod {
 					}
 					Flush(false);
 				} catch (Exception e) {
-					Debug.Log("MPPlayerStateDump: failed to dump snapshot: " + e);
+					UnityEngine.Debug.Log("MPPlayerStateDump: failed to dump snapshot: " + e);
 				} finally {
 					mtx.ReleaseMutex();
 				}
@@ -242,7 +261,7 @@ namespace GameMod {
 
 					Flush(false);
 				} catch (Exception e) {
-					Debug.Log("MPPlayerStateDump: failed to dump command: " + e);
+					UnityEngine.Debug.Log("MPPlayerStateDump: failed to dump command: " + e);
 				} finally {
 					mtx.ReleaseMutex();
 				}
@@ -264,7 +283,7 @@ namespace GameMod {
 					bw.Write(t);
 					Flush(false);
 				} catch (Exception e) {
-					Debug.Log("MPPlayerStateDump: failed to dump lerp begin: " + e);
+					UnityEngine.Debug.Log("MPPlayerStateDump: failed to dump lerp begin: " + e);
 				} finally {
 					mtx.ReleaseMutex();
 				}
@@ -282,7 +301,7 @@ namespace GameMod {
 					bw.Write(w);
 					Flush(false);
 				} catch (Exception e) {
-					Debug.Log("MPPlayerStateDump: failed to dump lerp begin: " + e);
+					UnityEngine.Debug.Log("MPPlayerStateDump: failed to dump lerp begin: " + e);
 				} finally {
 					mtx.ReleaseMutex();
 				}
@@ -316,7 +335,7 @@ namespace GameMod {
 					}
 					Flush(false);
 				} catch (Exception e) {
-					Debug.Log("MPPlayerStateDump: failed to dump buffer update contents: " + e);
+					UnityEngine.Debug.Log("MPPlayerStateDump: failed to dump buffer update contents: " + e);
 				} finally {
 					mtx.ReleaseMutex();
 				}
@@ -333,7 +352,7 @@ namespace GameMod {
 
 					Flush(false);
 				} catch (Exception e) {
-					Debug.Log("MPPlayerStateDump: failed to dump lerp param: " + e);
+					UnityEngine.Debug.Log("MPPlayerStateDump: failed to dump lerp param: " + e);
 				} finally {
 					mtx.ReleaseMutex();
 				}
@@ -360,7 +379,7 @@ namespace GameMod {
 					WriteNewPlayerSnapshotMessage(ref msg);
 					Flush(false);
 				} catch (Exception e) {
-					Debug.Log("MPPlayerStateDump: failed to dump new snapshot: " + e);
+					UnityEngine.Debug.Log("MPPlayerStateDump: failed to dump new snapshot: " + e);
 				} finally {
 					mtx.ReleaseMutex();
 				}
@@ -383,7 +402,7 @@ namespace GameMod {
 					bw.Write(extrapol);
 					Flush(false);
 				} catch (Exception e) {
-					Debug.Log("MPPlayerStateDump: failed to dump new interpolate: " + e);
+					UnityEngine.Debug.Log("MPPlayerStateDump: failed to dump new interpolate: " + e);
 				} finally {
 					mtx.ReleaseMutex();
 				}
@@ -404,7 +423,7 @@ namespace GameMod {
 					bw.Write(delta);
 					Flush(false);
 				} catch (Exception e) {
-					Debug.Log("MPPlayerStateDump: failed to dump new time sync: " + e);
+					UnityEngine.Debug.Log("MPPlayerStateDump: failed to dump new time sync: " + e);
 				} finally {
 					mtx.ReleaseMutex();
 				}
@@ -432,7 +451,34 @@ namespace GameMod {
 					bw.Write(rot.w);
 					Flush(false);
 				} catch (Exception e) {
-					Debug.Log("MPPlayerStateDump: failed to dump new player result: " + e);
+					UnityEngine.Debug.Log("MPPlayerStateDump: failed to dump new player result: " + e);
+				} finally {
+					mtx.ReleaseMutex();
+				}
+			}
+
+			public void AddPerfProbe(PerfProbeMode loc, uint mode)
+			{
+				
+				if (!go) {
+					return;
+				}
+				mtx.WaitOne();
+				try {
+					double ts;
+					stopWatch.Stop();
+					ts = stopWatch.Elapsed.TotalSeconds;
+					stopWatch.Start();
+					bw.Write((uint)Command.PERF_PROBE);
+					bw.Write((uint)loc);
+					bw.Write(mode);
+					bw.Write(ts);
+					bw.Write(Time.time);
+					bw.Write(Time.fixedTime);
+					bw.Write(Time.realtimeSinceStartup);
+					Flush(false);
+				} catch (Exception e) {
+					UnityEngine.Debug.Log("MPPlayerStateDump: failed to dump perf probe: " + e);
 				} finally {
 					mtx.ReleaseMutex();
 				}
@@ -454,7 +500,7 @@ namespace GameMod {
 		[HarmonyPatch(typeof(NetworkMatch), "ExitMatch")]
 		class MPPlayerStateDump_ExitMatch {
 			private static void Prefix() {
-				Debug.Log("EXIT!!!!!!!!!!!!!!!!");
+				UnityEngine.Debug.Log("EXIT!!!!!!!!!!!!!!!!");
 				buf.Stop();
 			}
 		}
@@ -473,6 +519,7 @@ namespace GameMod {
 			}
 		}
 
+		/*	
 		[HarmonyPatch(typeof(Client), "OnPlayerSnapshotToClient")]
 		class MPPlayerStateDump_Enqueue {
 			private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> codes) {
@@ -482,7 +529,7 @@ namespace GameMod {
 						yield return code;
 						yield return new CodeInstruction(OpCodes.Ldloc_0);
 						yield return new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(MPPlayerStateDump), "EnqueueBuffer"));
-						Debug.Log("Patched OnPlayerSnapshotToClient for MPPlayerStateDump");
+						UnityEngine.Debug.Log("Patched OnPlayerSnapshotToClient for MPPlayerStateDump");
 						continue;
 
 					}
@@ -490,10 +537,13 @@ namespace GameMod {
 				}
 			}
 		}
+		*/
 
+		/*
 		public static void EnqueueBuffer(PlayerSnapshotToClientMessage msg) {
 			buf.AddSnapshot(ref msg);
 		}
+		*/
 
 		/*
 
