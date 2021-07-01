@@ -46,7 +46,7 @@ namespace GameMod {
                     var playerSegnum = GetSegmentNumber(playerPositions[j]);
 
                     var distance = Pathfinding.FindConnectedDistance(segnum, playerSegnum, out int _);
-                    if (distance == 0f || distance >= 9999f) {
+                    if (distance <= 0f || distance >= 9999f) {
                         distance = RUtility.FindVec3Distance(position - playerPositions[j]);
                     }
 
@@ -99,10 +99,10 @@ namespace GameMod {
             float num2 = 3f / (2f + count);
 
             for (int i = 0; i < count; i++) {
-                var dist = distances[idx][i];
+                var dist = Math.Abs(distances[idx][i]);
 
                 if (team != playerTeams[i] || team == MpTeam.ANARCHY) {
-                    float num3 = (RUtility.FindVec3Distance(position - playerPositions[i]) + dist) / 2;
+                    float num3 = (Math.Abs(RUtility.FindVec3Distance(position - playerPositions[i])) + dist) / 2f;
                     if (num3 < 40f) {
                         float num4 = (40f - num3) * (40f - num3) * 0.2f;
                         num -= num4 * num2;
@@ -112,11 +112,11 @@ namespace GameMod {
                     }
                     num += dist / 4;
                 } else {
-                    float num5 = (RUtility.FindVec3Distance(position - playerPositions[i]) + dist) / 2;
+                    float num5 = (Math.Abs(RUtility.FindVec3Distance(position - playerPositions[i])) + dist) / 2f;
                     if (num5 > 50f) {
-                        num -= (num5 - 50f) * 2f * num2;
+                        num -= (num5 - 50f) * num2;
                     } else if (num5 < 10f) {
-                        num -= (10f - num5) * 100f;
+                        num -= (10f - num5) * 1000f;
                     }
                 }
             }
@@ -125,7 +125,7 @@ namespace GameMod {
             var spawnPoint = GameManager.m_level_data.m_player_spawn_points[idx];
 
             for (int i = 0; i < count; i++) {
-                var maxAngle = Math.Max(90f - distances[idx][i], 10f);
+                var maxAngle = Math.Max(180f - Math.Abs(RUtility.FindVec3Distance(position - playerPositions[i])), 20f);
                 if (team != playerTeams[i] || team == MpTeam.ANARCHY) {
                     num *= (Math.Min(Vector3.Angle(playerPositions[i] - spawnPoint.position, spawnPoint.orientation * Vector3.forward), maxAngle) / maxAngle);
                     num *= (Math.Min(Vector3.Angle(spawnPoint.position - playerPositions[i], m_player_rot[i] * Vector3.forward), maxAngle) / maxAngle);
