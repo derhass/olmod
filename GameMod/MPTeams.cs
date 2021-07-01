@@ -239,6 +239,26 @@ namespace GameMod {
             }
             return max_score;
         }
+
+        public static void SetPlayerGlow(PlayerShip ship, MpTeam team) {
+            if (GameplayManager.IsMultiplayerActive && !GameplayManager.IsDedicatedServer() && NetworkMatch.IsTeamMode(NetworkMatch.GetMode())) {
+                var teamcolor = UIManager.ChooseMpColor(team);
+
+                foreach (var mat in ship.m_materials) {
+                    // Main damage color
+                    if (mat.shader != null)
+                    {
+                        if ((Color)mat.GetVector("_color_burn") == teamcolor) {
+                            return;
+                        }
+                        mat.SetVector("_color_burn", teamcolor);
+                    }
+
+                    // Light color (e.g. TB overcharge)
+                    ship.c_lights[4].color = teamcolor;
+                }
+            }
+        }
     }
 
     [HarmonyPatch(typeof(UIElement), "MaybeDrawPlayerList")]
@@ -940,5 +960,47 @@ namespace GameMod {
         }
     }
 
+    // Edge color effect needs changed for Team matches, otherwise leave as global m_damage_material (red).  This is primarily noticeable as fully charged TB glow
+    [HarmonyPatch(typeof(PlayerShip), "Update")]
+    class MPTeams_PlayerShip_Update
+    {
+        static Material LoadDamageMaterial(PlayerShip player_ship)
+        {
+            if (GameplayManager.IsMultiplayerActive && !GameplayManager.IsDedicatedServer() && NetworkMatch.IsTeamMode(NetworkMatch.GetMode()))
+            {
+                Material m = new Material(UIManager.gm.m_damage_material);
+                var teamcolor = UIManager.ChooseMpColor(player_ship.c_player.m_mp_team);
+                m.SetColor("_EdgeColor", teamcolor);
+                return m;
+            }
+            else
+            {
+                return UIManager.gm.m_damage_material;
+            }
+        }
+
+        // Damage glow in team color
+        static void Postfix(PlayerShip __instance) {
+            MPTeams.SetPlayerGlow(__instance, __instance.c_player.m_mp_team);
+        }
+
+        // UIManager.gm.m_damage_material is a global client field for heavy incurred damage/TB overcharge, patch to call our LoadDamageMaterial() instead
+        static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> codes)
+        {
+            foreach (var code in codes)
+            {
+                if (code.opcode == OpCodes.Ldfld && code.operand == AccessTools.Field(typeof(GameManager), "m_damage_material"))
+                {
+                    yield return new CodeInstruction(OpCodes.Pop); // Remove previous ldsfld    class Overload.GameManager Overload.UIManager::gm, cheap enough to keep transpiler simpler
+                    yield return new CodeInstruction(OpCodes.Ldarg_0);
+                    yield return new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(MPTeams_PlayerShip_Update), "LoadDamageMaterial"));
+                    continue;
+                }
+
+                yield return code;
+            }
+        }
+    }
+    
     // still missing: chat colors...
 }
