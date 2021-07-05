@@ -56,7 +56,7 @@ namespace GameMod {
 			private Mutex mtx;
 			private bool go;
 			private int matchCount;
-			private const long maxMemBuffer = 256 * 1024;
+			private const long maxMemBuffer = 4 * 1024 * 1024;
 			private Stopwatch stopWatch = new Stopwatch();
 
 			public Buffer() {
