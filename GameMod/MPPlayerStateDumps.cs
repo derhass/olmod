@@ -539,6 +539,9 @@ namespace GameMod {
 			}
 
 			private void FinishT(ref Stopwatch useTimer) {
+				if (!useTimer.IsRunning) {
+					return;
+				}
 				long elapsedBase = useTimer.ElapsedMilliseconds;
 				long elapsedNeeded = (elapsedBase < msTimeMin)?msTimeMin:elapsedBase;
 				if (msTimeExtra > 0) {
@@ -606,6 +609,7 @@ namespace GameMod {
 
 		public static BurnCPUTime utime = new BurnCPUTime();
 		public static BurnCPUTime ftime = new BurnCPUTime();
+		public static BurnCPUTime ttime = new BurnCPUTime();
 
 		private static void hack_utime_console()
 		{
@@ -637,6 +641,19 @@ namespace GameMod {
 			}
 			ftime.Configure(a,b,-1);
 		}
+		private static void hack_ttime_console()
+		{
+			int a=-1;
+			int b=-1;
+			int n = uConsole.GetNumParameters();
+			if (n > 0) {
+				a=uConsole.GetInt();
+			}
+			if (n > 1) {
+				b=uConsole.GetInt();
+			}
+			ttime.Configure(a,b,-1);
+		}
 
 		public static Buffer buf = new Buffer();
 		private static bool perFrameCoroutine = false;
@@ -644,10 +661,13 @@ namespace GameMod {
 		public static IEnumerator CoroutineAtFrameEnd() {
 			UnityEngine.Debug.Log("PERFRAME COROUTINE started");
 			buf.AddPerfProbe(PerfProbeLocation.FRAME, (uint)PerfProbeMode.BEGIN);
+			ttime.Start();
 			while(true) {
 				yield return new WaitForEndOfFrame();
 				buf.AddPerfProbe(PerfProbeLocation.FRAME, (uint)PerfProbeMode.END);
+				ttime.Finish();
 				buf.AddPerfProbe(PerfProbeLocation.FRAME, (uint)PerfProbeMode.BEGIN);
+				ttime.Start();
 			}
 			UnityEngine.Debug.Log("PERFRAME COROUTINE done");
 		}
@@ -776,8 +796,10 @@ namespace GameMod {
 			static void Postfix(GameManager __instance) {
 				utime.Init("utime");
 				ftime.Init("ftime");
+				ttime.Init("ttime");
 				uConsole.RegisterCommand("hack_utime", hack_utime_console);
 				uConsole.RegisterCommand("hack_ftime", hack_ftime_console);
+				uConsole.RegisterCommand("hack_ttime", hack_ttime_console);
 				if (!perFrameCoroutine) {
 					__instance.StartCoroutine(CoroutineAtFrameEnd());
 					perFrameCoroutine = true;
