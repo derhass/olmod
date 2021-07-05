@@ -491,6 +491,117 @@ namespace GameMod {
 
 		}
 
+		public class BurnCPUTime {
+			private Stopwatch timer = new Stopwatch();
+			private long msTimeMin;
+			private long msTimeExtra;
+			private int  accCount;
+			private long accSpinCount;
+			private long accSpent;
+			private bool active;
+			private string name;
+
+			public BurnCPUTime() {
+				timer.Stop();
+				timer.Reset();
+				active = false;
+				msTimeMin = -1;
+				msTimeExtra = -1;
+				accCount = 0;
+				accSpinCount = 0;
+				accSpent = 0;
+				name = "unknownX";
+			}
+
+			~BurnCPUTime() {
+				timer.Stop();
+			}
+
+			public void Start() {
+				if (active) {
+					timer.Stop();
+					timer.Reset();
+					timer.Start();
+				}
+			}
+
+			public void Finish() {
+				if (active) {
+					long elapsedBase = timer.ElapsedMilliseconds;
+					long elapsedNeeded = (elapsedBase < msTimeMin)?msTimeMin:elapsedBase;
+					if (msTimeExtra > 0) {
+						elapsedNeeded += msTimeExtra;
+					}
+					long elapsed = elapsedBase;
+					long remain = elapsedNeeded - elapsed;
+					if (remain > 0) {
+						accSpent += remain;
+						accCount++;
+					}
+					while (elapsed < elapsedNeeded) {
+						elapsed = timer.ElapsedMilliseconds;
+						accSpinCount++;
+					}
+					if (accCount >= 300) {
+						UnityEngine.Debug.LogFormat("{0}: total w: {1}, total spin: {2}, cycles: {3}: avg: w {4} spin {5}",name,accSpent,accSpinCount,accCount,(double)accSpent/(double)accCount,(double)accSpinCount/(double)accCount);
+						accCount = 0;
+						accSpinCount = 0;
+						accSpent =  0;
+					}
+				}
+			}
+
+			public bool Configure(int msMin, int msExtra) {
+				if ((long)msMin == msTimeMin && (long)msExtra == msTimeExtra) {
+					return active;
+				}
+				active = false;
+				msTimeMin = (long)msMin;
+				msTimeExtra = (long)msExtra;
+				if (msTimeMin >= 0 || msTimeExtra >= 0) {
+					active = true;
+				}
+				UnityEngine.Debug.LogFormat("HACK T: {0} set to {1} as {2} {3}", name, (active)?"ON":"OFF", msTimeMin,msTimeExtra);
+				return active;
+			}
+
+			public void Init(string n)
+			{
+				name = n;
+			}
+
+		}
+
+		public static BurnCPUTime utime = new BurnCPUTime();
+		public static BurnCPUTime ftime = new BurnCPUTime();
+
+		private static void hack_utime_console()
+		{
+			int a=-1;
+			int b=-1;
+			int n = uConsole.GetNumParameters();
+			if (n > 0) {
+				a=uConsole.GetInt();
+			}
+			if (n > 1) {
+				b=uConsole.GetInt();
+			}
+			utime.Configure(a,b);
+		}
+		private static void hack_ftime_console()
+		{
+			int a=-1;
+			int b=-1;
+			int n = uConsole.GetNumParameters();
+			if (n > 0) {
+				a=uConsole.GetInt();
+			}
+			if (n > 1) {
+				b=uConsole.GetInt();
+			}
+			ftime.Configure(a,b);
+		}
+
 		public static Buffer buf = new Buffer();
 
 		/* these are not working as I had hoped...
@@ -590,19 +701,33 @@ namespace GameMod {
 		[HarmonyPatch(typeof(GameManager), "Update")]
 		class MPPlayerStateDump_GameManagerUpdate {
 			static void Prefix() {
+				utime.Start();
 				buf.AddPerfProbe(PerfProbeLocation.GAMEMANAGER_UPDATE, (uint)PerfProbeMode.BEGIN);
 			}
 			static void Postfix() {
 				buf.AddPerfProbe(PerfProbeLocation.GAMEMANAGER_UPDATE, (uint)PerfProbeMode.END);
+				utime.Finish();
 			}
 		}
 		[HarmonyPatch(typeof(GameManager), "FixedUpdate")]
 		class MPPlayerStateDump_GameManagerFixedUpdate {
 			static void Prefix() {
+				ftime.Start();
 				buf.AddPerfProbe(PerfProbeLocation.GAMEMANAGER_FIXED_UPDATE, (uint)PerfProbeMode.BEGIN);
 			}
 			static void Postfix() {
 				buf.AddPerfProbe(PerfProbeLocation.GAMEMANAGER_FIXED_UPDATE, (uint)PerfProbeMode.END);
+				ftime.Finish();
+			}
+		}
+
+		[HarmonyPatch(typeof(GameManager), "Awake")]
+		class MPPlayerStateDump_GameManageAwake {
+			static void Postfix() {
+				utime.Init("utime");
+				ftime.Init("ftime");
+				uConsole.RegisterCommand("hack_utime", hack_utime_console);
+				uConsole.RegisterCommand("hack_ftime", hack_ftime_console);
 			}
 		}
 	}
