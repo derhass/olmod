@@ -492,22 +492,31 @@ namespace GameMod {
 		}
 
 		public class BurnCPUTime {
+			private Stopwatch baseTimer = new Stopwatch();
 			private Stopwatch timer = new Stopwatch();
+			private int baseCount;
 			private long msTimeMin;
 			private long msTimeExtra;
+			private long msTimeBase;
 			private int  accCount;
+			private int  accBaseTaken;
 			private long accSpinCount;
 			private long accSpent;
 			private bool active;
 			private string name;
 
 			public BurnCPUTime() {
+				baseTimer.Stop();
+				baseTimer.Reset();
+				baseCount = 0;
 				timer.Stop();
 				timer.Reset();
 				active = false;
 				msTimeMin = -1;
 				msTimeExtra = -1;
+				msTimeBase = -1;
 				accCount = 0;
+				accBaseTaken = 0;
 				accSpinCount = 0;
 				accSpent = 0;
 				name = "unknownX";
@@ -515,6 +524,7 @@ namespace GameMod {
 
 			~BurnCPUTime() {
 				timer.Stop();
+				baseTimer.Stop();
 			}
 
 			public void Start() {
@@ -522,46 +532,66 @@ namespace GameMod {
 					timer.Stop();
 					timer.Reset();
 					timer.Start();
+					baseCount++;
 				}
 			}
 
+			private void FinishT(ref Stopwatch useTimer) {
+				long elapsedBase = useTimer.ElapsedMilliseconds;
+				long elapsedNeeded = (elapsedBase < msTimeMin)?msTimeMin:elapsedBase;
+				if (msTimeExtra > 0) {
+					elapsedNeeded += msTimeExtra;
+				}
+				long elapsed = elapsedBase;
+				long remain = elapsedNeeded - elapsed;
+				if (remain > 0) {
+					accSpent += remain;
+					accCount++;
+				}
+				while (elapsed < elapsedNeeded) {
+					elapsed = useTimer.ElapsedMilliseconds;
+					accSpinCount++;
+				}
+			}
 			public void Finish() {
 				if (active) {
-					long elapsedBase = timer.ElapsedMilliseconds;
-					long elapsedNeeded = (elapsedBase < msTimeMin)?msTimeMin:elapsedBase;
-					if (msTimeExtra > 0) {
-						elapsedNeeded += msTimeExtra;
-					}
-					long elapsed = elapsedBase;
-					long remain = elapsedNeeded - elapsed;
-					if (remain > 0) {
-						accSpent += remain;
-						accCount++;
-					}
-					while (elapsed < elapsedNeeded) {
-						elapsed = timer.ElapsedMilliseconds;
-						accSpinCount++;
+					if (baseCount <= 1 && msTimeBase>0) {
+						FinishT(ref baseTimer);
+						accBaseTaken++;
+					} else {
+						FinishT(ref timer);
 					}
 					if (accCount >= 300) {
-						UnityEngine.Debug.LogFormat("{0}: total w: {1}, total spin: {2}, cycles: {3}: avg: w {4} spin {5}",name,accSpent,accSpinCount,accCount,(double)accSpent/(double)accCount,(double)accSpinCount/(double)accCount);
+						UnityEngine.Debug.LogFormat("{0}: total w: {1}, total spin: {2}, cycles: {3} baseTaken: {4}, avg: w {6} spin {6} bt {7}",name,accSpent,accSpinCount,accCount,accBaseTaken,(double)accSpent/(double)accCount,(double)accSpinCount/(double)accCount,100.0*(double)accBaseTaken/(double)accCount);
 						accCount = 0;
+						accBaseTaken = 0;
 						accSpinCount = 0;
 						accSpent =  0;
 					}
 				}
 			}
 
-			public bool Configure(int msMin, int msExtra) {
-				if ((long)msMin == msTimeMin && (long)msExtra == msTimeExtra) {
-					return active;
+			public void BaseStart() {
+				if (active) {
+					baseTimer.Stop();
+					baseTimer.Reset();
+					baseTimer.Start();
+					baseCount = 0;
 				}
+			}
+
+			public void BaseFinish() {
+			}
+
+			public bool Configure(int msMin, int msExtra, int msBase) {
 				active = false;
 				msTimeMin = (long)msMin;
 				msTimeExtra = (long)msExtra;
-				if (msTimeMin >= 0 || msTimeExtra >= 0) {
+				msTimeBase = (long)msBase;
+				if (msTimeMin >= 0 || msTimeExtra >= 0 || msTimeBase >= 0) {
 					active = true;
 				}
-				UnityEngine.Debug.LogFormat("HACK T: {0} set to {1} as {2} {3}", name, (active)?"ON":"OFF", msTimeMin,msTimeExtra);
+				UnityEngine.Debug.LogFormat("HACK T: {0} set to {1} as {2} {3} {4}", name, (active)?"ON":"OFF", msTimeMin,msTimeExtra, msTimeBase);
 				return active;
 			}
 
@@ -579,6 +609,7 @@ namespace GameMod {
 		{
 			int a=-1;
 			int b=-1;
+			int c=-1;
 			int n = uConsole.GetNumParameters();
 			if (n > 0) {
 				a=uConsole.GetInt();
@@ -586,7 +617,10 @@ namespace GameMod {
 			if (n > 1) {
 				b=uConsole.GetInt();
 			}
-			utime.Configure(a,b);
+			if (n > 2) {
+				c=uConsole.GetInt();
+			}
+			utime.Configure(a,b,c);
 		}
 		private static void hack_ftime_console()
 		{
@@ -599,7 +633,7 @@ namespace GameMod {
 			if (n > 1) {
 				b=uConsole.GetInt();
 			}
-			ftime.Configure(a,b);
+			ftime.Configure(a,b,-1);
 		}
 
 		public static Buffer buf = new Buffer();
@@ -712,12 +746,14 @@ namespace GameMod {
 		[HarmonyPatch(typeof(GameManager), "FixedUpdate")]
 		class MPPlayerStateDump_GameManagerFixedUpdate {
 			static void Prefix() {
+				utime.BaseStart();
 				ftime.Start();
 				buf.AddPerfProbe(PerfProbeLocation.GAMEMANAGER_FIXED_UPDATE, (uint)PerfProbeMode.BEGIN);
 			}
 			static void Postfix() {
 				buf.AddPerfProbe(PerfProbeLocation.GAMEMANAGER_FIXED_UPDATE, (uint)PerfProbeMode.END);
 				ftime.Finish();
+				utime.BaseFinish();
 			}
 		}
 
