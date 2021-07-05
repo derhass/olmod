@@ -126,6 +126,7 @@ struct NewTimesync {
 enum PerfProbeLocation: uint32_t {
 	PERF_LOC_GAMEMANAGER_UPDATE=0,
 	PERF_LOC_GAMEMANAGER_FIXED_UPDATE,
+	PERF_LOC_FRAME,
 };
 
 enum PerfProbleMode: uint32_t {

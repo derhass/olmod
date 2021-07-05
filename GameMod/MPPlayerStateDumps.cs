@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -47,6 +48,7 @@ namespace GameMod {
 		public enum PerfProbeLocation : uint {
 			GAMEMANAGER_UPDATE,
 			GAMEMANAGER_FIXED_UPDATE,
+			FRAME,
 		}
 
 		public class Buffer {
@@ -492,6 +494,18 @@ namespace GameMod {
 		}
 
 		public static Buffer buf = new Buffer();
+		private static bool perFrameCoroutine = false;
+
+		public static IEnumerator CoroutineAtFrameEnd() {
+			UnityEngine.Debug.Log("PERFRAME COROUTINE started");
+			buf.AddPerfProbe(PerfProbeLocation.FRAME, (uint)PerfProbeMode.BEGIN);
+			while(true) {
+				yield return new WaitForEndOfFrame();
+				buf.AddPerfProbe(PerfProbeLocation.FRAME, (uint)PerfProbeMode.END);
+				buf.AddPerfProbe(PerfProbeLocation.FRAME, (uint)PerfProbeMode.BEGIN);
+			}
+			UnityEngine.Debug.Log("PERFRAME COROUTINE done");
+		}
 
 		/* these are not working as I had hoped...
 		[HarmonyPatch(typeof(NetworkMatch), "InitBeforeEachMatch")]
@@ -603,6 +617,17 @@ namespace GameMod {
 			}
 			static void Postfix() {
 				buf.AddPerfProbe(PerfProbeLocation.GAMEMANAGER_FIXED_UPDATE, (uint)PerfProbeMode.END);
+			}
+		}
+
+		[HarmonyPatch(typeof(GameManager), "Awake")]
+		class MPPlayerStateDump_GameManageAwake {
+			static void Postfix(GameManager __instance) {
+				if (!perFrameCoroutine) {
+					__instance.StartCoroutine(CoroutineAtFrameEnd());
+					perFrameCoroutine = true;
+
+				}
 			}
 		}
 	}
