@@ -33,6 +33,9 @@ namespace GameMod
         public const short MsgDetonate = 138;
         public const short MsgSetDisconnectedMatchState = 139;
         public const short MsgNewPlayerSnapshotToClient = 140;
+
+        public const short MsgSetJoystickRampMode = 145;
+        public const short MsgServerSendJoystickRampModeCapability = 146;
         // Do not use 400, it is in use by Mod-Projdata.dll.
     }
 }
