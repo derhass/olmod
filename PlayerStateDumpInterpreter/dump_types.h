@@ -30,6 +30,7 @@ enum Command {
 	NEW_PLAYER_RESULT,
 	// Version 3: Perf probes
 	PERF_PROBE,
+	TRANSFORM_DUMP,
 
 	// alwways add new commands here
 	COMMAND_END_MARKER

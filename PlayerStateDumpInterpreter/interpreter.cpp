@@ -724,6 +724,33 @@ void Interpreter::ProcessPerfProbe()
 	}
 }
 
+void Interpreter::ProcessTransformDump()
+{
+	PlayerSnapshot p;
+	double ts = ReadDouble();
+	float uTime = ReadFloat();
+	float uFixedTime = ReadFloat();
+	uint32_t stype = ReadUint();
+	ReadPlayerSnapshot(p);
+	p.state.timestamp=uTime;
+	p.state.realTimestamp=(float)ts;
+
+	log.Log(Logger::DEBUG, "got TRANSFORM DUMP type %u id: %u ts: %f",
+		(unsigned)stype, (unsigned)p.id, ts);
+
+	bool isNew;
+	ResultProcessorChannel *rpc = resultProcessor.GetChannel(p.id, 3+stype, isNew);
+	if (isNew) {
+		rpc->SetLogger(&log);
+		rpc->SetName("transform_dumps");
+		rpc->StartStream(GetOutputDir());
+		log.Log(Logger::INFO,"created new result process channel '%s'", rpc->GetName());
+	}
+	(void)uFixedTime;
+	rpc->Add(p);
+	log.Log(Logger::DEBUG_DETAIL, p);
+}
+
 bool Interpreter::ProcessCommand()
 {
 	if (!file || feof(file) || ferror(file)) {
@@ -784,6 +811,9 @@ bool Interpreter::ProcessCommand()
 			break;
 		case PERF_PROBE:
 			ProcessPerfProbe();
+			break;
+		case TRANSFORM_DUMP:
+			ProcessTransformDump();
 			break;
 		default:
 			if (file) {

@@ -16,6 +16,10 @@ int main(int argc, char **argv)
 	OlmodPlayerDumpState::Logger::LogLevel level = OlmodPlayerDumpState::Logger::DEBUG_DETAIL;
 	OlmodPlayerDumpState::Logger::LogLevel levelSim  = level;
 	OlmodPlayerDumpState::Logger::LogLevel levelPerfEval = level;
+
+	(void)levelSim;
+	(void)levelPerfEval;
+
 	const char *dir = (argc>2)?argv[2]:".";
 
 	std::setlocale(LC_ALL,"C");

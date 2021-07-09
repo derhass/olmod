@@ -36,6 +36,7 @@ namespace GameMod {
 			NEW_PLAYER_RESULT,
 			// Version 3: performance monitoring
 			PERF_PROBE,
+			TRANSFORM_DUMP,
 			// always add new commands at the end!
 		}
 
@@ -490,7 +491,63 @@ namespace GameMod {
 				}
 			}
 
-
+			public void AddTransformDump(Transform t, uint type, uint id)
+			{
+				if (!go) {
+					return;
+				}
+				mtx.WaitOne();
+				try {
+					double ts = stopWatch.Elapsed.TotalSeconds;
+					bw.Write((uint)Command.TRANSFORM_DUMP);
+					bw.Write(ts);
+					bw.Write(Time.time);
+					bw.Write(Time.fixedTime);
+					bw.Write(type);
+					bw.Write(id);
+					bw.Write(t.position.x);
+					bw.Write(t.position.y);
+					bw.Write(t.position.z);
+					bw.Write(t.rotation.x);
+					bw.Write(t.rotation.y);
+					bw.Write(t.rotation.z);
+					bw.Write(t.rotation.w);
+					Flush(false);
+				} catch (Exception e) {
+					UnityEngine.Debug.Log("MPPlayerStateDump: failed to dump transform: " + e);
+				} finally {
+					mtx.ReleaseMutex();
+				}
+			}
+			
+			public void AddTransformDump(Vector3 pos, Quaternion rot, uint type, uint id)
+			{
+				if (!go) {
+					return;
+				}
+				mtx.WaitOne();
+				try {
+					double ts = stopWatch.Elapsed.TotalSeconds;
+					bw.Write((uint)Command.TRANSFORM_DUMP);
+					bw.Write(ts);
+					bw.Write(Time.time);
+					bw.Write(Time.fixedTime);
+					bw.Write(type);
+					bw.Write(id);
+					bw.Write(pos.x);
+					bw.Write(pos.y);
+					bw.Write(pos.z);
+					bw.Write(rot.x);
+					bw.Write(rot.y);
+					bw.Write(rot.z);
+					bw.Write(rot.w);
+					Flush(false);
+				} catch (Exception e) {
+					UnityEngine.Debug.Log("MPPlayerStateDump: failed to dump transform: " + e);
+				} finally {
+					mtx.ReleaseMutex();
+				}
+			}
 		}
 
 		public static Buffer buf = new Buffer();
@@ -501,6 +558,16 @@ namespace GameMod {
 			buf.AddPerfProbe(PerfProbeLocation.FRAME, (uint)PerfProbeMode.BEGIN);
 			while(true) {
 				yield return new WaitForEndOfFrame();
+				/*
+				if (GameManager.m_player_ship != null) {
+					UnityEngine.Debug.LogFormat("xxx interpol {0}", GameManager.m_player_ship.c_rigidbody.interpolation);
+				}
+				*/
+				buf.AddTransformDump(GameManager.m_player_ship.c_rigidbody.transform,0,0);
+				buf.AddTransformDump(GameManager.m_local_player.transform,0,1);
+				buf.AddTransformDump(GameManager.m_player_ship.c_camera.transform,0,2);
+				buf.AddTransformDump(GameManager.m_player_ship.c_rigidbody.position,GameManager.m_player_ship.c_rigidbody.rotation,0,4);
+				buf.AddTransformDump(GameManager.m_local_player.m_error_pos,GameManager.m_local_player.m_error_rot,0,5);
 				buf.AddPerfProbe(PerfProbeLocation.FRAME, (uint)PerfProbeMode.END);
 				buf.AddPerfProbe(PerfProbeLocation.FRAME, (uint)PerfProbeMode.BEGIN);
 			}
