@@ -666,6 +666,7 @@ namespace GameMod {
 				buf.AddLerpEnd(__instance.m_lerp_wait_for_respawn_pos);
 			}
 		}
+
 		*/
 
 		[HarmonyPatch(typeof(GameManager), "Update")]
@@ -693,6 +694,31 @@ namespace GameMod {
 				if (!perFrameCoroutine) {
 					__instance.StartCoroutine(CoroutineAtFrameEnd());
 					perFrameCoroutine = true;
+
+				}
+			}
+		}
+
+		public static Vector3 previousShipPosition = new Vector3();
+		public static Quaternion previousShipRotation = new Quaternion();
+		public static bool playerShipOverridden = false;
+
+		[HarmonyPatch(typeof(PlayerShip), "FixedUpdateAll")]
+		class MPPlayerStateDump_SmoothHack1 {
+			static void Prefix() {
+				if (GameplayManager.IsMultiplayerActive) {
+
+					GameManager.m_local_player.transform.position = previousShipPosition;
+					GameManager.m_local_player.transform.rotation = previousShipRotation;
+				}
+			}
+			static void Postfix() {
+				if (GameplayManager.IsMultiplayerActive) {
+					previousShipPosition = GameManager.m_local_player.transform.position;
+					previousShipRotation = GameManager.m_local_player.transform.rotation;
+					NetworkSim.PauseAllRigidBodiesExcept(GameManager.m_local_player.c_player_ship.c_rigidbody);
+					Physics.Simulate(Time.fixedDeltaTime);
+					NetworkSim.ResumeAllPausedRigidBodies();
 
 				}
 			}
