@@ -745,7 +745,9 @@ namespace GameMod {
 					// which follow until we reach the next FixedUpdate cycle, where we  undo the changes right at
 					// the beginnin.
 					NetworkSim.PauseAllRigidBodiesExcept(GameManager.m_local_player.c_player_ship.c_rigidbody);
+					NetworkSim.m_resimulating = true; // this disables some collision handling of the player ship
 					Physics.Simulate(Time.fixedDeltaTime);
+					NetworkSim.m_resimulating = false;
 					NetworkSim.ResumeAllPausedRigidBodies();
 
 					// we need to restore the orginal values in the next cycle...
