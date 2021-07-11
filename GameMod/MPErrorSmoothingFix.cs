@@ -9,6 +9,25 @@ namespace GameMod {
         private static Vector3 savedAngularVelocity = new Vector3();
         private static Quaternion savedRotation = new Quaternion();
         private static bool playerPositionOverridden = false;
+        private static bool hackIsEnabled = true;
+
+        private static void hack_smooth_command() {
+                int n = uConsole.GetNumParameters();
+                if (n > 0) {
+                        int value = uConsole.GetInt();
+                        hackIsEnabled = (value>0) ? true: false;
+                } else {
+                        hackIsEnabled = !hackIsEnabled;
+                }
+                UnityEngine.Debug.LogFormat("hack_smooth is now {0}", (hackIsEnabled)?"ON":"OFF");
+        }
+
+        [HarmonyPatch(typeof(GameManager), "Awake")]
+        class MPErrorSmoothingFix_Controller {
+            static void Postfix() {
+                uConsole.RegisterCommand("hack_smooth", hack_smooth_command);
+            }
+        }
 
         [HarmonyPatch(typeof(GameManager), "FixedUpdate")]
         class MPErrorSmoothingFix_FixedUpdateCycle {
@@ -24,7 +43,7 @@ namespace GameMod {
             }
             static void Postfix() {
                 // only on the Client, in Multiplayer, in an active game, not during death roll:
-                if (!Server.IsActive() && GameplayManager.IsMultiplayerActive && NetworkMatch.InGameplay() && !GameManager.m_local_player.c_player_ship.m_dying) {
+                if (hackIsEnabled && !Server.IsActive() && GameplayManager.IsMultiplayerActive && NetworkMatch.InGameplay() && !GameManager.m_local_player.c_player_ship.m_dying) {
                     // Save the current ship sate.
                     // This is the one synced with the server, and with the
                     // error smoothing applied to it already.
