@@ -13,7 +13,7 @@ namespace GameMod {
         private static bool       targetTransformOverridden = false;
         private static Transform  targetTransformNode = null;
 
-        private static int hackIsEnabled = 0;
+        private static int hackIsEnabled = 1;
 
         private static void dump_transform(int level, Transform t)
         {
