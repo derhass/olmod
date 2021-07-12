@@ -669,6 +669,12 @@ namespace GameMod {
 		}
 		*/
 
+		[HarmonyPatch(typeof(PlayerShip), "FixedUpdateAll")]
+		class MPPlayerStateDump_XXA {
+			static void Postfix() {
+				buf.AddTransformDump(GameManager.m_local_player.transform,0,6);
+			}
+		}
 		[HarmonyPatch(typeof(GameManager), "Update")]
 		class MPPlayerStateDump_GameManagerUpdate {
 			static void Prefix() {
