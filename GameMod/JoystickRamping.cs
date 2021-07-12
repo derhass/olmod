@@ -20,8 +20,8 @@ namespace GameMod
     {
 
         public static bool alt_turn_ramp_mode = false;          // local player flag that defines which behaviour should be used, gets loaded/saved through MPSetup.cs in .xprefsmod
-        public static Dictionary<string, int> client_settings;  // used to store the turn ramp mode setting of the active players on the server side
-        public static bool server_support = true;               // indicates wether the current server supports the changed behaviour, set to true when outside of a mp game
+        public static Dictionary<uint, int> client_settings;    // used to store the turn ramp mode setting of the active players on the server side
+        public static bool server_support = true;               // indicates wether the current server supports the changed behaviour, has to be true outside of games to make the ui option accessible
 
         // 
         [HarmonyPatch(typeof(PlayerShip), "FixedUpdateProcessControlsInternal")]
@@ -93,11 +93,11 @@ namespace GameMod
                 {
                     try
                     {
-                        if (client_settings.ContainsKey(_inst.c_player.m_mp_name.ToUpper()))
+                        if (client_settings.ContainsKey(_inst.c_player.netId.Value))//_inst.c_player.m_mp_name.ToUpper()))
                         {
                             int val = 0;
-                            client_settings.TryGetValue(_inst.c_player.m_mp_name.ToUpper(), out val);
-                            // Debug.Log("Name:" + _inst.c_player.m_mp_name + "  NETID:" + (int)_inst.netId.Value + "  VALUE:" + val);
+                            client_settings.TryGetValue(_inst.c_player.netId.Value, out val);
+                            Debug.Log("Name:" + _inst.c_player.m_mp_name + "  NETID:" + (int)_inst.netId.Value + "  VALUE:" + val);
                             return val == 1;
                         }
                     }
@@ -160,9 +160,9 @@ namespace GameMod
                     Debug.Log("JoystickRamping_AcceptedToLobby: no client?");
                     return;
                 }
-                server_support = false;
-                Debug.Log("JoystickRamping: sending turn ramping mode flag. name:" + PilotManager.PilotName.ToUpper());
-                Client.GetClient().Send(MessageTypes.MsgSetJoystickRampMode, new TurnrampModeMessage { mode = alt_turn_ramp_mode ? 1 : 0, mp_name = PilotManager.PilotName.ToUpper() });
+                server_support = false; 
+                Debug.Log("JoystickRamping: sending turn ramping mode flag. GameManager.m_local_player.netId:" + GameManager.m_local_player.netId);
+                Client.GetClient().Send(MessageTypes.MsgSetJoystickRampMode, new TurnrampModeMessage { mode = alt_turn_ramp_mode ? 1 : 0, netId = GameManager.m_local_player.netId.Value });
             }
         }
 
@@ -178,17 +178,15 @@ namespace GameMod
             {
                 var msg = rawMsg.ReadMessage<TurnrampModeMessage>();
 
-                Debug.LogFormat("JoystickRamping: received client turn ramping mode {0}: {1}: {2} ", msg.mp_name, rawMsg.conn.connectionId, msg.mode == 1 ? "LINEAR" : "DEFAULT");
+                Debug.LogFormat("JoystickRamping: received client turn ramping mode {0}: {1}: {2} ", msg.netId, rawMsg.conn.connectionId, msg.mode == 1 ? "LINEAR" : "DEFAULT");
 
-                if (client_settings == null)
-                {
-                    client_settings = new Dictionary<string, int>();
+                if (client_settings == null) {
+                    client_settings = new Dictionary<uint, int>();
                 }
-                if (client_settings.ContainsKey(msg.mp_name))
-                {
-                    client_settings.Remove(msg.mp_name);
+                if (client_settings.ContainsKey(msg.netId)) {
+                    client_settings.Remove(msg.netId);
                 }
-                client_settings.Add(msg.mp_name, msg.mode);
+                client_settings.Add(msg.netId, msg.mode);
 
             }
 
@@ -216,7 +214,7 @@ namespace GameMod
         {
             static void Postfix()
             {
-                client_settings = new Dictionary<string, int>();
+                client_settings = new Dictionary<uint, int>();
                 server_support = true;
             }
         }
@@ -224,16 +222,16 @@ namespace GameMod
         public class TurnrampModeMessage : MessageBase
         {
             public int mode;
-            public string mp_name;
+            public uint netId;
             public override void Serialize(NetworkWriter writer)
             {
                 writer.Write((byte)mode);
-                writer.Write(mp_name);
+                writer.Write(netId);
             }
             public override void Deserialize(NetworkReader reader)
             {
                 mode = reader.ReadByte();
-                mp_name = reader.ReadString();
+                netId = reader.ReadUInt32();
             }
         }
 
@@ -272,15 +270,12 @@ namespace GameMod
         {
             private static void DrawTurnspeedModeOption(UIElement uie, ref Vector2 position)
             {
-
                 if (!server_support && !GameplayManager.IsMultiplayerActive)
                 {
                     server_support = true;
                     Debug.Log("JoystickRamping.server_support didnt reset properly");
                 }
-
                 position.y += 62f;
-
                 uie.SelectAndDrawStringOptionItem(Loc.LS("TURN RAMPING MODE"), position, 0, GetTurnRampMode(),
                     Loc.LS("LINEAR ADDS THE TURNSPEED SPEED IMMEDIATLY AND PROPORTIONAL TO THE JOYSTICK INPUT"), 1.5f,
                     !server_support); // grey out this option if the current server doesnt support this setting
@@ -322,7 +317,7 @@ namespace GameMod
                         Debug.Log("JoystickRamping_ControlsOptionsUpdate: no client?");
                         return;
                     }
-                    Client.GetClient().Send(MessageTypes.MsgSetJoystickRampMode, new TurnrampModeMessage { mode = alt_turn_ramp_mode ? 1 : 0, mp_name = PilotManager.PilotName.ToUpper() });
+                    Client.GetClient().Send(MessageTypes.MsgSetJoystickRampMode, new TurnrampModeMessage { mode = alt_turn_ramp_mode ? 1 : 0, netId = GameManager.m_local_player.netId.Value });
                 }
             }
 
@@ -335,7 +330,7 @@ namespace GameMod
                     {
                         // remove the button press handling of the 'PRIMARY AUTOSELECT' option
                         codes.RemoveRange(i + 1, 6);
-                        // adds new logic
+                        // adds logic to handle button presses of the new option
                         codes.Insert(i + 2, new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(JoystickRamping_ControlsOptionsUpdate), "ProcessTurnRampModeButtonPress")));
                         break;
                     }
