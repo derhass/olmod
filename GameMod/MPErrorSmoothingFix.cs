@@ -9,8 +9,6 @@ namespace GameMod {
         private static Quaternion lastRotation = new Quaternion();
         private static Vector3    currPosition = new Vector3();
         private static Quaternion currRotation = new Quaternion();
-        private static Vector3    savedPosition = new Vector3();
-        private static Quaternion savedRotation = new Quaternion();
         private static bool       doManualInterpolation = false;
         private static bool       targetTransformOverridden = false;
         private static Transform  targetTransformNode = null;
@@ -71,15 +69,11 @@ namespace GameMod {
             GameManager.m_local_player.c_player_ship.c_rigidbody.interpolation = RigidbodyInterpolation.Interpolate;
         }
 
-        // override the transformation of the traget node
+        // override the transformation of the target node
         // use smooth interpolation based on Time.time relative to Time.fixedTime
         // this is done PER FRAME
         private static void doTransformOverride()
         {
-            // save the unmodified state
-            savedPosition = targetTransformNode.position;
-            savedRotation = targetTransformNode.rotation;
-
             // interpolate or extrapolate the position
             float fract = (Time.time - Time.fixedTime) / Time.fixedDeltaTime;
             if (hackIsEnabled > 1) {
@@ -96,8 +90,8 @@ namespace GameMod {
         private static void undoTransformOverride()
         {
                 if (targetTransformOverridden) {
-                    targetTransformNode.position = savedPosition;
-                    targetTransformNode.rotation = savedRotation;
+                    targetTransformNode.position = currPosition;
+                    targetTransformNode.rotation = currRotation;
                     targetTransformOverridden = false;
                 }
         }
@@ -136,11 +130,6 @@ namespace GameMod {
         [HarmonyPatch(typeof(GameManager), "Update")]
         class MPErrorSmoothingFix_FixedUpdateCycle {
             static void Prefix() {
-                // undo potential override before calculating data for the frame
-                undoTransformOverride(); 
-            }
-
-            static void Postfix() {
                 if (doManualInterpolation && (targetTransformNode != null)) {
                     doTransformOverride();
                 }
