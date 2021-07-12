@@ -7,8 +7,8 @@ namespace GameMod {
     public class MPErrorSmoothingFix {
         private static Vector3    lastPosition = new Vector3();
         private static Quaternion lastRotation = new Quaternion();
-        private static Vector3    deltaPosition = new Vector3();
-        private static Quaternion deltaRotation = new Quaternion();
+        private static Vector3    currPosition = new Vector3();
+        private static Quaternion currRotation = new Quaternion();
         private static Vector3    savedLocalPosition = new Vector3();
         private static Quaternion savedLocalRotation = new Quaternion();
         private static bool       doManualInterpolation = false;
@@ -61,27 +61,32 @@ namespace GameMod {
 
         [HarmonyPatch(typeof(GameManager), "FixedUpdate")]
         class MPErrorSmoothingFix_UpdateCycle {
+            static void Prefix() {
+                if (localTransformOverridden) {
+                    localTransformNode.localPosition = savedLocalPosition;
+                    localTransformNode.localRotation = savedLocalRotation;
+                    localTransformOverridden = false;
+                }
+            }
             static void Postfix() {
                 // only on the Client, in Multiplayer, in an active game, not during death roll:
                 if ((hackIsEnabled>0) && !Server.IsActive() && GameplayManager.IsMultiplayerActive && NetworkMatch.InGameplay() && !GameManager.m_local_player.c_player_ship.m_dying) {
                     if (!doManualInterpolation) {
-                        GameManager.m_local_player.c_player_ship.c_rigidbody.interpolation=RigidbodyInterpolation.None;
+                        GameManager.m_local_player.c_player_ship.c_rigidbody.interpolation = RigidbodyInterpolation.None;
+                        localTransformNode = GameManager.m_local_player.c_player_ship.c_camera.transform;
                         doManualInterpolation = true;
-                        lastPosition = GameManager.m_local_player.transform.position;
-                        lastRotation = GameManager.m_local_player.transform.rotation;
-                        if (GameManager.m_local_player.c_player_ship.c_camera.transform.parent != null) {
-                          localTransformNode = GameManager.m_local_player.c_player_ship.c_camera.transform.parent.parent;
-                        }
+                        currPosition = localTransformNode.position;
+                        currRotation = localTransformNode.rotation;
                     }
-                    deltaPosition =  GameManager.m_local_player.transform.position - lastPosition;
-                    deltaRotation =  GameManager.m_local_player.transform.rotation * Quaternion.Inverse(lastRotation);
-                    lastPosition = GameManager.m_local_player.transform.position;
-                    lastRotation = GameManager.m_local_player.transform.rotation;
+                    lastPosition = currPosition;
+                    lastRotation = currRotation;
+                    currPosition = localTransformNode.position;
+                    currRotation = localTransformNode.rotation;
                 } else {
                     if (doManualInterpolation) {
                       doManualInterpolation = false;
                       localTransformNode = null;
-                      GameManager.m_local_player.c_player_ship.c_rigidbody.interpolation=RigidbodyInterpolation.Interpolate;
+                      GameManager.m_local_player.c_player_ship.c_rigidbody.interpolation = RigidbodyInterpolation.Interpolate;
                     }
                 }
             }
@@ -103,11 +108,9 @@ namespace GameMod {
                     savedLocalPosition = localTransformNode.localPosition;
                     savedLocalRotation = localTransformNode.localRotation;
                     float fract = (Time.time - Time.fixedTime) / Time.fixedDeltaTime;
-                    Vector3 posOffset = deltaPosition * fract;
-                    Quaternion rotOffset = Quaternion.SlerpUnclamped(Quaternion.identity, deltaRotation, fract); 
-                    UnityEngine.Debug.LogFormat("STEP: fract: {0} ({1} {2} {3})", fract, posOffset.x, posOffset.y, posOffset.z);
-                    localTransformNode.localPosition = localTransformNode.localPosition + posOffset;
-                    localTransformNode.localRotation = localTransformNode.localRotation * rotOffset;
+                    UnityEngine.Debug.LogFormat("STEP: fract: {0}", fract);
+                    localTransformNode.position = Vector3.LerpUnclamped(lastPosition, currPosition, fract);
+                    localTransformNode.rotation = Quaternion.SlerpUnclamped(lastRotation, currRotation, fract);
                     localTransformOverridden = true;
                     UnityEngine.Debug.Log("XXX After");
                     dump_transform_hierarchy(GameManager.m_local_player.c_player_ship.c_camera.transform);
