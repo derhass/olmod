@@ -1,5 +1,6 @@
 using Harmony;
 using Overload;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace GameMod {
@@ -9,17 +10,17 @@ namespace GameMod {
         private static Vector3 savedAngularVelocity = new Vector3();
         private static Quaternion savedRotation = new Quaternion();
         private static bool playerPositionOverridden = false;
-        private static bool hackIsEnabled = true;
+        private static int hackIsEnabled = 0;
 
         private static void hack_smooth_command() {
                 int n = uConsole.GetNumParameters();
                 if (n > 0) {
                         int value = uConsole.GetInt();
-                        hackIsEnabled = (value>0) ? true: false;
+                        hackIsEnabled = value;
                 } else {
-                        hackIsEnabled = !hackIsEnabled;
+                        hackIsEnabled = (hackIsEnabled >0)?0:1;
                 }
-                UnityEngine.Debug.LogFormat("hack_smooth is now {0}", (hackIsEnabled)?"ON":"OFF");
+                UnityEngine.Debug.LogFormat("hack_smooth is now {0}", hackIsEnabled);
         }
 
         [HarmonyPatch(typeof(GameManager), "Awake")]
@@ -43,7 +44,7 @@ namespace GameMod {
             }
             static void Postfix() {
                 // only on the Client, in Multiplayer, in an active game, not during death roll:
-                if (hackIsEnabled && !Server.IsActive() && GameplayManager.IsMultiplayerActive && NetworkMatch.InGameplay() && !GameManager.m_local_player.c_player_ship.m_dying) {
+                if ((hackIsEnabled>0) && !Server.IsActive() && GameplayManager.IsMultiplayerActive && NetworkMatch.InGameplay() && !GameManager.m_local_player.c_player_ship.m_dying) {
                     // Save the current ship sate.
                     // This is the one synced with the server, and with the
                     // error smoothing applied to it already.
@@ -70,14 +71,29 @@ namespace GameMod {
                     // Note that this change is local to the client only, and only during the rendering cycles
                     // which follow until we reach the next FixedUpdate cycle, where we  undo the changes right at
                     // the beginning.
-                    NetworkSim.PauseAllRigidBodiesExcept(GameManager.m_local_player.c_player_ship.c_rigidbody);
+                    int cnt = 0;
+                    foreach (KeyValuePair<Rigidbody, RigidBodyState> paused_rigid_body in NetworkSim.m_paused_rigid_bodies) {
+                        cnt++;
+                    }
+
+                    UnityEngine.Debug.LogFormat("XXX cnt {0}, msim {1}", cnt,NetworkSim.m_resimulating);
+
+                    if (hackIsEnabled < 3) {
+                        NetworkSim.PauseAllRigidBodiesExcept(GameManager.m_local_player.c_player_ship.c_rigidbody);
+                    }
                     NetworkSim.m_resimulating = true; // this disables some collision handling of the player ship
-                    Physics.Simulate(Time.fixedDeltaTime);
+                    if (hackIsEnabled < 2) {
+                        Physics.Simulate(Time.fixedDeltaTime);
+                    }
                     NetworkSim.m_resimulating = false;
-                    NetworkSim.ResumeAllPausedRigidBodies();
+                    if (hackIsEnabled < 4) {
+                        NetworkSim.ResumeAllPausedRigidBodies();
+                    }
 
                     // we need to restore the orginal values in the next cycle...
-                    playerPositionOverridden = true;
+                    if (hackIsEnabled < 2) { 
+                        playerPositionOverridden = true;
+                    }
                 }
             }
         }
