@@ -5,11 +5,16 @@ using UnityEngine;
 
 namespace GameMod {
     public class MPErrorSmoothingFix {
-        private static Vector3 savedPosition = new Vector3();
-        private static Vector3 savedVelocity = new Vector3();
-        private static Vector3 savedAngularVelocity = new Vector3();
-        private static Quaternion savedRotation = new Quaternion();
-        private static bool playerPositionOverridden = false;
+        private static Vector3    lastPosition = new Vector3();
+        private static Quaternion lastRotation = new Quaternion();
+        private static Vector3    deltaPosition = new Vector3();
+        private static Quaternion deltaRotation = new Quaternion();
+        private static Vector3    savedLocalPosition = new Vector3();
+        private static Quaternion savedLocalRotation = new Quaternion();
+        private static bool       doManualInterpolation = false;
+        private static bool       localTransformOverridden = false;
+        private static Transform  localTransformNode = null;
+
         private static int hackIsEnabled = 0;
 
         private static void dump_transform(int level, Transform t)
@@ -55,75 +60,57 @@ namespace GameMod {
         }
 
         [HarmonyPatch(typeof(GameManager), "FixedUpdate")]
-        class MPErrorSmoothingFix_FixedUpdateCycle {
-            static void Prefix() {
-                if (!Server.IsActive() && GameplayManager.IsMultiplayerActive && NetworkMatch.InGameplay() && !GameManager.m_local_player.c_player_ship.m_dying) {
-                    GameManager.m_local_player.c_player_ship.c_rigidbody.interpolation=RigidbodyInterpolation.None;
-                    if (hackIsEnabled == -1) {
-                            dump_transform_hierarchy(GameManager.m_local_player.c_player_ship.c_camera.transform);
-                    }
-                }
-                if (playerPositionOverridden) {
-                    //restore the saved values
-                    GameManager.m_local_player.transform.position = savedPosition;
-                    GameManager.m_local_player.transform.rotation = savedRotation;
-                    GameManager.m_local_player.c_player_ship.c_rigidbody.velocity = savedVelocity;
-                    GameManager.m_local_player.c_player_ship.c_rigidbody.angularVelocity = savedAngularVelocity;
-                    playerPositionOverridden = false;
-                }
-            }
+        class MPErrorSmoothingFix_UpdateCycle {
             static void Postfix() {
                 // only on the Client, in Multiplayer, in an active game, not during death roll:
                 if ((hackIsEnabled>0) && !Server.IsActive() && GameplayManager.IsMultiplayerActive && NetworkMatch.InGameplay() && !GameManager.m_local_player.c_player_ship.m_dying) {
-                    // Save the current ship sate.
-                    // This is the one synced with the server, and with the
-                    // error smoothing applied to it already.
-                    savedPosition = GameManager.m_local_player.transform.position;
-                    savedRotation = GameManager.m_local_player.transform.rotation;
-                    savedVelocity = GameManager.m_local_player.c_player_ship.c_rigidbody.velocity;
-                    savedAngularVelocity = GameManager.m_local_player.c_player_ship.c_rigidbody.angularVelocity;
+                    if (!doManualInterpolation) {
+                        GameManager.m_local_player.c_player_ship.c_rigidbody.interpolation=RigidbodyInterpolation.None;
+                        doManualInterpolation = true;
+                        lastPosition = GameManager.m_local_player.transform.position;
+                        lastRotation = GameManager.m_local_player.transform.rotation;
+                        if (GameManager.m_local_player.c_player_ship.c_camera.transform.parent != null) {
+                          localTransformNode = GameManager.m_local_player.c_player_ship.c_camera.transform.parent.parent;
+                        }
+                    }
+                    deltaPosition =  GameManager.m_local_player.transform.position - lastPosition;
+                    deltaRotation =  GameManager.m_local_player.transform.rotation * Quaternion.Inverse(lastRotation);
+                    lastPosition = GameManager.m_local_player.transform.position;
+                    lastRotation = GameManager.m_local_player.transform.rotation;
+                } else {
+                    if (doManualInterpolation) {
+                      doManualInterpolation = false;
+                      localTransformNode = null;
+                      GameManager.m_local_player.c_player_ship.c_rigidbody.interpolation=RigidbodyInterpolation.Interpolate;
+                    }
+                }
+            }
+        }
 
-                    // Simulate one physics tick more for the player object (and effectively, also for the camera).
-                    // Note that m_local_player.c_player_ship.c_rigidbody.interpolation = Interpolate is set,
-                    // which normally results in the data being interpolated per frame which gets rendered.
-                    // However, this seems to only work with data generated by two consecutive  physics simulation ticks.
-                    // Since the error smoothing is applied _after_ the physics simulation, this interpolation does not
-                    // work anymore, so if error smoothing was done, the user's ship and camera is moved only at each
-                    // fixed time step (60Hz in multiplayer), no matter how high the framerate is.
-                    //
-                    // We fix this by doing one more physics interpolation step for the player ship.
-                    // Note we do this uncoditionally no matter whether error smoothing was applied or not, to
-                    // get consistently one frame ahead. When the Interpolate mode is selected,
-                    // it will effectively delay the results by one physics tick,, so being one frame ahead is
-                    // actually more close to the truth, and will result in a slightly more direct input feeling,
-                    // since we effectively do some sort of extrapolation now.
-                    //
-                    // Note that this change is local to the client only, and only during the rendering cycles
-                    // which follow until we reach the next FixedUpdate cycle, where we  undo the changes right at
-                    // the beginning.
-                    int cnt = 0;
-                    foreach (KeyValuePair<Rigidbody, RigidBodyState> paused_rigid_body in NetworkSim.m_paused_rigid_bodies) {
-                        cnt++;
-                    }
-
-                    UnityEngine.Debug.LogFormat("XXX cnt {0}, msim {1}", cnt,NetworkSim.m_resimulating);
-
-                    if (hackIsEnabled < 3) {
-                        NetworkSim.PauseAllRigidBodiesExcept(GameManager.m_local_player.c_player_ship.c_rigidbody);
-                    }
-                    NetworkSim.m_resimulating = true; // this disables some collision handling of the player ship
-                    if (hackIsEnabled < 2) {
-                        Physics.Simulate(Time.fixedDeltaTime);
-                    }
-                    NetworkSim.m_resimulating = false;
-                    if (hackIsEnabled < 4) {
-                        NetworkSim.ResumeAllPausedRigidBodies();
-                    }
-
-                    // we need to restore the orginal values in the next cycle...
-                    if (hackIsEnabled < 2) { 
-                        playerPositionOverridden = true;
-                    }
+        [HarmonyPatch(typeof(GameManager), "Update")]
+        class MPErrorSmoothingFix_FixedUpdateCycle {
+            static void Prefix() {
+                if (localTransformOverridden) {
+                    localTransformNode.localPosition = savedLocalPosition;
+                    localTransformNode.localRotation = savedLocalRotation;
+                    localTransformOverridden = false;
+                }
+            }
+            static void Postfix() {
+                if (doManualInterpolation && (localTransformNode != null)) {
+                    UnityEngine.Debug.Log("XXX BEFORE");
+                    dump_transform_hierarchy(GameManager.m_local_player.c_player_ship.c_camera.transform);
+                    savedLocalPosition = localTransformNode.localPosition;
+                    savedLocalRotation = localTransformNode.localRotation;
+                    float fract = (Time.time - Time.fixedTime) / Time.fixedDeltaTime;
+                    Vector3 posOffset = deltaPosition * fract;
+                    Quaternion rotOffset = Quaternion.SlerpUnclamped(Quaternion.identity, deltaRotation, fract); 
+                    UnityEngine.Debug.LogFormat("STEP: fract: {0} ({1} {2} {3})", fract, posOffset.x, posOffset.y, posOffset.z);
+                    localTransformNode.localPosition = localTransformNode.localPosition + posOffset;
+                    localTransformNode.localRotation = localTransformNode.localRotation * rotOffset;
+                    localTransformOverridden = true;
+                    UnityEngine.Debug.Log("XXX After");
+                    dump_transform_hierarchy(GameManager.m_local_player.c_player_ship.c_camera.transform);
                 }
             }
         }
