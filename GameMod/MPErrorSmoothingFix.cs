@@ -9,11 +9,11 @@ namespace GameMod {
         private static Quaternion lastRotation = new Quaternion();
         private static Vector3    currPosition = new Vector3();
         private static Quaternion currRotation = new Quaternion();
-        private static Vector3    savedLocalPosition = new Vector3();
-        private static Quaternion savedLocalRotation = new Quaternion();
+        private static Vector3    savedPosition = new Vector3();
+        private static Quaternion savedRotation = new Quaternion();
         private static bool       doManualInterpolation = false;
-        private static bool       localTransformOverridden = false;
-        private static Transform  localTransformNode = null;
+        private static bool       targetTransformOverridden = false;
+        private static Transform  targetTransformNode = null;
 
         private static int hackIsEnabled = 0;
 
@@ -45,12 +45,63 @@ namespace GameMod {
                 }
                 UnityEngine.Debug.LogFormat("hack_smooth is now {0}", hackIsEnabled);
         }
-        [HarmonyPatch(typeof(PlayerShip), "Awake")]
-        class MPErrorSmoothingFix_X1 {
-            static void Postfix() {
-               // GameManager.m_local_player.c_player_ship.c_rigidbody.interpolation=RigidbodyInterpolation.None;
+
+        // start the manual interpolation phase
+        // this disables Unitys automatic interpolation for the rigid body of the player ship
+        private static void enableManualInterpolation()
+        {
+            doManualInterpolation = true;
+            if (GameManager.m_local_player.c_player_ship.c_camera.transform.parent) {
+                targetTransformNode = GameManager.m_local_player.c_player_ship.c_camera.transform.parent.parent;
+                targetTransformNode = GameManager.m_local_player.c_player_ship.transform;
+            }
+            if (targetTransformNode) {
+                GameManager.m_local_player.c_player_ship.c_rigidbody.interpolation = RigidbodyInterpolation.None;
+                currPosition = targetTransformNode.position;
+                currRotation = targetTransformNode.rotation;
             }
         }
+
+        // stop the manual interpolation phase
+        // restore Unitys automatic interpolation for the rigid body of the player ship
+        private static void disableManualInterpolation()
+        {
+            doManualInterpolation = false;
+            targetTransformNode = null;
+            GameManager.m_local_player.c_player_ship.c_rigidbody.interpolation = RigidbodyInterpolation.Interpolate;
+        }
+
+        // override the transformation of the traget node
+        // use smooth interpolation based on Time.time relative to Time.fixedTime
+        // this is done PER FRAME
+        private static void doTransformOverride()
+        {
+            // save the unmodified state
+            savedPosition = targetTransformNode.position;
+            savedRotation = targetTransformNode.rotation;
+
+            // interpolate or extrapolate the position
+            float fract = (Time.time - Time.fixedTime) / Time.fixedDeltaTime;
+            if (hackIsEnabled > 1) {
+                    fract += 1.0f;
+            }
+            targetTransformNode.position = Vector3.LerpUnclamped(lastPosition, currPosition, fract);
+            targetTransformNode.rotation = Quaternion.SlerpUnclamped(lastRotation, currRotation, fract);
+
+            // mark the transformation as overridden
+            targetTransformOverridden = true;
+        }
+
+        // undo the transformation we modified
+        private static void undoTransformOverride()
+        {
+                if (targetTransformOverridden) {
+                    targetTransformNode.position = savedPosition;
+                    targetTransformNode.rotation = savedRotation;
+                    targetTransformOverridden = false;
+                }
+        }
+
 
         [HarmonyPatch(typeof(GameManager), "Awake")]
         class MPErrorSmoothingFix_Controller {
@@ -62,32 +113,22 @@ namespace GameMod {
         [HarmonyPatch(typeof(GameManager), "FixedUpdate")]
         class MPErrorSmoothingFix_UpdateCycle {
             static void Prefix() {
-                if (localTransformOverridden) {
-                    localTransformNode.localPosition = savedLocalPosition;
-                    localTransformNode.localRotation = savedLocalRotation;
-                    localTransformOverridden = false;
-                }
+                    // undo potential override also before FixedUpdate
+                    undoTransformOverride();
             }
+
             static void Postfix() {
                 // only on the Client, in Multiplayer, in an active game, not during death roll:
                 if ((hackIsEnabled>0) && !Server.IsActive() && GameplayManager.IsMultiplayerActive && NetworkMatch.InGameplay() && !GameManager.m_local_player.c_player_ship.m_dying) {
                     if (!doManualInterpolation) {
-                        GameManager.m_local_player.c_player_ship.c_rigidbody.interpolation = RigidbodyInterpolation.None;
-                        localTransformNode = GameManager.m_local_player.c_player_ship.c_camera.transform;
-                        doManualInterpolation = true;
-                        currPosition = localTransformNode.position;
-                        currRotation = localTransformNode.rotation;
+                        enableManualInterpolation();
                     }
                     lastPosition = currPosition;
                     lastRotation = currRotation;
-                    currPosition = localTransformNode.position;
-                    currRotation = localTransformNode.rotation;
-                } else {
-                    if (doManualInterpolation) {
-                      doManualInterpolation = false;
-                      localTransformNode = null;
-                      GameManager.m_local_player.c_player_ship.c_rigidbody.interpolation = RigidbodyInterpolation.Interpolate;
-                    }
+                    currPosition = targetTransformNode.position;
+                    currRotation = targetTransformNode.rotation;
+                } else if (doManualInterpolation) {
+                    disableManualInterpolation();
                 }
             }
         }
@@ -95,25 +136,13 @@ namespace GameMod {
         [HarmonyPatch(typeof(GameManager), "Update")]
         class MPErrorSmoothingFix_FixedUpdateCycle {
             static void Prefix() {
-                if (localTransformOverridden) {
-                    localTransformNode.localPosition = savedLocalPosition;
-                    localTransformNode.localRotation = savedLocalRotation;
-                    localTransformOverridden = false;
-                }
+                // undo potential override before calculating data for the frame
+                undoTransformOverride(); 
             }
+
             static void Postfix() {
-                if (doManualInterpolation && (localTransformNode != null)) {
-                    UnityEngine.Debug.Log("XXX BEFORE");
-                    dump_transform_hierarchy(GameManager.m_local_player.c_player_ship.c_camera.transform);
-                    savedLocalPosition = localTransformNode.localPosition;
-                    savedLocalRotation = localTransformNode.localRotation;
-                    float fract = (Time.time - Time.fixedTime) / Time.fixedDeltaTime;
-                    UnityEngine.Debug.LogFormat("STEP: fract: {0}", fract);
-                    localTransformNode.position = Vector3.LerpUnclamped(lastPosition, currPosition, fract);
-                    localTransformNode.rotation = Quaternion.SlerpUnclamped(lastRotation, currRotation, fract);
-                    localTransformOverridden = true;
-                    UnityEngine.Debug.Log("XXX After");
-                    dump_transform_hierarchy(GameManager.m_local_player.c_player_ship.c_camera.transform);
+                if (doManualInterpolation && (targetTransformNode != null)) {
+                    doTransformOverride();
                 }
             }
         }
