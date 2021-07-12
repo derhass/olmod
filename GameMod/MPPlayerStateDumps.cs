@@ -566,6 +566,7 @@ namespace GameMod {
 				buf.AddTransformDump(GameManager.m_player_ship.c_rigidbody.transform,0,0);
 				buf.AddTransformDump(GameManager.m_local_player.transform,0,1);
 				buf.AddTransformDump(GameManager.m_player_ship.c_camera.transform,0,2);
+				buf.AddTransformDump(GameManager.m_local_player.c_player_ship.c_cam_controller.transform,0,3);
 				buf.AddTransformDump(GameManager.m_player_ship.c_rigidbody.position,GameManager.m_player_ship.c_rigidbody.rotation,0,4);
 				buf.AddTransformDump(GameManager.m_local_player.m_error_pos,GameManager.m_local_player.m_error_rot,0,5);
 				buf.AddPerfProbe(PerfProbeLocation.FRAME, (uint)PerfProbeMode.END);

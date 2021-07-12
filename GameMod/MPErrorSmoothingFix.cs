@@ -12,6 +12,24 @@ namespace GameMod {
         private static bool playerPositionOverridden = false;
         private static int hackIsEnabled = 0;
 
+        private static void dump_transform(int level, Transform t)
+        {
+                UnityEngine.Debug.LogFormat("{0}: {1} Lp ({2} {3} {4}) Lr ({5} {6} {7}) Ls ({8} {9} {10})",
+                                level, t.name, t.localPosition.x, t.localPosition.y, t.localPosition.z,
+                                t.localEulerAngles.x, t.localEulerAngles.y, t.localEulerAngles.z,
+                                t.localScale.x, t.localScale.y, t.localScale.z);
+
+        }
+
+        private static void dump_transform_hierarchy(Transform t)
+        {
+                int level = 0;
+                while (t != null) {
+                        dump_transform(level, t);
+                        t=t.parent;
+                        level++;
+                }
+        }
         private static void hack_smooth_command() {
                 int n = uConsole.GetNumParameters();
                 if (n > 0) {
@@ -21,6 +39,12 @@ namespace GameMod {
                         hackIsEnabled = (hackIsEnabled >0)?0:1;
                 }
                 UnityEngine.Debug.LogFormat("hack_smooth is now {0}", hackIsEnabled);
+        }
+        [HarmonyPatch(typeof(PlayerShip), "Awake")]
+        class MPErrorSmoothingFix_X1 {
+            static void Postfix() {
+               // GameManager.m_local_player.c_player_ship.c_rigidbody.interpolation=RigidbodyInterpolation.None;
+            }
         }
 
         [HarmonyPatch(typeof(GameManager), "Awake")]
@@ -33,6 +57,12 @@ namespace GameMod {
         [HarmonyPatch(typeof(GameManager), "FixedUpdate")]
         class MPErrorSmoothingFix_FixedUpdateCycle {
             static void Prefix() {
+                if (!Server.IsActive() && GameplayManager.IsMultiplayerActive && NetworkMatch.InGameplay() && !GameManager.m_local_player.c_player_ship.m_dying) {
+                    GameManager.m_local_player.c_player_ship.c_rigidbody.interpolation=RigidbodyInterpolation.None;
+                    if (hackIsEnabled == -1) {
+                            dump_transform_hierarchy(GameManager.m_local_player.c_player_ship.c_camera.transform);
+                    }
+                }
                 if (playerPositionOverridden) {
                     //restore the saved values
                     GameManager.m_local_player.transform.position = savedPosition;
