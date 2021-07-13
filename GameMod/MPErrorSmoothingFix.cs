@@ -49,10 +49,7 @@ namespace GameMod {
         private static void enableManualInterpolation()
         {
             doManualInterpolation = true;
-            if (GameManager.m_local_player.c_player_ship.c_camera.transform.parent) {
-                targetTransformNode = GameManager.m_local_player.c_player_ship.c_camera.transform.parent.parent;
-                targetTransformNode = GameManager.m_local_player.c_player_ship.transform;
-            }
+            targetTransformNode = GameManager.m_local_player.c_player_ship.transform;
             if (targetTransformNode) {
                 GameManager.m_local_player.c_player_ship.c_rigidbody.interpolation = RigidbodyInterpolation.None;
                 currPosition = targetTransformNode.position;
