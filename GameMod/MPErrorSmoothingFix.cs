@@ -45,7 +45,7 @@ namespace GameMod {
         }
 
         // start the manual interpolation phase
-        // this disables Unitys automatic interpolation for the rigid body of the player ship
+        // this disables Unity's automatic interpolation for the rigid body of the player ship
         private static void enableManualInterpolation()
         {
             doManualInterpolation = true;
@@ -61,23 +61,24 @@ namespace GameMod {
         }
 
         // stop the manual interpolation phase
-        // restore Unitys automatic interpolation for the rigid body of the player ship
+        // restore Unity's automatic interpolation for the rigid body of the player ship
         private static void disableManualInterpolation()
         {
             doManualInterpolation = false;
             targetTransformNode = null;
+            targetTransformOverridden = false;
             GameManager.m_local_player.c_player_ship.c_rigidbody.interpolation = RigidbodyInterpolation.Interpolate;
         }
 
         // override the transformation of the target node
         // use smooth interpolation based on Time.time relative to Time.fixedTime
-        // this is done PER FRAME
+        // this should be done PER FRAME
         private static void doTransformOverride()
         {
-            // interpolate or extrapolate the position
+            // interpolate the position
             float fract = (Time.time - Time.fixedTime) / Time.fixedDeltaTime;
             if (hackIsEnabled > 1) {
-                    fract += 1.0f;
+                fract += 1.0f;
             }
             targetTransformNode.position = Vector3.LerpUnclamped(lastPosition, currPosition, fract);
             targetTransformNode.rotation = Quaternion.SlerpUnclamped(lastRotation, currRotation, fract);
@@ -89,13 +90,14 @@ namespace GameMod {
         // undo the transformation we modified
         private static void undoTransformOverride()
         {
-                if (targetTransformOverridden) {
+            if (targetTransformOverridden) {
+                if (targetTransformNode != null) {
                     targetTransformNode.position = currPosition;
                     targetTransformNode.rotation = currRotation;
-                    targetTransformOverridden = false;
                 }
+                targetTransformOverridden = false;
+            }
         }
-
 
         [HarmonyPatch(typeof(GameManager), "Awake")]
         class MPErrorSmoothingFix_Controller {
@@ -107,13 +109,16 @@ namespace GameMod {
         [HarmonyPatch(typeof(GameManager), "FixedUpdate")]
         class MPErrorSmoothingFix_UpdateCycle {
             static void Prefix() {
+                // only on the Client, in Multiplayer, in an active game, not during death roll:
+                if (!Server.IsActive() && GameplayManager.IsMultiplayerActive && NetworkMatch.InGameplay() && !GameManager.m_local_player.c_player_ship.m_dying) {
                     // undo potential override also before FixedUpdate
                     undoTransformOverride();
+                }
             }
 
             static void Postfix() {
                 // only on the Client, in Multiplayer, in an active game, not during death roll:
-                if ((hackIsEnabled>0) && !Server.IsActive() && GameplayManager.IsMultiplayerActive && NetworkMatch.InGameplay() && !GameManager.m_local_player.c_player_ship.m_dying) {
+                if ( (hackIsEnabled > 0) && !Server.IsActive() && GameplayManager.IsMultiplayerActive && NetworkMatch.InGameplay() && !GameManager.m_local_player.c_player_ship.m_dying) {
                     if (!doManualInterpolation) {
                         enableManualInterpolation();
                     }
@@ -133,6 +138,13 @@ namespace GameMod {
                 if (doManualInterpolation && (targetTransformNode != null)) {
                     doTransformOverride();
                 }
+            }
+        }
+
+        [HarmonyPatch(typeof(NetworkMatch), "InitBeforeEachMatch")]
+        class MPErrorSmoothingFix_InitBeforeEachMatch {
+            private static void Prefix() {
+                disableManualInterpolation();
             }
         }
     }
