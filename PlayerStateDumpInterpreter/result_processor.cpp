@@ -112,7 +112,7 @@ void ResultProcessorChannel::StreamOut(const PlayerState& s, size_t idx)
 	float yawPitchRoll[3];
 
 	s.rot.ToEuler(yawPitchRoll);
-	fprintf(fStream, "%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f",
+	fprintf(fStream, "%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f",
 			s.timestamp,
 			s.pos[0],
 			s.pos[1],
@@ -124,13 +124,10 @@ void ResultProcessorChannel::StreamOut(const PlayerState& s, size_t idx)
 			s.realTimestamp,
 			s.vel[0],
 			s.vel[1],
-			s.vel[2]
-			/* TODO: vrot npt dumped yet */
-			);
-	/*,
+			s.vel[2],
 			yawPitchRoll[0],
 			yawPitchRoll[1],
-			yawPitchRoll[2]);*/
+			yawPitchRoll[2]);
 	if (resultProcessor.dumpDeltaPos && idx != (size_t)-1 && idx > 0) {
 		const PlayerState b=data[idx-1];
 		fprintf(fStream, "\t%f",s.timestamp-b.timestamp);
