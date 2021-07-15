@@ -84,20 +84,27 @@ namespace GameMod
                 return codes;
             }
 
-
+            // only send the flag if the server supports it
 
             public static bool MaybeChangeRampingBehaviour()
             {
                 // (Server) if this is the server lookup the current players setting with _inst
                 if (GameplayManager.IsDedicatedServer())
                 {
+                    if(client_settings == null) client_settings = new Dictionary<uint, int>();
                     try
                     {
-                        if (client_settings.ContainsKey(_inst.c_player.netId.Value))
+                        NetworkIdentity ni = _inst.c_player.GetComponent<NetworkIdentity>();
+                        if (client_settings.ContainsKey(ni.netId.Value))//_inst.c_player.netId.Value))
                         {
                             int val = 0;
-                            client_settings.TryGetValue(_inst.c_player.netId.Value, out val);
+                            client_settings.TryGetValue(ni.netId.Value, out val);
+                            //Debug.Log("\n[Server] Found a key for " + ni.netId.Value + " " + _inst.c_player.m_mp_name+" returning " + (val == 1 ? "LINEAR" : "DEFAULT"));
                             return val == 1;
+                        }
+                        else
+                        {
+                            //Debug.Log("\n[Server] Couldnt find a key for "+ ni.netId.Value + " " + _inst.c_player.m_mp_name + " returning DEFAULT");
                         }
                     }
                     catch (Exception ex)
@@ -108,6 +115,7 @@ namespace GameMod
 
                 }
                 // (Client)
+                //Debug.Log("\n   [Client] mode:"+(alt_turn_ramp_mode ? "LINEAR":"DEFAULT") +"   server_support: "+server_support+" --> result:"+(alt_turn_ramp_mode && server_support ? "LINEAR" : "DEFAULT"));
                 return alt_turn_ramp_mode && server_support;
             }
 
@@ -126,62 +134,40 @@ namespace GameMod
 
 
 
-
-
-        // MP CLIENT:
-        [HarmonyPatch(typeof(Client), "RegisterHandlers")]
-        class JoystickRamping_Client_RegisterHandlers
-        {
-            private static void OnServerTurnrampModeStatus(NetworkMessage rawMsg)
-            {
-                var msg = rawMsg.ReadMessage<ServerTurnrampModeStatus>();
-                server_support = msg.value == 1 ? true : false;
-            }
-
-            static void Postfix()
-            {
-                if (Client.GetClient() == null)
-                    return;
-                server_support = false;
-                Client.GetClient().RegisterHandler(MessageTypes.MsgServerSendJoystickRampModeCapability, OnServerTurnrampModeStatus);
-            }
-        }
-
-        // send the flag on entering a game or lobby
-        [HarmonyPatch(typeof(NetworkMatch), "OnAcceptedToLobby")]
-        class JoystickRamping_AcceptedToLobby
-        {
-            private static void Postfix(AcceptedToLobbyMessage accept_msg)
-            {
-                if (Client.GetClient() == null)
-                {
-                    Debug.Log("JoystickRamping_AcceptedToLobby: no client?");
-                    return;
-                }
-                server_support = false; 
-                Client.GetClient().Send(MessageTypes.MsgSetJoystickRampMode, new TurnrampModeMessage { mode = alt_turn_ramp_mode ? 1 : 0, netId = GameManager.m_local_player.netId.Value });
-            }
-        }
-
-
-
-
-        // MP SERVER:
-        // listen for client sending the flag and store that information in a Dictionary
         [HarmonyPatch(typeof(Server), "RegisterHandlers")]
         class JoystickRamping_Server_RegisterHandlers
         {
             private static void OnSetJoystickRampMode(NetworkMessage rawMsg)
             {
-                var msg = rawMsg.ReadMessage<TurnrampModeMessage>();
+                //Debug.Log("\n\n\n[Server] Received a client flag");
 
-                if (client_settings == null) {
+                var msg = rawMsg.ReadMessage<TurnrampModeMessage>();
+                //Debug.Log("client NETID: "+msg.netId+" sent over NETID: "+rawMsg.conn.connectionId);
+                if (client_settings == null)
+                {
                     client_settings = new Dictionary<uint, int>();
+                    Debug.Log("[Server] client settings was empty, reset the dictionary");
                 }
-                if (client_settings.ContainsKey(msg.netId)) {
-                    client_settings.Remove(msg.netId);
+                /*
+                Debug.Log("[Server] printing Dictionary:");
+                foreach (KeyValuePair<uint, int> entry in client_settings)
+                {
+                    Debug.Log("  Key:" + entry.Key + "  Value:" + entry.Value);
+                }*/
+
+                if (client_settings.ContainsKey((uint)rawMsg.conn.connectionId))
+                {
+                    client_settings.Remove((uint)rawMsg.conn.connectionId);
+                    Debug.Log("[Server] recognized an existing entry and deleted it");
                 }
-                client_settings.Add(msg.netId, msg.mode);
+                client_settings.Add((uint)rawMsg.conn.connectionId, msg.mode);
+
+                /*Debug.Log("[Server] printing Dictionary:");
+                foreach (KeyValuePair<uint, int> entry in client_settings)
+                {
+                    //Debug.Log(entry.ToString());
+                    Debug.Log("  Key:" + entry.Key + "  Value:" + entry.Value);
+                }*/
 
             }
 
@@ -191,14 +177,42 @@ namespace GameMod
             }
         }
 
+
+
+
+        [HarmonyPatch(typeof(Client), "SendPlayerLoadoutToServer")]
+        class JoystickRamping_SendPlayerLoadoutToServer
+        {
+            private static void Postfix()
+            {
+                if (Client.GetClient() == null)
+                {
+                    Debug.Log("JoystickRamping_SendPlayerLoadoutToServer: no client?");
+                    return;
+                }
+                server_support = false; 
+                Client.GetClient().Send(MessageTypes.MsgSetJoystickRampMode, new TurnrampModeMessage { mode = alt_turn_ramp_mode ? 1 : 0, netId = GameManager.m_local_player.netId.Value });
+            }
+        }
+
+
+        
+        
         [HarmonyPatch(typeof(Server), "OnLoadoutDataMessage")]
         class JoystickRamping_Server_OnLoadoutDataMessage
         {
             static void Postfix(NetworkMessage msg)
             {
-                var connId = msg.conn.connectionId;
-                if (connId == 0) return;
-                NetworkServer.SendToClient(connId, MessageTypes.MsgServerSendJoystickRampModeCapability, new ServerTurnrampModeStatus { value = 1 });
+                Debug.Log("<OnLoadoutDataMessage>[Server] printing Dictionary:");
+                if(client_settings != null)
+                {
+                    foreach (KeyValuePair<uint, int> entry in client_settings)
+                    {
+                        //Debug.Log(entry.ToString());
+                        Debug.Log("  Key:" + entry.Key + "  Value:" + entry.Value);
+                    }
+                }
+
             }
         }
 
@@ -220,29 +234,17 @@ namespace GameMod
             public uint netId;
             public override void Serialize(NetworkWriter writer)
             {
-                writer.Write((byte)mode);
+                writer.Write(mode);
                 writer.Write(netId);
             }
             public override void Deserialize(NetworkReader reader)
             {
-                mode = reader.ReadByte();
+                mode = reader.ReadInt32();
                 netId = reader.ReadUInt32();
             }
         }
 
 
-        public class ServerTurnrampModeStatus : MessageBase
-        {
-            public int value;
-            public override void Serialize(NetworkWriter writer)
-            {
-                writer.Write((byte)value);
-            }
-            public override void Deserialize(NetworkReader reader)
-            {
-                value = reader.ReadByte();
-            }
-        }
 
 
 
@@ -312,6 +314,7 @@ namespace GameMod
                         Debug.Log("JoystickRamping_ControlsOptionsUpdate: no client?");
                         return;
                     }
+                    Debug.Log("Just sent the updated flag to the server: current: "+(alt_turn_ramp_mode ? "LINEAR" : "DEFAULT"));
                     Client.GetClient().Send(MessageTypes.MsgSetJoystickRampMode, new TurnrampModeMessage { mode = alt_turn_ramp_mode ? 1 : 0, netId = GameManager.m_local_player.netId.Value });
                 }
             }
