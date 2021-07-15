@@ -90,6 +90,12 @@ namespace GameMod {
                 MPNoPositionCompression.NewSnapshotVersion = (valTimestamps)?MPNoPositionCompression.SnapshotVersion.VELOCITY_TIMESTAMP:MPNoPositionCompression.SnapshotVersion.VELOCITY;
                 return oldValue;
             }
+            if( key == "ramping.alt_mode.allowed" && bool.TryParse(value, out bool valJoystickFix))
+            {
+                Debug.Log("MPTweaks: received server capability for the linear turn ramping");
+                JoystickRamping.server_support = valJoystickFix;
+                return Boolean.TrueString;
+            }
             return null;
         }
 
@@ -171,6 +177,7 @@ namespace GameMod {
             if (!MPCustomModeFile.PickupCheck)
                 tweaks.Add("item.pickupcheck", Boolean.FalseString);
             tweaks.Add("nocompress.reliable_timestamps", Boolean.TrueString);
+            tweaks.Add("ramping.alt_mode.allowed", Boolean.TrueString);
             if (tweaks.Any())
             {
                 Debug.LogFormat("MPTweaks: sending tweaks {0}", tweaks.Join());
@@ -286,7 +293,7 @@ namespace GameMod {
             caps.Add("ModVersion", OlmodVersion.FullVersionString);
             caps.Add("Modded", Core.GameMod.Modded ? "1" : "0");
             caps.Add("ModsLoaded", Core.GameMod.ModsLoaded);
-            caps.Add("SupportsTweaks", "sniper,jip,nocompress_0_3_6");
+            caps.Add("SupportsTweaks", "sniper,jip,nocompress_0_3_6,ramping_fix");
             caps.Add("ModPrivateData", "1");
             caps.Add("ClassicWeaponSpawns", "1");
             caps.Add("NetVersion", MPTweaks.NET_VERSION.ToString());
