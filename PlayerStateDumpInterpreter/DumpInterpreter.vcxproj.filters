@@ -60,6 +60,12 @@
     <ClCompile Include="simulator_original.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="perf_eval_base.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="perf_eval_v1.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="config.h">
@@ -111,6 +117,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="simulator_original.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="perf_eval_base.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="perf_eval_v1.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

@@ -115,6 +115,8 @@
     <ClCompile Include="logger.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="math_helper.cpp" />
+    <ClCompile Include="perf_eval_base.cpp" />
+    <ClCompile Include="perf_eval_v1.cpp" />
     <ClCompile Include="result_processor.cpp" />
     <ClCompile Include="simulator_36rc2.cpp" />
     <ClCompile Include="simulator_36rc3.cpp" />
@@ -133,6 +135,8 @@
     <ClInclude Include="interpreter.h" />
     <ClInclude Include="logger.h" />
     <ClInclude Include="math_helper.h" />
+    <ClInclude Include="perf_eval_base.h" />
+    <ClInclude Include="perf_eval_v1.h" />
     <ClInclude Include="player_types.h" />
     <ClInclude Include="result_processor.h" />
     <ClInclude Include="simulator_36rc2.h" />
