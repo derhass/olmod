@@ -83,7 +83,7 @@ namespace GameMod {
 					string basePath = Path.Combine(Application.persistentDataPath, "perfdump_");
 					string curDateTime = DateTime.UtcNow.ToString("yyyyMMdd-HHmmss", System.Globalization.CultureInfo.InvariantCulture);
 					string name = basePath + curDateTime + "_" + matchCount;
-					if (Server.IsActive()) {
+					if (GameplayManager.IsDedicatedServer()) {
 						name = name + "_server";
 					}
 					name = name + ".olmd";
@@ -575,7 +575,7 @@ namespace GameMod {
 		public static IEnumerator CoroutineAtFrameEnd() {
 			UnityEngine.Debug.Log("PERFRAME COROUTINE started");
 			buf.AddPerfProbe(PerfProbeLocation.FRAME, (uint)PerfProbeMode.BEGIN);
-			while(!Server.IsActive()) {
+			while(true) {
 				yield return new WaitForEndOfFrame();
 				dump_player_info(GameManager.m_local_player,true);
 				buf.AddPerfProbe(PerfProbeLocation.FRAME, (uint)PerfProbeMode.END);
@@ -604,20 +604,24 @@ namespace GameMod {
 		[HarmonyPatch(typeof(Client), "Connect")]
 		class MPPlayerStateDump_Connect {
 			private static void Postfix() {
-				buf.Start();
+				if (!GameplayManager.IsDedicatedServer()) {
+					buf.Start();
+				}
 			}
 		}
 		[HarmonyPatch(typeof(Client), "Disconnect")]
 		class MPPlayerStateDump_Disconnect {
 			private static void Prefix() {
-				buf.Stop();
+				if (!GameplayManager.IsDedicatedServer()) {
+					buf.Stop();
+				}
 			}
 		}
 
 		[HarmonyPatch(typeof(NetworkMatch), "InitBeforeEachMatch")]
 		class MPPlayerStateDump_InitBeforeEachMatch {
 			private static void Postfix() {
-				if (Server.IsActive()) {
+				if (GameplayManager.IsDedicatedServer()) {
 					buf.Start();
 				}
 			}
@@ -625,7 +629,7 @@ namespace GameMod {
 		[HarmonyPatch(typeof(NetworkMatch), "ExitMatch")]
 		class MPPlayerStateDump_ExitMatch {
 			private static void Postfix() {
-				if (Server.IsActive()) {
+				if (GameplayManager.IsDedicatedServer()) {
 					buf.Stop();
 				}
 			}
@@ -710,7 +714,7 @@ namespace GameMod {
 			}
 			static void Postfix() {
 				buf.AddPerfProbe(PerfProbeLocation.GAMEMANAGER_FIXED_UPDATE, (uint)PerfProbeMode.END);
-				if (Server.IsActive()) {
+				if (GameplayManager.IsDedicatedServer()) {
 					foreach (Player p in Overload.NetworkManager.m_Players) {
 						dump_player_info(p,false);
 					}
@@ -758,7 +762,7 @@ namespace GameMod {
 		[HarmonyPatch(typeof(GameManager), "Awake")]
 		class MPPlayerStateDump_GameManageAwake {
 			static void Postfix(GameManager __instance) {
-				if (!Server.IsActive() && !perFrameCoroutine) {
+				if (!GameplayManager.IsDedicatedServer() && !perFrameCoroutine) {
 					__instance.StartCoroutine(CoroutineAtFrameEnd());
 					perFrameCoroutine = true;
 
