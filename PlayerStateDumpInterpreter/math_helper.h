@@ -1,6 +1,7 @@
 #ifndef OLMD_MATH_HELPER_H
 #define OLMD_MATH_HELPER_H
 
+#define _USE_MATH_DEFINES // for windows only...
 #include <cstdlib>
 
 namespace OlmodPlayerDumpState {
