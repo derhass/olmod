@@ -746,6 +746,13 @@ namespace GameMod {
 			}
 		}
 
+		[HarmonyPatch(typeof(Overload.Player), "EncodeInput")]
+		class MPPlayerStateDump_PlayerEncodeInput {
+			static void Postfix() {
+				buf.AddTransformDump(GameManager.m_local_player.cc_turn_vec,Quaternion.identity,0,997,Client.m_tick,Client.m_last_acknowledged_tick);
+			}
+		}
+
 		[HarmonyPatch(typeof(GameplayManager), "FixedUpdate")]
 		class MPPlayerStateDump_GameplayManagerFixedUpdate {
 			static void Postfix() {
