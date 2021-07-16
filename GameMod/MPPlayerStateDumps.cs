@@ -495,7 +495,7 @@ namespace GameMod {
 				}
 			}
 
-			public void AddTransformDump(Transform t, uint type, uint id)
+			public void AddTransformDump(Transform t, uint id, uint type)
 			{
 				if (!go) {
 					return;
@@ -524,7 +524,7 @@ namespace GameMod {
 				}
 			}
 			
-			public void AddTransformDump(Vector3 pos, Quaternion rot, uint type, uint id)
+			public void AddTransformDump(Vector3 pos, Quaternion rot, uint id, uint type)
 			{
 				if (!go) {
 					return;
@@ -557,21 +557,27 @@ namespace GameMod {
 		public static Buffer buf = new Buffer();
 		private static bool perFrameCoroutine = false;
 
+		public static void dump_player_info(Player player, bool asLocalPlayer)
+		{
+			if (player != null) {
+				uint id = 0;
+				if (!asLocalPlayer) {
+					id = player.netId.Value;
+				}
+				buf.AddTransformDump(player.c_player_ship.c_rigidbody.transform,id,0);
+				buf.AddTransformDump(player.transform,id,1);
+				buf.AddTransformDump(player.c_player_ship.c_camera.transform,id,2);
+				buf.AddTransformDump(player.c_player_ship.c_rigidbody.position,player.c_player_ship.c_rigidbody.rotation,id,4);
+				buf.AddTransformDump(player.m_error_pos,player.m_error_rot,id,5);
+			}
+		}
+
 		public static IEnumerator CoroutineAtFrameEnd() {
 			UnityEngine.Debug.Log("PERFRAME COROUTINE started");
 			buf.AddPerfProbe(PerfProbeLocation.FRAME, (uint)PerfProbeMode.BEGIN);
 			while(!Server.IsActive()) {
 				yield return new WaitForEndOfFrame();
-				/*
-				if (GameManager.m_player_ship != null) {
-					UnityEngine.Debug.LogFormat("xxx interpol {0}", GameManager.m_player_ship.c_rigidbody.interpolation);
-				}
-				*/
-				buf.AddTransformDump(GameManager.m_player_ship.c_rigidbody.transform,0,0);
-				buf.AddTransformDump(GameManager.m_local_player.transform,0,1);
-				buf.AddTransformDump(GameManager.m_player_ship.c_camera.transform,0,2);
-				buf.AddTransformDump(GameManager.m_player_ship.c_rigidbody.position,GameManager.m_player_ship.c_rigidbody.rotation,0,4);
-				buf.AddTransformDump(GameManager.m_local_player.m_error_pos,GameManager.m_local_player.m_error_rot,0,5);
+				dump_player_info(GameManager.m_local_player,true);
 				buf.AddPerfProbe(PerfProbeLocation.FRAME, (uint)PerfProbeMode.END);
 				buf.AddPerfProbe(PerfProbeLocation.FRAME, (uint)PerfProbeMode.BEGIN);
 			}
@@ -704,6 +710,12 @@ namespace GameMod {
 			}
 			static void Postfix() {
 				buf.AddPerfProbe(PerfProbeLocation.GAMEMANAGER_FIXED_UPDATE, (uint)PerfProbeMode.END);
+				if (Server.IsActive()) {
+					foreach (Player p in Overload.NetworkManager.m_Players) {
+						dump_player_info(p,false);
+					}
+					dump_player_info(GameManager.m_local_player, true);
+				}
 			}
 		}
 
