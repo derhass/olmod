@@ -82,11 +82,15 @@ namespace GameMod {
 				try {
 					string basePath = Path.Combine(Application.persistentDataPath, "perfdump_");
 					string curDateTime = DateTime.UtcNow.ToString("yyyyMMdd-HHmmss", System.Globalization.CultureInfo.InvariantCulture);
-					string name = basePath + curDateTime + "_" + matchCount + ".olmd";
+					string name = basePath + curDateTime + "_" + matchCount;
+					if (GameplayManager.IsDedicatedServer()) {
+						name = name + "_server";
+					}
+					name = name + ".olmd";
 					UnityEngine.Debug.Log("MPPlayerStateDump: dump started to " + name);
 					fs = File.Create(name);
 					ms.Position = 0;
-					bw.Write((uint)4); // file format version
+					bw.Write((uint)5); // file format version
 					bw.Write((uint)0); // size of extra header, reserved for later versions
 					matchCount++;
 					stopWatch.Stop();
@@ -491,7 +495,7 @@ namespace GameMod {
 				}
 			}
 
-			public void AddTransformDump(Transform t, uint type, uint id)
+			public void AddTransformDump(Transform t, uint id, uint type, int tick, int last_ack_tick)
 			{
 				if (!go) {
 					return;
@@ -512,6 +516,8 @@ namespace GameMod {
 					bw.Write(t.rotation.y);
 					bw.Write(t.rotation.z);
 					bw.Write(t.rotation.w);
+					bw.Write(tick);
+					bw.Write(last_ack_tick);
 					Flush(false);
 				} catch (Exception e) {
 					UnityEngine.Debug.Log("MPPlayerStateDump: failed to dump transform: " + e);
@@ -520,7 +526,7 @@ namespace GameMod {
 				}
 			}
 			
-			public void AddTransformDump(Vector3 pos, Quaternion rot, uint type, uint id)
+			public void AddTransformDump(Vector3 pos, Quaternion rot, uint id, uint type, int tick, int last_ack_tick)
 			{
 				if (!go) {
 					return;
@@ -541,6 +547,8 @@ namespace GameMod {
 					bw.Write(rot.y);
 					bw.Write(rot.z);
 					bw.Write(rot.w);
+					bw.Write(tick);
+					bw.Write(last_ack_tick);
 					Flush(false);
 				} catch (Exception e) {
 					UnityEngine.Debug.Log("MPPlayerStateDump: failed to dump transform: " + e);
@@ -553,22 +561,38 @@ namespace GameMod {
 		public static Buffer buf = new Buffer();
 		private static bool perFrameCoroutine = false;
 
+		public static void dump_player_info(Player player, bool asLocalPlayer, bool dumpAll)
+		{
+			if (player != null) {
+				uint id = 0;
+				int tick;
+				int last_ack_tick;
+				if (GameplayManager.IsDedicatedServer()) {
+					tick = player.m_updated_state.m_tick;
+					last_ack_tick = player.m_last_ackknowledged_server_tick;
+				} else {
+					tick = Client.m_tick;
+					last_ack_tick = Client.m_last_acknowledged_tick;
+				}
+				if (!asLocalPlayer) {
+					id = player.netId.Value;
+				}
+				buf.AddTransformDump(player.transform,id,1,tick,last_ack_tick);
+				buf.AddTransformDump(player.m_error_pos,player.m_error_rot,id,5,tick,last_ack_tick);
+				if (dumpAll) {
+					buf.AddTransformDump(player.c_player_ship.c_rigidbody.transform,id,0,tick,last_ack_tick);
+					buf.AddTransformDump(player.c_player_ship.c_camera.transform,id,2,tick,last_ack_tick);
+					buf.AddTransformDump(player.c_player_ship.c_rigidbody.position,player.c_player_ship.c_rigidbody.rotation,id,4,tick,last_ack_tick);
+				}
+			}
+		}
+
 		public static IEnumerator CoroutineAtFrameEnd() {
 			UnityEngine.Debug.Log("PERFRAME COROUTINE started");
 			buf.AddPerfProbe(PerfProbeLocation.FRAME, (uint)PerfProbeMode.BEGIN);
 			while(true) {
 				yield return new WaitForEndOfFrame();
-				/*
-				if (GameManager.m_player_ship != null) {
-					UnityEngine.Debug.LogFormat("xxx interpol {0}", GameManager.m_player_ship.c_rigidbody.interpolation);
-				}
-				*/
-				buf.AddTransformDump(GameManager.m_player_ship.c_rigidbody.transform,0,0);
-				buf.AddTransformDump(GameManager.m_local_player.transform,0,1);
-				buf.AddTransformDump(GameManager.m_player_ship.c_camera.transform,0,2);
-				buf.AddTransformDump(GameManager.m_local_player.c_player_ship.c_cam_controller.transform,0,3);
-				buf.AddTransformDump(GameManager.m_player_ship.c_rigidbody.position,GameManager.m_player_ship.c_rigidbody.rotation,0,4);
-				buf.AddTransformDump(GameManager.m_local_player.m_error_pos,GameManager.m_local_player.m_error_rot,0,5);
+				dump_player_info(GameManager.m_local_player,true,true);
 				buf.AddPerfProbe(PerfProbeLocation.FRAME, (uint)PerfProbeMode.END);
 				buf.AddPerfProbe(PerfProbeLocation.FRAME, (uint)PerfProbeMode.BEGIN);
 			}
@@ -595,16 +619,36 @@ namespace GameMod {
 		[HarmonyPatch(typeof(Client), "Connect")]
 		class MPPlayerStateDump_Connect {
 			private static void Postfix() {
-				buf.Start();
+				if (!GameplayManager.IsDedicatedServer()) {
+					buf.Start();
+				}
 			}
 		}
 		[HarmonyPatch(typeof(Client), "Disconnect")]
 		class MPPlayerStateDump_Disconnect {
 			private static void Prefix() {
-				buf.Stop();
+				if (!GameplayManager.IsDedicatedServer()) {
+					buf.Stop();
+				}
 			}
 		}
 
+		[HarmonyPatch(typeof(NetworkMatch), "InitBeforeEachMatch")]
+		class MPPlayerStateDump_InitBeforeEachMatch {
+			private static void Postfix() {
+				if (GameplayManager.IsDedicatedServer()) {
+					buf.Start();
+				}
+			}
+		}
+		[HarmonyPatch(typeof(NetworkMatch), "ExitMatch")]
+		class MPPlayerStateDump_ExitMatch {
+			private static void Postfix() {
+				if (GameplayManager.IsDedicatedServer()) {
+					buf.Stop();
+				}
+			}
+		}
 		/*	
 		[HarmonyPatch(typeof(Client), "OnPlayerSnapshotToClient")]
 		class MPPlayerStateDump_Enqueue {
@@ -672,7 +716,9 @@ namespace GameMod {
 		[HarmonyPatch(typeof(PlayerShip), "FixedUpdateAll")]
 		class MPPlayerStateDump_XXA {
 			static void Postfix() {
-				buf.AddTransformDump(GameManager.m_local_player.transform,0,6);
+				if (!GameplayManager.IsDedicatedServer()) {
+					buf.AddTransformDump(GameManager.m_local_player.transform,0,6,Client.m_tick,Client.m_last_acknowledged_tick);
+				}
 			}
 		}
 		[HarmonyPatch(typeof(GameManager), "Update")]
@@ -691,13 +737,55 @@ namespace GameMod {
 			}
 			static void Postfix() {
 				buf.AddPerfProbe(PerfProbeLocation.GAMEMANAGER_FIXED_UPDATE, (uint)PerfProbeMode.END);
+				if (GameplayManager.IsDedicatedServer()) {
+					foreach (Player p in Overload.NetworkManager.m_Players) {
+						dump_player_info(p,false,false);
+					}
+					//dump_player_info(GameManager.m_local_player, false, false);
+				}
 			}
 		}
+
+		[HarmonyPatch(typeof(GameplayManager), "FixedUpdate")]
+		class MPPlayerStateDump_GameplayManagerFixedUpdate {
+			static void Postfix() {
+				buf.AddPerfProbe(PerfProbeLocation.GAMEMANAGER_FIXED_UPDATE, (uint)PerfProbeMode.GENERIC_START + 0);
+			}
+		}
+
+		[HarmonyPatch(typeof(UpdateDynamicManager), "FixedUpdateDynamicObjects")]
+		class MPPlayerStateDump_UpdateDynamicManagerFixedUpdate {
+			static void Postfix() {
+				buf.AddPerfProbe(PerfProbeLocation.GAMEMANAGER_FIXED_UPDATE, (uint)PerfProbeMode.GENERIC_START + 1);
+			}
+		}
+
+		[HarmonyPatch(typeof(Overload.NetworkManager), "FixedUpdate")]
+		class MPPlayerStateDump_NetworkManagerFixedUpdate {
+			static void Postfix() {
+				buf.AddPerfProbe(PerfProbeLocation.GAMEMANAGER_FIXED_UPDATE, (uint)PerfProbeMode.GENERIC_START + 2);
+			}
+		}
+
+		[HarmonyPatch(typeof(Overload.Client), "ReconcileServerPlayerState")]
+		class MPPlayerStateDump_ClientReconcileServerFixedUpdate {
+			static void Postfix() {
+				buf.AddPerfProbe(PerfProbeLocation.GAMEMANAGER_FIXED_UPDATE, (uint)PerfProbeMode.GENERIC_START + 4);
+			}
+		}
+
+		[HarmonyPatch(typeof(PlayerShip), "FixedUpdateAll")]
+		class MPPlayerStateDump_PlayerShipFixedUpdate {
+			static void Postfix() {
+				buf.AddPerfProbe(PerfProbeLocation.GAMEMANAGER_FIXED_UPDATE, (uint)PerfProbeMode.GENERIC_START + 5);
+			}
+		}
+
 
 		[HarmonyPatch(typeof(GameManager), "Awake")]
 		class MPPlayerStateDump_GameManageAwake {
 			static void Postfix(GameManager __instance) {
-				if (!perFrameCoroutine) {
+				if (!GameplayManager.IsDedicatedServer() && !perFrameCoroutine) {
 					__instance.StartCoroutine(CoroutineAtFrameEnd());
 					perFrameCoroutine = true;
 
