@@ -20,6 +20,8 @@ class CQuaternion {
 		void lerp(const CQuaternion& a, const CQuaternion& b, float t);
 		void slerp(const CQuaternion& a, const CQuaternion& b, float t);
 		void ToEuler(float euler[3]) const;
+		CQuaternion conjugate() const;
+		CQuaternion inverse() const;
 };
 
 extern void lerp(const float *a, const float *b, float *c, float t, size_t dims=3);

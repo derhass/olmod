@@ -136,6 +136,13 @@ void ResultProcessorChannel::StreamOut(const PlayerState& s, size_t idx)
 			fprintf(fStream, "\t%f",s.pos[k]-b.pos[k]);
 			
 		}
+
+		CQuaternion r = s.rot * b.rot.inverse();
+		r.ToEuler(yawPitchRoll);
+		fprintf(fStream, "%f\t%f\t%f",
+				yawPitchRoll[0],
+				yawPitchRoll[1],
+				yawPitchRoll[2]);
 	}
 	fputc('\n',fStream);
 }
