@@ -82,7 +82,11 @@ namespace GameMod {
 				try {
 					string basePath = Path.Combine(Application.persistentDataPath, "perfdump_");
 					string curDateTime = DateTime.UtcNow.ToString("yyyyMMdd-HHmmss", System.Globalization.CultureInfo.InvariantCulture);
-					string name = basePath + curDateTime + "_" + matchCount + ".olmd";
+					string name = basePath + curDateTime + "_" + matchCount;
+					if (Server.IsActive()) {
+						name = name + "_server";
+					}
+					name = name + ".olmd";
 					UnityEngine.Debug.Log("MPPlayerStateDump: dump started to " + name);
 					fs = File.Create(name);
 					ms.Position = 0;
@@ -556,7 +560,7 @@ namespace GameMod {
 		public static IEnumerator CoroutineAtFrameEnd() {
 			UnityEngine.Debug.Log("PERFRAME COROUTINE started");
 			buf.AddPerfProbe(PerfProbeLocation.FRAME, (uint)PerfProbeMode.BEGIN);
-			while(true) {
+			while(!Server.IsActive()) {
 				yield return new WaitForEndOfFrame();
 				/*
 				if (GameManager.m_player_ship != null) {
@@ -604,6 +608,22 @@ namespace GameMod {
 			}
 		}
 
+		[HarmonyPatch(typeof(NetworkMatch), "InitBeforeEachMatch")]
+		class MPPlayerStateDump_InitBeforeEachMatch {
+			private static void Postfix() {
+				if (Server.IsActive()) {
+					buf.Start();
+				}
+			}
+		}
+		[HarmonyPatch(typeof(NetworkMatch), "ExitMatch")]
+		class MPPlayerStateDump_ExitMatch {
+			private static void Postfix() {
+				if (Server.IsActive()) {
+					buf.Stop();
+				}
+			}
+		}
 		/*	
 		[HarmonyPatch(typeof(Client), "OnPlayerSnapshotToClient")]
 		class MPPlayerStateDump_Enqueue {
@@ -687,10 +707,46 @@ namespace GameMod {
 			}
 		}
 
+		[HarmonyPatch(typeof(GameplayManager), "FixedUpdate")]
+		class MPPlayerStateDump_GameplayManagerFixedUpdate {
+			static void Postfix() {
+				buf.AddPerfProbe(PerfProbeLocation.GAMEMANAGER_FIXED_UPDATE, (uint)PerfProbeMode.GENERIC_START + 0);
+			}
+		}
+
+		[HarmonyPatch(typeof(UpdateDynamicManager), "FixedUpdateDynamicObjects")]
+		class MPPlayerStateDump_UpdateDynamicManagerFixedUpdate {
+			static void Postfix() {
+				buf.AddPerfProbe(PerfProbeLocation.GAMEMANAGER_FIXED_UPDATE, (uint)PerfProbeMode.GENERIC_START + 1);
+			}
+		}
+
+		[HarmonyPatch(typeof(Overload.NetworkManager), "FixedUpdate")]
+		class MPPlayerStateDump_NetworkManagerFixedUpdate {
+			static void Postfix() {
+				buf.AddPerfProbe(PerfProbeLocation.GAMEMANAGER_FIXED_UPDATE, (uint)PerfProbeMode.GENERIC_START + 2);
+			}
+		}
+
+		[HarmonyPatch(typeof(Overload.Client), "ReconcileServerPlayerState")]
+		class MPPlayerStateDump_ClientReconcileServerFixedUpdate {
+			static void Postfix() {
+				buf.AddPerfProbe(PerfProbeLocation.GAMEMANAGER_FIXED_UPDATE, (uint)PerfProbeMode.GENERIC_START + 4);
+			}
+		}
+
+		[HarmonyPatch(typeof(PlayerShip), "FixedUpdateAll")]
+		class MPPlayerStateDump_PlayerShipFixedUpdate {
+			static void Postfix() {
+				buf.AddPerfProbe(PerfProbeLocation.GAMEMANAGER_FIXED_UPDATE, (uint)PerfProbeMode.GENERIC_START + 5);
+			}
+		}
+
+
 		[HarmonyPatch(typeof(GameManager), "Awake")]
 		class MPPlayerStateDump_GameManageAwake {
 			static void Postfix(GameManager __instance) {
-				if (!perFrameCoroutine) {
+				if (!Server.IsActive() && !perFrameCoroutine) {
 					__instance.StartCoroutine(CoroutineAtFrameEnd());
 					perFrameCoroutine = true;
 

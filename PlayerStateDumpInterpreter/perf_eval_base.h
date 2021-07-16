@@ -20,6 +20,7 @@ class PerfEvalBase {
 	protected:
 		std::vector<PerfProbe> probesCurrent;
 		std::vector<PerfProbe> probesPrevious;
+		std::vector<PerfProbe> lastInLocation;
 		ResultProcessor& resultProcessor;
 		const Interpreter* ip;
 		Config cfg;

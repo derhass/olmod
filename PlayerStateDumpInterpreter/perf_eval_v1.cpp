@@ -50,6 +50,29 @@ void V1::ProcessPerfProbe(const PerfProbe& probe)
 			rpc->Add(pd);
 			rpc->FlushCurrent();
 		}
+	} else if (probe.mode != (uint32_t)PERF_MODE_BEGIN) {
+		if (lastInLocation.size() > (size_t)probe.location && probesCurrent.size() > (size_t)probe.location) {
+			bool isNew;
+			ResultProcessorAuxChannel *rpc = resultProcessor.GetAuxChannel(0, probe.location, probe.mode, isNew);
+			if (rpc) {
+				if (isNew) {
+					rpc->SetLogger(&log);
+					rpc->SetName("perf_stats_delta");
+					rpc->StartStream(ip->GetOutputDir());
+					log.Log(Logger::INFO,"created new result process channel '%s'", rpc->GetName());
+				}
+				PerfProbe pd;
+
+				rpc->Add(probe);
+				pd.Diff(probe, lastInLocation[probe.location]);
+				rpc->Add(pd);
+				pd.Diff(probe,probesCurrent[probe.location]);
+				rpc->Add(pd);
+				rpc->Add(lastInLocation[probe.location].mode);
+				rpc->FlushCurrent();
+
+			}
+		}
 	}
 }
 
