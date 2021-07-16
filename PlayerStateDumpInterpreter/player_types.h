@@ -19,6 +19,10 @@ struct PlayerState {
 	float vrot[3]; // euler angles;
 	float message_timestamp; // not directly transmitted, but in the parent message
 	float realTimestamp; // not transmitted
+	// in new protocol V5, only for transfrom dumps
+	bool isTransformDump;
+	int32_t  tick;
+	int32_t last_ack_tick;
 
 	void Invalidate()
 	{
@@ -43,6 +47,8 @@ struct PlayerState {
 
 		realTimestamp = -1.0f;
 		message_timestamp = -1.0f;
+
+		isTransformDump = false;
 	}
 };
 

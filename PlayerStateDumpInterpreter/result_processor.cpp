@@ -107,7 +107,7 @@ void ResultProcessorChannel::Finish()
 	ResultProcessorChannelBase::Finish();
 }
 
-void ResultProcessorChannel::StreamOut(const PlayerState& s, size_t idx)
+void ResultProcessorChannel::StreamOut(const PlayerState& s, size_t idx, bool asDumpTransform)
 {
 	float yawPitchRoll[3];
 
@@ -136,11 +136,23 @@ void ResultProcessorChannel::StreamOut(const PlayerState& s, size_t idx)
 			fprintf(fStream, "\t%f",s.pos[k]-b.pos[k]);
 			
 		}
+
+		CQuaternion r = s.rot * b.rot.inverse();
+		r.ToEuler(yawPitchRoll);
+		fprintf(fStream, "\t%f\t%f\t%f",
+				yawPitchRoll[0],
+				yawPitchRoll[1],
+				yawPitchRoll[2]);
+	}
+	if (asDumpTransform) {
+		fprintf(fStream, "\t%d\t%d",
+				(int)s.tick,
+				(int)s.last_ack_tick);
 	}
 	fputc('\n',fStream);
 }
 
-void ResultProcessorChannel::Add(const PlayerState& s)
+void ResultProcessorChannel::Add(const PlayerState& s, bool asDumpTransform)
 {
 	/*
 	if (log) {
@@ -149,18 +161,18 @@ void ResultProcessorChannel::Add(const PlayerState& s)
 	*/
 	data.push_back(s);
 	if (fStream) {
-		StreamOut(s, data.size()-1);
+		StreamOut(s, data.size()-1, asDumpTransform);
 	}
 }
 
-void ResultProcessorChannel::Add(const PlayerSnapshot& s)
+void ResultProcessorChannel::Add(const PlayerSnapshot& s, bool asDumpTransform)
 {
 	if (s.id != playerId) {
 		if (log) {
 			log->Log(Logger::WARN, "rpc %u %u: adding data point for wrong player %u", (unsigned)objectId, (unsigned)playerId, (unsigned)s.id);
 		}
 	}
-	Add(s.state);
+	Add(s.state, asDumpTransform);
 }
 
 ResultProcessorAuxChannel::ResultProcessorAuxChannel(ResultProcessor& rp, uint32_t player, uint32_t object, uint32_t aux) :

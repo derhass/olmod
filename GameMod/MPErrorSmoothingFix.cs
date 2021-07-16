@@ -14,6 +14,7 @@ namespace GameMod {
         private static Transform  targetTransformNode = null;
 
         private static int hackIsEnabled = 1;
+        private static int hackError = 0;
 
         private static void dump_transform(int level, Transform t)
         {
@@ -42,6 +43,16 @@ namespace GameMod {
                         hackIsEnabled = (hackIsEnabled >0)?0:1;
                 }
                 UnityEngine.Debug.LogFormat("hack_smooth is now {0}", hackIsEnabled);
+        }
+        private static void hack_error_command() {
+                int n = uConsole.GetNumParameters();
+                if (n > 0) {
+                        int value = uConsole.GetInt();
+                        hackError = value;
+                } else {
+                        hackError = (hackError>0)?0:1;
+                }
+                UnityEngine.Debug.LogFormat("hack_error is now {0}", hackError);
         }
 
         // start the manual interpolation phase
@@ -96,10 +107,53 @@ namespace GameMod {
             }
         }
 
+        /*
+        [HarmonyPatch(typeof(Player), "SetSmoothingErrorRot")]
+        class MPErrorSmoothingFix_ErrRot {
+            static bool Prefix() {
+                if (hackError > 0) {
+                    return false;
+                }
+                return true;
+            }
+        }
+
+        [HarmonyPatch(typeof(Player), "SetSmoothingErrorPos")]
+        class MPErrorSmoothingFix_ErrPos {
+            static bool Prefix() {
+                if (hackError > 0) {
+                    return false;
+                }
+                return true;
+            }
+        }
+        */
+        [HarmonyPatch(typeof(Player), "AddSmoothingError")]
+        class MPErrorSmoothingFix_ErrAdd {
+            static bool Prefix() {
+                if (hackError == 1) {
+                    return false;
+                }
+                return true;
+            }
+        }
+
+        [HarmonyPatch(typeof(Player), "RemoveSmoothingError")]
+        class MPErrorSmoothingFix_ErrRemove {
+            static bool Prefix() {
+                if (hackError == 1) {
+                    return false;
+                }
+                return true;
+            }
+        }
+
+
         [HarmonyPatch(typeof(GameManager), "Awake")]
         class MPErrorSmoothingFix_Controller {
             static void Postfix() {
                 uConsole.RegisterCommand("hack_smooth", hack_smooth_command);
+                uConsole.RegisterCommand("hack_error", hack_error_command);
             }
         }
 

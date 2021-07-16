@@ -129,6 +129,23 @@ void CQuaternion::ToEuler(float euler[3]) const
 	euler[0] = (float)std::atan2(siny_cosp, cosy_cosp);
 }
 
+CQuaternion CQuaternion::conjugate() const
+{
+	CQuaternion c;
+	c.v[0] = - v[0];
+	c.v[1] = - v[1];
+	c.v[2] = - v[2];
+	c.v[3] =   v[3];
+	return c;
+}
+
+CQuaternion CQuaternion::inverse() const
+{
+	CQuaternion c = conjugate();
+	c.normalize();
+	return c;
+}
+
 extern void lerp(const float *a, const float *b, float *c, float t, size_t dims)
 {
 	size_t i;

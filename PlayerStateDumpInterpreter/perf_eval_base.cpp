@@ -101,6 +101,8 @@ void PerfEvalBase::DoPerfProbe(const PerfProbe& probe)
 	}
 
 	ProcessPerfProbe(probe);
+
+	AddProbe(lastInLocation, probe);
 }
 
 void PerfEvalBase::ProcessPerfProbe(const PerfProbe& probe)
