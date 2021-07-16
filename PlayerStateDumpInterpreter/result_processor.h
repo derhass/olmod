@@ -53,14 +53,14 @@ class ResultProcessorChannel : public ResultProcessorChannelBase {
 
 		virtual void Clear();
 		virtual void Finish();
-		virtual void StreamOut(const PlayerState& s, size_t idx);
+		virtual void StreamOut(const PlayerState& s, size_t idx, bool asDumpTransform);
 
 		ResultProcessorChannel(ResultProcessor& rp, uint32_t player, uint32_t object);
 		virtual ~ResultProcessorChannel();
 	
 	public:
-		virtual void Add(const PlayerState& s);
-		void Add(const PlayerSnapshot& s);
+		virtual void Add(const PlayerState& s, bool asDumpTransform = false);
+		void Add(const PlayerSnapshot& s, bool asDumpTransform = false);
 };
 
 class ResultProcessorAuxChannel : public ResultProcessorChannelBase {

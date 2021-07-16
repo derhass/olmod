@@ -90,7 +90,7 @@ namespace GameMod {
 					UnityEngine.Debug.Log("MPPlayerStateDump: dump started to " + name);
 					fs = File.Create(name);
 					ms.Position = 0;
-					bw.Write((uint)4); // file format version
+					bw.Write((uint)5); // file format version
 					bw.Write((uint)0); // size of extra header, reserved for later versions
 					matchCount++;
 					stopWatch.Stop();
@@ -495,7 +495,7 @@ namespace GameMod {
 				}
 			}
 
-			public void AddTransformDump(Transform t, uint id, uint type)
+			public void AddTransformDump(Transform t, uint id, uint type, int tick, int last_ack_tick)
 			{
 				if (!go) {
 					return;
@@ -516,6 +516,8 @@ namespace GameMod {
 					bw.Write(t.rotation.y);
 					bw.Write(t.rotation.z);
 					bw.Write(t.rotation.w);
+					bw.Write(tick);
+					bw.Write(last_ack_tick);
 					Flush(false);
 				} catch (Exception e) {
 					UnityEngine.Debug.Log("MPPlayerStateDump: failed to dump transform: " + e);
@@ -524,7 +526,7 @@ namespace GameMod {
 				}
 			}
 			
-			public void AddTransformDump(Vector3 pos, Quaternion rot, uint id, uint type)
+			public void AddTransformDump(Vector3 pos, Quaternion rot, uint id, uint type, int tick, int last_ack_tick)
 			{
 				if (!go) {
 					return;
@@ -545,6 +547,8 @@ namespace GameMod {
 					bw.Write(rot.y);
 					bw.Write(rot.z);
 					bw.Write(rot.w);
+					bw.Write(tick);
+					bw.Write(last_ack_tick);
 					Flush(false);
 				} catch (Exception e) {
 					UnityEngine.Debug.Log("MPPlayerStateDump: failed to dump transform: " + e);
@@ -557,18 +561,29 @@ namespace GameMod {
 		public static Buffer buf = new Buffer();
 		private static bool perFrameCoroutine = false;
 
-		public static void dump_player_info(Player player, bool asLocalPlayer)
+		public static void dump_player_info(Player player, bool asLocalPlayer, bool dumpAll)
 		{
 			if (player != null) {
 				uint id = 0;
+				int tick;
+				int last_ack_tick;
+				if (GameplayManager.IsDedicatedServer()) {
+					tick = player.m_updated_state.m_tick;
+					last_ack_tick = player.m_last_ackknowledged_server_tick;
+				} else {
+					tick = Client.m_tick;
+					last_ack_tick = Client.m_last_acknowledged_tick;
+				}
 				if (!asLocalPlayer) {
 					id = player.netId.Value;
 				}
-				buf.AddTransformDump(player.c_player_ship.c_rigidbody.transform,id,0);
-				buf.AddTransformDump(player.transform,id,1);
-				buf.AddTransformDump(player.c_player_ship.c_camera.transform,id,2);
-				buf.AddTransformDump(player.c_player_ship.c_rigidbody.position,player.c_player_ship.c_rigidbody.rotation,id,4);
-				buf.AddTransformDump(player.m_error_pos,player.m_error_rot,id,5);
+				buf.AddTransformDump(player.transform,id,1,tick,last_ack_tick);
+				buf.AddTransformDump(player.m_error_pos,player.m_error_rot,id,5,tick,last_ack_tick);
+				if (dumpAll) {
+					buf.AddTransformDump(player.c_player_ship.c_rigidbody.transform,id,0,tick,last_ack_tick);
+					buf.AddTransformDump(player.c_player_ship.c_camera.transform,id,2,tick,last_ack_tick);
+					buf.AddTransformDump(player.c_player_ship.c_rigidbody.position,player.c_player_ship.c_rigidbody.rotation,id,4,tick,last_ack_tick);
+				}
 			}
 		}
 
@@ -577,7 +592,7 @@ namespace GameMod {
 			buf.AddPerfProbe(PerfProbeLocation.FRAME, (uint)PerfProbeMode.BEGIN);
 			while(true) {
 				yield return new WaitForEndOfFrame();
-				dump_player_info(GameManager.m_local_player,true);
+				dump_player_info(GameManager.m_local_player,true,true);
 				buf.AddPerfProbe(PerfProbeLocation.FRAME, (uint)PerfProbeMode.END);
 				buf.AddPerfProbe(PerfProbeLocation.FRAME, (uint)PerfProbeMode.BEGIN);
 			}
@@ -716,9 +731,9 @@ namespace GameMod {
 				buf.AddPerfProbe(PerfProbeLocation.GAMEMANAGER_FIXED_UPDATE, (uint)PerfProbeMode.END);
 				if (GameplayManager.IsDedicatedServer()) {
 					foreach (Player p in Overload.NetworkManager.m_Players) {
-						dump_player_info(p,false);
+						dump_player_info(p,false,false);
 					}
-					dump_player_info(GameManager.m_local_player, true);
+					//dump_player_info(GameManager.m_local_player, false, false);
 				}
 			}
 		}

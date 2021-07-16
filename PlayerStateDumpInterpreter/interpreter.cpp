@@ -159,7 +159,7 @@ bool Interpreter::OpenFile(const char *filename)
 	}
 	log.Log(Logger::DEBUG, "version: %u",(unsigned)fileVersion);
 
-	if (fileVersion < 1 || fileVersion > 4) {
+	if (fileVersion < 1 || fileVersion > 5) {
 		log.Log(Logger::ERROR, "open: version of '%s' not supported: %u",fileName,(unsigned)fileVersion);
 		return false;
 	}
@@ -246,6 +246,7 @@ void Interpreter::ReadPlayerSnapshot(PlayerSnapshot& s)
 	s.state.timestamp = -1.0f;
 	s.state.realTimestamp = -1.0f;
 	s.state.message_timestamp = -1.0f;
+	s.state.isTransformDump = false;
 	if (!file) {
 		log.Log(Logger::WARN, "failed to read PlayerSnapshot");
 	}
@@ -270,6 +271,7 @@ void Interpreter::ReadNewPlayerSnapshot(PlayerSnapshot& s, float ts)
 	s.state.timestamp = -1.0f;
 	s.state.realTimestamp = -1.0f;
 	s.state.message_timestamp = -1.0f;
+	s.state.isTransformDump = false;
 	if (!file) {
 		log.Log(Logger::WARN, "failed to read PlayerSnapshot");
 	}
@@ -732,8 +734,18 @@ void Interpreter::ProcessTransformDump()
 	float uFixedTime = ReadFloat();
 	uint32_t stype = ReadUint();
 	ReadPlayerSnapshot(p);
+	int32_t tick = 0;
+	int32_t last_ack_tick = 0;
+	if (fileVersion >= 5) {
+		tick = ReadInt();
+		last_ack_tick = ReadInt();
+	}
+
 	p.state.timestamp=uTime;
 	p.state.realTimestamp=(float)ts;
+	p.state.isTransformDump = true;
+	p.state.tick = tick;
+	p.state.last_ack_tick = last_ack_tick;
 
 	log.Log(Logger::DEBUG, "got TRANSFORM DUMP type %u id: %u ts: %f",
 		(unsigned)stype, (unsigned)p.id, ts);
@@ -747,7 +759,7 @@ void Interpreter::ProcessTransformDump()
 		log.Log(Logger::INFO,"created new result process channel '%s'", rpc->GetName());
 	}
 	(void)uFixedTime;
-	rpc->Add(p);
+	rpc->Add(p, true);
 	log.Log(Logger::DEBUG_DETAIL, p);
 }
 
