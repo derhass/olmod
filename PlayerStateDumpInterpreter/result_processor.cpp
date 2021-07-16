@@ -139,7 +139,7 @@ void ResultProcessorChannel::StreamOut(const PlayerState& s, size_t idx)
 
 		CQuaternion r = s.rot * b.rot.inverse();
 		r.ToEuler(yawPitchRoll);
-		fprintf(fStream, "%f\t%f\t%f",
+		fprintf(fStream, "\t%f\t%f\t%f",
 				yawPitchRoll[0],
 				yawPitchRoll[1],
 				yawPitchRoll[2]);
