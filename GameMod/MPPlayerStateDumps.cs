@@ -734,6 +734,7 @@ namespace GameMod {
 						dump_player_info(p,false,false);
 					}
 					//dump_player_info(GameManager.m_local_player, false, false);
+					GameManager.m_local_player.transform.position = Vector3.zero;
 				}
 			}
 		}
