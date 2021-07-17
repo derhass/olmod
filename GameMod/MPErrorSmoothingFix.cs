@@ -130,9 +130,15 @@ namespace GameMod {
         */
         [HarmonyPatch(typeof(Player), "AddSmoothingError")]
         class MPErrorSmoothingFix_ErrAdd {
-            static bool Prefix() {
+            static bool Prefix(Player __instance) {
                 if (hackError == 1) {
                     return false;
+                }
+                if (hackError == 2) {
+                    __instance.c_player_ship.c_rigidbody.MovePosition(__instance.transform.position + __instance.m_error_pos);
+                    __instance.c_player_ship.c_rigidbody.MoveRotation(__instance.m_error_rot * __instance.transform.rotation);
+                    return false;
+
                 }
                 return true;
             }
