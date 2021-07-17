@@ -578,11 +578,11 @@ namespace GameMod {
 					id = player.netId.Value;
 				}
 				buf.AddTransformDump(player.transform,id,1,tick,last_ack_tick);
-				buf.AddTransformDump(player.m_error_pos,player.m_error_rot,id,5,tick,last_ack_tick);
 				if (dumpAll) {
 					buf.AddTransformDump(player.c_player_ship.c_rigidbody.transform,id,0,tick,last_ack_tick);
 					buf.AddTransformDump(player.c_player_ship.c_camera.transform,id,2,tick,last_ack_tick);
 					buf.AddTransformDump(player.c_player_ship.c_rigidbody.position,player.c_player_ship.c_rigidbody.rotation,id,4,tick,last_ack_tick);
+					buf.AddTransformDump(player.m_error_pos,player.m_error_rot,id,5,tick,last_ack_tick);
 				}
 			}
 		}
