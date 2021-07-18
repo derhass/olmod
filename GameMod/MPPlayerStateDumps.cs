@@ -616,14 +616,19 @@ namespace GameMod {
 		}
 		*/
 
-		[HarmonyPatch(typeof(Client), "Connect")]
-		class MPPlayerStateDump_Connect {
-			private static void Postfix() {
-				if (!GameplayManager.IsDedicatedServer()) {
-					buf.Start();
+		[HarmonyPatch(typeof(NetworkMatch), "SetMatchState")]
+		class MPPlayerStateDump_SetMatchState {
+			private static void Prefix(MatchState state) {
+				if (state != NetworkMatch.m_match_state) {
+					if (state == MatchState.PLAYING) {
+						buf.Start();
+					} else {
+						buf.Stop();
+					}
 				}
 			}
 		}
+
 		[HarmonyPatch(typeof(Client), "Disconnect")]
 		class MPPlayerStateDump_Disconnect {
 			private static void Prefix() {
@@ -633,22 +638,13 @@ namespace GameMod {
 			}
 		}
 
-		[HarmonyPatch(typeof(NetworkMatch), "InitBeforeEachMatch")]
-		class MPPlayerStateDump_InitBeforeEachMatch {
-			private static void Postfix() {
-				if (GameplayManager.IsDedicatedServer()) {
-					buf.Start();
-				}
-			}
-		}
 		[HarmonyPatch(typeof(NetworkMatch), "ExitMatch")]
 		class MPPlayerStateDump_ExitMatch {
 			private static void Postfix() {
-				if (GameplayManager.IsDedicatedServer()) {
-					buf.Stop();
-				}
+				buf.Stop();
 			}
 		}
+
 		/*	
 		[HarmonyPatch(typeof(Client), "OnPlayerSnapshotToClient")]
 		class MPPlayerStateDump_Enqueue {
