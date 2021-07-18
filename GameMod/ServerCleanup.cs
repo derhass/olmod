@@ -1,6 +1,8 @@
 using Harmony;
 using Overload;
 using System.Collections.Generic;
+using System.Reflection;
+using System.Reflection.Emit;
 using UnityEngine;
 
 /* NOTE: This class is meant as the central place for "cleaning up" server
@@ -64,6 +66,36 @@ namespace GameMod {
                 return false;
             }
             return true;
+        }
+    }
+
+    public class Foo {
+        public static void SetFixedDeltaTime(float v)
+        {
+	        Debug.LogFormat("fixed delta time from {0} to {1}", Time.fixedDeltaTime, v);
+	        if (Time.fixedDeltaTime != v) {
+               Time.fixedDeltaTime = v;
+               Debug.Log("did it!");
+            }
+        }
+    }
+
+    [HarmonyPatch(typeof(GameManager), "Update")]
+    class ServerCleanup_XXX {
+        static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> codes)
+        {
+            int i=0;
+            foreach (var code in codes)
+            {
+                if (code.opcode == OpCodes.Call &&  ((MethodInfo)code.operand).Name == "set_fixedDeltaTime")
+                {
+                    Debug.LogFormat("patching set_fixedDeltaTime {0}", ++i);
+                    yield return new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(Foo), "SetFixedDeltaTime"));
+
+                    continue;
+                }
+                yield return code;
+            }
         }
     }
 }
