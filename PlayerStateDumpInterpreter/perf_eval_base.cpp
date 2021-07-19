@@ -77,7 +77,7 @@ bool PerfEvalBase::AddProbe(std::vector<PerfProbe>& probes, const PerfProbe& pro
 	return added;
 }
 
-void PerfEvalBase::DoPerfProbe(const PerfProbe& probe)
+void PerfEvalBase::DoPerfProbe(const PerfProbe& probe, bool small)
 {
 	if (probe.location > 1000) {
 		log.Log(Logger::WARN, "probe location %u is unplausible, ignoring it", (unsigned)probe.location);
@@ -100,12 +100,12 @@ void PerfEvalBase::DoPerfProbe(const PerfProbe& probe)
 		}
 	}
 
-	ProcessPerfProbe(probe);
+	ProcessPerfProbe(probe, small);
 
 	AddProbe(lastInLocation, probe);
 }
 
-void PerfEvalBase::ProcessPerfProbe(const PerfProbe& probe)
+void PerfEvalBase::ProcessPerfProbe(const PerfProbe& probe, bool small)
 {
 	(void)probe;
 }

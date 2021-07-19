@@ -28,7 +28,7 @@ void V1::Finish()
 	PerfEvalBase::Finish();
 }
 
-void V1::ProcessPerfProbe(const PerfProbe& probe)
+void V1::ProcessPerfProbe(const PerfProbe& probe, bool small)
 {
 	if (probe.mode == (uint32_t)PERF_MODE_END) {
 		bool isNew;
@@ -42,12 +42,12 @@ void V1::ProcessPerfProbe(const PerfProbe& probe)
 			}
 			PerfProbe pd;
 
-			rpc->Add(probesCurrent[probe.location]);
-			rpc->Add(probe);
-			pd.Diff(probesCurrent[probe.location],probesPrevious[probe.location]);
-			rpc->Add(pd);
-			pd.Diff(probe,probesCurrent[probe.location]);
-			rpc->Add(pd);
+			rpc->Add(probesCurrent[probe.location], small);
+			rpc->Add(probe, small);
+			pd.Diff(probesCurrent[probe.location],probesPrevious[probe.location], small);
+			rpc->Add(pd, small);
+			pd.Diff(probe,probesCurrent[probe.location], small);
+			rpc->Add(pd, small);
 			rpc->FlushCurrent();
 		}
 	} else if (probe.mode != (uint32_t)PERF_MODE_BEGIN) {
@@ -63,11 +63,11 @@ void V1::ProcessPerfProbe(const PerfProbe& probe)
 				}
 				PerfProbe pd;
 
-				rpc->Add(probe);
-				pd.Diff(probe, lastInLocation[probe.location]);
-				rpc->Add(pd);
-				pd.Diff(probe,probesCurrent[probe.location]);
-				rpc->Add(pd);
+				rpc->Add(probe, small);
+				pd.Diff(probe, lastInLocation[probe.location], small);
+				rpc->Add(pd, small);
+				pd.Diff(probe,probesCurrent[probe.location], small);
+				rpc->Add(pd, small);
 				rpc->Add(lastInLocation[probe.location].mode);
 				rpc->FlushCurrent();
 

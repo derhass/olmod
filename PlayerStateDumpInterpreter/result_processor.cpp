@@ -235,12 +235,14 @@ void ResultProcessorAuxChannel::Add(const PlayerState& s)
 	Add(s.rot.v,4);
 }
 
-void ResultProcessorAuxChannel::Add(const PerfProbe& p)
+void ResultProcessorAuxChannel::Add(const PerfProbe& p, bool small)
 {
 	Add((float)p.ts);
-	Add(p.timeStamp);
-	Add(p.fixedTimeStamp);
-	Add(p.realTimeStamp);
+	if (!small) {
+		Add(p.timeStamp);
+		Add(p.fixedTimeStamp);
+		Add(p.realTimeStamp);
+	}
 }
 
 void ResultProcessorAuxChannel::FlushCurrent()
