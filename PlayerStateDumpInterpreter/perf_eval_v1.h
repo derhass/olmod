@@ -17,7 +17,7 @@ class V1 : public PerfEvalBase {
 		virtual void Start();
 		virtual void Finish();
 
-		virtual void ProcessPerfProbe(const PerfProbe& probe);
+		virtual void ProcessPerfProbe(const PerfProbe& probe, bool small);
 	public:
 		V1(ResultProcessor& rp);
 		virtual ~V1();

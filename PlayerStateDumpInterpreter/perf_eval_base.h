@@ -33,10 +33,10 @@ class PerfEvalBase {
 
 		friend class Interpreter;
 
-		virtual void ProcessPerfProbe(const PerfProbe& probe);
+		virtual void ProcessPerfProbe(const PerfProbe& probe, bool small);
 
 		virtual void Start();
-		virtual void DoPerfProbe(const PerfProbe& probe);
+		virtual void DoPerfProbe(const PerfProbe& probe, bool small);
 		virtual void Finish();
 
 
