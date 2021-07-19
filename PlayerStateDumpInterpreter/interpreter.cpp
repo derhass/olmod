@@ -165,7 +165,7 @@ bool Interpreter::OpenFile(const char *filename)
 	}
 	log.Log(Logger::DEBUG, "version: %u",(unsigned)fileVersion);
 
-	if (fileVersion < 1 || fileVersion > 6) {
+	if (fileVersion < 1 || fileVersion > 7) {
 		log.Log(Logger::ERROR, "open: version of '%s' not supported: %u",fileName,(unsigned)fileVersion);
 		return false;
 	}
@@ -713,46 +713,41 @@ void Interpreter::ProcessNewPlayerResult()
 	log.Log(Logger::DEBUG_DETAIL, p);
 }
 
-void Interpreter::ProcessPerfProbe()
+void Interpreter::ProcessPerfProbe(bool small, uint32_t compact)
 {
 	PerfProbe p;
-	p.location = ReadUint();
-	p.mode = ReadUint();
-	p.ts = ReadDouble();
-	p.timeStamp = ReadFloat();
-	p.fixedTimeStamp = ReadFloat();
-	if (fileVersion < 6) {
-		p.realTimeStamp = ReadFloat();
+	if (compact) {
+		p.location = (compact>>16) & 0xff;
+		p.mode = compact & 0xffff;
 	} else {
-		p.realTimeStamp = 0.0f;
+		p.location = ReadUint();
+		p.mode = ReadUint();
 	}
-
-
-	log.Log(Logger::DEBUG, "got PERF_PROBE: %u %u, ts: %f, time: %f, fixedTime: %f, realTime: %f",
-		(unsigned)p.location,(unsigned)p.mode,
-		p.ts, p.timeStamp, p.fixedTimeStamp, p.realTimeStamp);
-	for (PerfEvalSet::iterator it=perfEvals.begin(); it!=perfEvals.end(); it++) {
-		PerfEvalBase *pe = (*it);
-		pe->DoPerfProbe(p,false);
-	}
-}
-
-void Interpreter::ProcessPerfProbeSmall()
-{
-	PerfProbe p;
-	p.location = ReadUint();
-	p.mode = ReadUint();
 	p.ts = ReadDouble();
-	p.timeStamp = 0.0f;;
-	p.fixedTimeStamp = 0.0f;
-	p.realTimeStamp = 0.0f;
+	if (small) {
+		p.timeStamp = 0.0f;;
+		p.fixedTimeStamp = 0.0f;
+		p.realTimeStamp = 0.0f;
+		log.Log(Logger::DEBUG, "got PERF_PROBE_SMALL: %u %u, ts: %f",
+			(unsigned)p.location,(unsigned)p.mode,
+			p.ts);
+	} else {
+		p.timeStamp = ReadFloat();
+		p.fixedTimeStamp = ReadFloat();
+		if (fileVersion < 6) {
+			p.realTimeStamp = ReadFloat();
+		} else {
+			p.realTimeStamp = 0.0f;
+		}
+		log.Log(Logger::DEBUG, "got PERF_PROBE: %u %u, ts: %f, time: %f, fixedTime: %f, realTime: %f",
+			(unsigned)p.location,(unsigned)p.mode,
+			p.ts, p.timeStamp, p.fixedTimeStamp, p.realTimeStamp);
+	}
 
-	log.Log(Logger::DEBUG, "got PERF_PROBE_SMALL: %u %u, ts: %f",
-		(unsigned)p.location,(unsigned)p.mode,
-		p.ts);
+
 	for (PerfEvalSet::iterator it=perfEvals.begin(); it!=perfEvals.end(); it++) {
 		PerfEvalBase *pe = (*it);
-		pe->DoPerfProbe(p,true);
+		pe->DoPerfProbe(p,small);
 	}
 }
 
@@ -801,8 +796,31 @@ bool Interpreter::ProcessCommand()
 		return false;
 	}
 
-	Command cmd = (Command)ReadUint();
-	log.Log(Logger::DEBUG, "got command 0x%x", (unsigned)cmd);
+	uint32_t value = ReadUint();
+	Command cmd = COMMAND_END_MARKER;
+
+	if (fileVersion >= 7) {
+		if ( (value & (uint32_t)PERF_PROBE_COMPACT_MARKER) == (uint32_t)PERF_PROBE_COMPACT_MARKER) {
+			uint32_t masked = value & (uint32_t)PERF_PROBE_COMPACT_MASK;
+			switch(masked) {
+				case (uint32_t)PERF_PROBE_COMPACT_BASE:
+					cmd = PERF_PROBE_COMPACT_BASE;
+					break;
+				case (uint32_t)PERF_PROBE_COMPACT_SMALL:
+					cmd = PERF_PROBE_COMPACT_SMALL;
+					break;
+				default:
+					log.Log(Logger::WARN, "got invalid compact perfprobe code 0x%x", (unsigned)masked);
+			}
+			log.Log(Logger::DEBUG, "got compact perfprobe command 0x%x, raw: 0x%x", (unsigned)cmd, (unsigned)value);
+		}
+	}
+
+	if (cmd == COMMAND_END_MARKER) {
+		cmd = (Command)value;
+		log.Log(Logger::DEBUG, "got command 0x%x", (unsigned)cmd);
+	}
+
 	switch(cmd) {
 		case ENQUEUE:
 			ProcessEnqueue();
@@ -854,13 +872,19 @@ bool Interpreter::ProcessCommand()
 			ProcessNewPlayerResult();
 			break;
 		case PERF_PROBE:
-			ProcessPerfProbe();
+			ProcessPerfProbe(false,0);
 			break;
 		case TRANSFORM_DUMP:
 			ProcessTransformDump();
 			break;
 		case PERF_PROBE_SMALL:
-			ProcessPerfProbeSmall();
+			ProcessPerfProbe(true,0);
+			break;
+		case PERF_PROBE_COMPACT_BASE:
+			ProcessPerfProbe(false, value);
+			break;
+		case PERF_PROBE_COMPACT_SMALL:
+			ProcessPerfProbe(true, value);
 			break;
 		default:
 			if (file) {
