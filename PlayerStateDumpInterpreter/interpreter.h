@@ -89,8 +89,7 @@ class Interpreter {
 		void ProcessNewTimeSync();
 		void ProcessNewInterpolate();
 		void ProcessNewPlayerResult();
-		void ProcessPerfProbe();
-		void ProcessPerfProbeSmall();
+		void ProcessPerfProbe(bool small, uint32_t compact);
 		void ProcessTransformDump();
 
 		bool ProcessCommand();

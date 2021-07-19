@@ -38,7 +38,17 @@ namespace GameMod {
 			PERF_PROBE,
 			TRANSFORM_DUMP,
 			PERF_PROBE_SMALL,
-			// always add new commands at the end!
+			// always add new commands here!
+			// ...
+
+			// special case for PERF DUMPS in Version 7:
+			// we use the 6 most significant bits to encode
+			// compact perf dumps as
+			// | 8bit perf dump code | 8 bit location | 16 bit mode
+			// where perf dump code is either 11111110
+			// and 11111111 for PERF_DUMP_SMALL
+			PERF_PROBE_COMPACT_BASE = 0xfe000000,
+			PERF_PROBE_COMPACT_SMALL = 0xff000000,
 		}
 
 		public enum PerfProbeMode : uint {
@@ -91,7 +101,7 @@ namespace GameMod {
 					UnityEngine.Debug.Log("MPPlayerStateDump: dump started to " + name);
 					fs = File.Create(name);
 					ms.Position = 0;
-					bw.Write((uint)6); // file format version
+					bw.Write((uint)7); // file format version
 					bw.Write((uint)0); // size of extra header, reserved for later versions
 					matchCount++;
 					stopWatch.Stop();
@@ -476,11 +486,10 @@ namespace GameMod {
 				}
 				mtx.WaitOne();
 				try {
-					double ts;
-					ts = stopWatch.Elapsed.TotalSeconds;
-					bw.Write((uint)Command.PERF_PROBE);
-					bw.Write((uint)loc);
-					bw.Write(mode);
+					double ts = stopWatch.Elapsed.TotalSeconds;
+					uint compact = ((uint)Command.PERF_PROBE_COMPACT_BASE) |
+						       (((uint)loc)<<16) | mode;
+					bw.Write(compact);
 					bw.Write(ts);
 					bw.Write(Time.time);
 					bw.Write(Time.fixedTime);
@@ -500,11 +509,10 @@ namespace GameMod {
 				}
 				mtx.WaitOne();
 				try {
-					double ts;
-					ts = stopWatch.Elapsed.TotalSeconds;
-					bw.Write((uint)Command.PERF_PROBE_SMALL);
-					bw.Write((uint)loc);
-					bw.Write(mode);
+					double ts = stopWatch.Elapsed.TotalSeconds;
+					uint compact = ((uint)Command.PERF_PROBE_COMPACT_SMALL) |
+						       (((uint)loc)<<16) | mode;
+					bw.Write(compact);
 					bw.Write(ts);
 					Flush(false);
 				} catch (Exception e) {
@@ -790,6 +798,30 @@ namespace GameMod {
 		class MPPlayerStateDump_ClientReconcileServerFixedUpdate {
 			static void Postfix() {
 				buf.AddPerfProbeSmall(PerfProbeLocation.GAMEMANAGER_FIXED_UPDATE, (uint)PerfProbeMode.GENERIC_START + 4);
+			}
+		}
+
+		[HarmonyPatch(typeof(Overload.Player), "RemoveSmoothingError")]
+		class MPPlayerStateDump_PlayerRemoveSmoothingError {
+			static void Postfix() {
+				buf.AddPerfProbeSmall(PerfProbeLocation.GAMEMANAGER_FIXED_UPDATE, (uint)PerfProbeMode.GENERIC_START + 6);
+			}
+		}
+
+		[HarmonyPatch(typeof(Overload.Server), "AccelerateInputs")]
+		class MPPlayerStateDump_ServerAccelerateInputs {
+			static void Prefix() {
+				buf.AddPerfProbeSmall(PerfProbeLocation.GAMEMANAGER_FIXED_UPDATE, (uint)PerfProbeMode.GENERIC_START + 7);
+			}
+			static void Postfix() {
+				buf.AddPerfProbeSmall(PerfProbeLocation.GAMEMANAGER_FIXED_UPDATE, (uint)PerfProbeMode.GENERIC_START + 8);
+			}
+		}
+
+		[HarmonyPatch(typeof(Overload.Server), "SendSnapshotsToPlayers")]
+		class MPPlayerStateDump_ServerSend {
+			static void Postfix() {
+				buf.AddPerfProbeSmall(PerfProbeLocation.GAMEMANAGER_FIXED_UPDATE, (uint)PerfProbeMode.GENERIC_START + 9);
 			}
 		}
 
