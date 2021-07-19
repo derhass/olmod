@@ -34,7 +34,13 @@ enum Command {
 	PERF_PROBE_SMALL,
 
 	// alwways add new commands here
-	COMMAND_END_MARKER
+	COMMAND_END_MARKER,
+
+	// special cases
+	PERF_PROBE_COMPACT_MARKER = 0xfc000000, // six most significant bits all 1 mark a compact perf dump
+	PERF_PROBE_COMPACT_MASK = 0xff000000,   // eight most significant bits encode the compact perf dump
+	PERF_PROBE_COMPACT_BASE = 0xfe000000,
+	PERF_PROBE_COMPACT_SMALL = 0xff000000
 };
 
 enum SnapshotVersion {
