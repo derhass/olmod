@@ -31,6 +31,7 @@ enum Command {
 	// Version 3: Perf probes
 	PERF_PROBE,
 	TRANSFORM_DUMP,
+	PERF_PROBE_SMALL,
 
 	// alwways add new commands here
 	COMMAND_END_MARKER
@@ -145,7 +146,7 @@ struct PerfProbe {
 	float realTimeStamp;
 
 	void Clear(uint32_t loc = 0, uint32_t m = 0);
-	void Diff(const PerfProbe& a, const PerfProbe& b);
+	void Diff(const PerfProbe& a, const PerfProbe& b, bool small);
 };
 
 } // namespace OlmodPlayerDumpState 

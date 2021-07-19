@@ -90,6 +90,7 @@ class Interpreter {
 		void ProcessNewInterpolate();
 		void ProcessNewPlayerResult();
 		void ProcessPerfProbe();
+		void ProcessPerfProbeSmall();
 		void ProcessTransformDump();
 
 		bool ProcessCommand();

@@ -27,14 +27,20 @@ void PerfProbe::Clear(uint32_t loc, uint32_t m)
 	realTimeStamp = 0.0f;
 }
 
-void PerfProbe::Diff(const PerfProbe& a, const PerfProbe& b)
+void PerfProbe::Diff(const PerfProbe& a, const PerfProbe& b, bool small)
 {
 	location = a.location;
 	mode = b.mode;
 	ts = a.ts - b.ts;
-	timeStamp = a.timeStamp - b.timeStamp;
-	fixedTimeStamp = a.fixedTimeStamp - b.fixedTimeStamp;
-	realTimeStamp = a.realTimeStamp - b.realTimeStamp;
+	if (small) {
+		timeStamp = 0.0f;
+		fixedTimeStamp = 0.0f;
+		realTimeStamp = 0.0f;
+	} else {
+		timeStamp = a.timeStamp - b.timeStamp;
+		fixedTimeStamp = a.fixedTimeStamp - b.fixedTimeStamp;
+		realTimeStamp = a.realTimeStamp - b.realTimeStamp;
+	}
 }
 
 GameState::GameState() :
@@ -159,7 +165,7 @@ bool Interpreter::OpenFile(const char *filename)
 	}
 	log.Log(Logger::DEBUG, "version: %u",(unsigned)fileVersion);
 
-	if (fileVersion < 1 || fileVersion > 5) {
+	if (fileVersion < 1 || fileVersion > 6) {
 		log.Log(Logger::ERROR, "open: version of '%s' not supported: %u",fileName,(unsigned)fileVersion);
 		return false;
 	}
@@ -715,14 +721,38 @@ void Interpreter::ProcessPerfProbe()
 	p.ts = ReadDouble();
 	p.timeStamp = ReadFloat();
 	p.fixedTimeStamp = ReadFloat();
-	p.realTimeStamp = ReadFloat();
+	if (fileVersion < 6) {
+		p.realTimeStamp = ReadFloat();
+	} else {
+		p.realTimeStamp = 0.0f;
+	}
+
 
 	log.Log(Logger::DEBUG, "got PERF_PROBE: %u %u, ts: %f, time: %f, fixedTime: %f, realTime: %f",
 		(unsigned)p.location,(unsigned)p.mode,
 		p.ts, p.timeStamp, p.fixedTimeStamp, p.realTimeStamp);
 	for (PerfEvalSet::iterator it=perfEvals.begin(); it!=perfEvals.end(); it++) {
 		PerfEvalBase *pe = (*it);
-		pe->DoPerfProbe(p);
+		pe->DoPerfProbe(p,false);
+	}
+}
+
+void Interpreter::ProcessPerfProbeSmall()
+{
+	PerfProbe p;
+	p.location = ReadUint();
+	p.mode = ReadUint();
+	p.ts = ReadDouble();
+	p.timeStamp = 0.0f;;
+	p.fixedTimeStamp = 0.0f;
+	p.realTimeStamp = 0.0f;
+
+	log.Log(Logger::DEBUG, "got PERF_PROBE_SMALL: %u %u, ts: %f",
+		(unsigned)p.location,(unsigned)p.mode,
+		p.ts);
+	for (PerfEvalSet::iterator it=perfEvals.begin(); it!=perfEvals.end(); it++) {
+		PerfEvalBase *pe = (*it);
+		pe->DoPerfProbe(p,true);
 	}
 }
 
@@ -738,7 +768,9 @@ void Interpreter::ProcessTransformDump()
 	int32_t last_ack_tick = 0;
 	if (fileVersion >= 5) {
 		tick = ReadInt();
-		last_ack_tick = ReadInt();
+		if (fileVersion < 6) {
+			last_ack_tick = ReadInt();
+		}
 	}
 
 	p.state.timestamp=uTime;
@@ -826,6 +858,9 @@ bool Interpreter::ProcessCommand()
 			break;
 		case TRANSFORM_DUMP:
 			ProcessTransformDump();
+			break;
+		case PERF_PROBE_SMALL:
+			ProcessPerfProbeSmall();
 			break;
 		default:
 			if (file) {

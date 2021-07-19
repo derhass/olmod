@@ -82,7 +82,7 @@ class ResultProcessorAuxChannel : public ResultProcessorChannelBase {
 		virtual void Add(float value);
 		virtual void Add(const float* values, size_t size);
 		virtual void Add(const PlayerState& s);
-		virtual void Add(const PerfProbe& p);
+		virtual void Add(const PerfProbe& p, bool small);
 		virtual void FlushCurrent();
 };
 
