@@ -139,6 +139,14 @@ namespace GameMod {
                     __instance.c_player_ship.c_rigidbody.MoveRotation(__instance.m_error_rot * __instance.transform.rotation);
                     return false;
 
+                } else if (hackError == 3) {
+                    if (__instance.m_error_pos != Vector3.zero) {
+                        GameManager.m_player_ship.c_rigidbody.AddForce(Vector3.ClampMagnitude(__instance.m_error_pos, 1f));
+                    }
+                    if (__instance.m_error_rot != Quaternion.identity) {
+                        __instance.transform.rotation = __instance.m_error_rot * __instance.transform.rotation;
+                    }
+                    return false;
                 }
                 return true;
             }
