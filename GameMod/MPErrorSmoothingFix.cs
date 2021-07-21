@@ -15,6 +15,7 @@ namespace GameMod {
 
         private static int hackIsEnabled = 1;
         private static int hackError = 0;
+        private static float hackForce = 1.0f;
 
         private static void dump_transform(int level, Transform t)
         {
@@ -62,6 +63,13 @@ namespace GameMod {
                 }
                 UnityEngine.Debug.LogFormat("hack_move {0}", v.x);
                 GameManager.m_local_player.transform.position += v;
+        }
+        private static void hack_force_command() {
+                int n = uConsole.GetNumParameters();
+                if (n > 0) {
+                    hackForce = uConsole.GetFloat();
+                }
+                UnityEngine.Debug.LogFormat("hack_force {0}", hackForce);
         }
 
         // start the manual interpolation phase
@@ -140,7 +148,7 @@ namespace GameMod {
         [HarmonyPatch(typeof(Player), "AddSmoothingError")]
         class MPErrorSmoothingFix_ErrAdd {
             static bool Prefix(Player __instance) {
-                if (hackError == 1 || hackError == 4) {
+                if (hackError == 1 || hackError == 4 || hackError == 5) {
                     return false;
                 }
                 if (hackError == 2) {
@@ -163,8 +171,14 @@ namespace GameMod {
 
         [HarmonyPatch(typeof(Player), "RemoveSmoothingError")]
         class MPErrorSmoothingFix_ErrRemove {
-            static bool Prefix() {
+            static bool Prefix(Player __instance) {
                 if (hackError == 1) {
+                    return false;
+                } else if (hackError == 5) {
+                    if (__instance.m_error_pos != Vector3.zero) {
+                    __instance.transform.position -= __instance.m_error_pos;
+                        GameManager.m_player_ship.c_rigidbody.AddForce(Vector3.ClampMagnitude(hackForce * __instance.m_error_pos, 1.0e10f));
+                    }
                     return false;
                 }
                 return true;
@@ -178,6 +192,7 @@ namespace GameMod {
                 uConsole.RegisterCommand("hack_smooth", hack_smooth_command);
                 uConsole.RegisterCommand("hack_error", hack_error_command);
                 uConsole.RegisterCommand("hack_move", hack_move_command);
+                uConsole.RegisterCommand("hack_force", hack_force_command);
             }
         }
 
