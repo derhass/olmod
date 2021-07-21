@@ -54,6 +54,15 @@ namespace GameMod {
                 }
                 UnityEngine.Debug.LogFormat("hack_error is now {0}", hackError);
         }
+        private static void hack_move_command() {
+                int n = uConsole.GetNumParameters();
+                Vector3 v = Vector3.zero;
+                if (n > 0) {
+                    v.x = uConsole.GetFloat();
+                }
+                UnityEngine.Debug.LogFormat("hack_move {0}", v.x);
+                GameManager.m_local_player.transform.position += v;
+        }
 
         // start the manual interpolation phase
         // this disables Unity's automatic interpolation for the rigid body of the player ship
@@ -131,7 +140,7 @@ namespace GameMod {
         [HarmonyPatch(typeof(Player), "AddSmoothingError")]
         class MPErrorSmoothingFix_ErrAdd {
             static bool Prefix(Player __instance) {
-                if (hackError == 1) {
+                if (hackError == 1 || hackError == 4) {
                     return false;
                 }
                 if (hackError == 2) {
@@ -168,6 +177,7 @@ namespace GameMod {
             static void Postfix() {
                 uConsole.RegisterCommand("hack_smooth", hack_smooth_command);
                 uConsole.RegisterCommand("hack_error", hack_error_command);
+                uConsole.RegisterCommand("hack_move", hack_move_command);
             }
         }
 
