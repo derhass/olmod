@@ -158,11 +158,16 @@ namespace GameMod {
 
                 } else if (hackError == 3) {
                     if (__instance.m_error_pos != Vector3.zero) {
-                        GameManager.m_player_ship.c_rigidbody.AddForce(Vector3.ClampMagnitude(__instance.m_error_pos, 1f));
+                        GameManager.m_player_ship.c_rigidbody.AddForce(hackForce*__instance.m_error_pos);
+
                     }
                     if (__instance.m_error_rot != Quaternion.identity) {
                         __instance.transform.rotation = __instance.m_error_rot * __instance.transform.rotation;
                     }
+                    return false;
+                } else if (hackError == 11) {
+                    Vector3 x = new Vector3(hackForce,0,0);
+                    GameManager.m_player_ship.c_rigidbody.AddForce(x);
                     return false;
                 }
                 return true;
