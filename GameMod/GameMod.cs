@@ -104,7 +104,8 @@ namespace GameMod.Core {
     }
 
     // add monsterball mb_arena1 level to multiplayer levels
-    [HarmonyPatch(typeof(GameManager), "ScanForLevels")]
+    
+    ///[HarmonyPatch(typeof(GameManager), "ScanForLevels")]
     class MBLevelPatch
     {
         public static bool SLInit = false;
@@ -125,7 +126,7 @@ namespace GameMod.Core {
         }
     }
 
-    [HarmonyPatch(typeof(LocalLANHost), "GetServerLocation")]
+    ////[HarmonyPatch(typeof(LocalLANHost), "GetServerLocation")]
     class ServerLocationPatch
     {
         private static bool Prefix(ref string __result)
@@ -136,7 +137,7 @@ namespace GameMod.Core {
     }
 
     // Remove annoying Tobii errors.
-    [HarmonyPatch(typeof(Debug), "LogError", new Type[] { typeof(object) })]
+    ////[HarmonyPatch(typeof(Debug), "LogError", new Type[] { typeof(object) })]
     class RemoveTobiiErrors
     {
         static bool Prefix(object message)
@@ -146,7 +147,7 @@ namespace GameMod.Core {
     }
 
     // Remove 10 FPS floor for the game time in multiplayer matches.
-    [HarmonyPatch(typeof(GameManager), "Update")]
+    /////[HarmonyPatch(typeof(GameManager), "Update")]
     class MPRemove10FPSFloor
     {
         static float MaybeMin(float a, float b)
@@ -180,7 +181,7 @@ namespace GameMod.Core {
     }
 
     // GSync fix
-    [HarmonyPatch(typeof(GameManager), "UpdateTargetFramerate")]
+    ///[HarmonyPatch(typeof(GameManager), "UpdateTargetFramerate")]
     class GSyncFix
     {
         static bool Prefix()
@@ -198,7 +199,7 @@ namespace GameMod.Core {
     }
 
     // Shenanigans.
-    [HarmonyPatch(typeof(StringParse), "IsNiceWord")]
+    //////[HarmonyPatch(typeof(StringParse), "IsNiceWord")]
     class ReallyIsNiceWord
     {
         static bool Prefix(string s, ref bool __result)
@@ -214,7 +215,7 @@ namespace GameMod.Core {
     }
 
     // Fix next/previous resolution buttons.
-    [HarmonyPatch(typeof(MenuManager), "SelectNextResolution")]
+    /////[HarmonyPatch(typeof(MenuManager), "SelectNextResolution")]
     class FixSelectNextResolution
     {
         static bool Prefix()

@@ -91,9 +91,8 @@ namespace GameMod.VersionHandling
     [HarmonyPatch(typeof(GameManager), "Awake")]
     class XXX
     {
-        private static void Postfix(GameManager __instance)
+        private static void Postfix()
         {
-                __instance.StartCoroutine(GetLatestVersionNumber);
         }
             /*
         static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> codes) {

@@ -95,7 +95,7 @@ namespace GameMod {
         public bool ready;
     }
 
-    [HarmonyPatch(typeof(Client), "RegisterHandlers")]
+    ////[HarmonyPatch(typeof(Client), "RegisterHandlers")]
     class MPJoinInProgressClientHandlers
     {
         private static void OnJIPJustJoinedMessage(NetworkMessage rawMsg)
@@ -148,7 +148,7 @@ namespace GameMod {
         }
     }
 
-    [HarmonyPatch]
+    ////[HarmonyPatch]
     class JIPStartBackfill
     {
         private static MethodBase TargetMethod()
@@ -162,7 +162,7 @@ namespace GameMod {
         }
     }
 
-    [HarmonyPatch]
+    ////[HarmonyPatch]
     class JIPDoTick
     {
         private static MethodBase TargetMethod()
@@ -176,7 +176,7 @@ namespace GameMod {
         }
     }
 
-    [HarmonyPatch]
+    ////[HarmonyPatch]
     class JIPOnUpdateGS
     {
         private static MethodBase TargetMethod()
@@ -190,7 +190,7 @@ namespace GameMod {
         }
     }
 
-    [HarmonyPatch(typeof(NetworkMatch), "ProcessLobby")]
+    ////[HarmonyPatch(typeof(NetworkMatch), "ProcessLobby")]
     class JIPProcessLobby
     {
         private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> codes)
@@ -199,7 +199,7 @@ namespace GameMod {
         }
     }
 
-    [HarmonyPatch(typeof(NetworkMatch), "NetSystemOnUpdateGameSession")]
+    ////[HarmonyPatch(typeof(NetworkMatch), "NetSystemOnUpdateGameSession")]
     class JIPNetOnUpdateGS
     {
         private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> codes)
@@ -208,7 +208,7 @@ namespace GameMod {
         }
     }
 
-    [HarmonyPatch(typeof(NetworkMatch), "NetSystemNotifyPlayerConnected")]
+    //[HarmonyPatch(typeof(NetworkMatch), "NetSystemNotifyPlayerConnected")]
     class JIPPlayerConn
     {
         private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> codes)
@@ -217,7 +217,7 @@ namespace GameMod {
         }
     }
 
-    [HarmonyPatch(typeof(NetworkMatch), "AcceptNewConnection")]
+    //[HarmonyPatch(typeof(NetworkMatch), "AcceptNewConnection")]
     class JIPAcceptConn
     {
         public static bool MaybeInLobby()
@@ -231,7 +231,7 @@ namespace GameMod {
         }
     }
 
-    [HarmonyPatch(typeof(Server), "OnPlayerJoinLobbyMessage")]
+    //[HarmonyPatch(typeof(Server), "OnPlayerJoinLobbyMessage")]
     class JIPJoinLobby
     {
         private static IEnumerator SendSceneLoad(int connectionId)
@@ -266,11 +266,12 @@ namespace GameMod {
         }
     }
 
-    [HarmonyPatch(typeof(Server), "OnReadyForCountdownToServer")]
+    //[HarmonyPatch(typeof(Server), "OnReadyForCountdownToServer")]
     class JIPReadyForCountdown
     {
         private static void SendMatchState(int connectionId)
         {
+		/*
             if (NetworkMatch.IsTeamMode(NetworkMatch.GetMode()))
                 foreach (var team in MPTeams.ActiveTeams)
                     NetworkServer.SendToClient(connectionId, CustomMsgType.SetScoreForTeam, new ScoreForTeamMessage
@@ -281,6 +282,7 @@ namespace GameMod {
             //if (!MPTweaks.ClientHasMod(connectionId))
             //    return;
 
+	    */
             // Process any disconnected scoreboard entries, add them to active pilot, and remove stale scoreboard objects
             foreach (var player in Overload.NetworkManager.m_Players)
             {
@@ -312,6 +314,7 @@ namespace GameMod {
             NetworkServer.SendToClient(connectionId, MessageTypes.MsgSetMatchState, msg);
 
             // Send disconnected pilot stats as separate message
+	    /*
             if (MPTweaks.ClientHasTweak(connectionId, "jip"))
             {
                 var dcPlayers = Overload.NetworkManager.m_PlayersForScoreboard.Where(x => !Overload.NetworkManager.m_Players.Contains(x));
@@ -333,7 +336,7 @@ namespace GameMod {
                     };
                 }
                 NetworkServer.SendToClient(connectionId, MessageTypes.MsgSetDisconnectedMatchState, dcmsg);
-            }            
+            } */           
         }
 
         private static float SendPreGame(int connectionId, float pregameWait)
@@ -362,10 +365,11 @@ namespace GameMod {
             {
                 foreach (Player player in Overload.NetworkManager.m_Players)
                 {
+			/*
                     if (MPTweaks.ClientHasTweak(player.connectionToClient.connectionId, "jip"))
                     {
                         NetworkServer.SendToClient(player.connectionToClient.connectionId, MessageTypes.MsgJIPJustJoined, new JIPJustJoinedMessage { playerId = newPlayer.netId, ready = false });
-                    }
+                    }*/
                 }
                 MPJoinInProgress.SetReady(newPlayer, false);
             }
@@ -387,10 +391,11 @@ namespace GameMod {
             {
                 foreach (Player player in Overload.NetworkManager.m_Players)
                 {
+			/*
                     if (MPTweaks.ClientHasTweak(player.connectionToClient.connectionId, "jip"))
                     {
                         NetworkServer.SendToClient(player.connectionToClient.connectionId, MessageTypes.MsgJIPJustJoined, new JIPJustJoinedMessage { playerId = newPlayer.netId, ready = true });
-                    }
+                    }*/
                 }
                 MPJoinInProgress.SetReady(newPlayer, true);
             }
@@ -403,11 +408,11 @@ namespace GameMod {
             SendMatchState(connectionId);
 
             NetworkSpawnPlayer.Respawn(newPlayer.c_player_ship);
-            MPTweaks.Send(connectionId);
+            //MPTweaks.Send(connectionId);
             //if (!newPlayer.m_spectator && RearView.MPNetworkMatchEnabled)
             //    newPlayer.CallTargetAddHUDMessage(newPlayer.connectionToClient, "REARVIEW ENABLED", -1, true);
-            CTF.SendJoinUpdate(newPlayer);
-            Race.SendJoinUpdate(newPlayer);
+            //CTF.SendJoinUpdate(newPlayer);
+            //Race.SendJoinUpdate(newPlayer);
             foreach (Player player in Overload.NetworkManager.m_Players)
             {
                 if (player.connectionToClient.connectionId == connectionId)
@@ -428,7 +433,7 @@ namespace GameMod {
                     use_loadout1 = player.m_use_loadout1
                 });
             }
-            ServerStatLog.Connected(newPlayer.m_mp_name);
+            //ServerStatLog.Connected(newPlayer.m_mp_name);
         }
 
         private static void Postfix(NetworkMessage msg)
@@ -436,8 +441,9 @@ namespace GameMod {
             Server.SendLoadoutDataToClients();
 
             int connectionId = msg.conn.connectionId;
+	    /*
             if (!MPTweaks.ClientHasMod(connectionId) && MPTweaks.MatchNeedsMod())
-                return;
+                return;*/
 
             if (NetworkMatch.GetMatchState() == MatchState.PLAYING)
             {
@@ -450,7 +456,7 @@ namespace GameMod {
         }
     }
 
-    [HarmonyPatch(typeof(Server), "OnDisconnect")]
+    //[HarmonyPatch(typeof(Server), "OnDisconnect")]
     class JIPDisconnectRemovePing
     {
         private static FieldInfo _ServerPing_m_pings_Field = typeof(ServerPing).GetField("m_pings", BindingFlags.NonPublic | BindingFlags.Static);
@@ -465,7 +471,7 @@ namespace GameMod {
     Fix for unable to rejoin with multiple players on same pc
     doesn't work because OnUpdateGameSession uses only (pc)playerId for dup check
     and restores m_has_connected / m_time_slot_reserved if same playerId is already connected :(
-    [HarmonyPatch]
+    //[HarmonyPatch]
     class JIPRejoin
     {
         private static Type CPIType;
@@ -507,7 +513,7 @@ namespace GameMod {
     }
     */
 
-    [HarmonyPatch(typeof(UIElement), "DrawMpMatchSetup")]
+    //[HarmonyPatch(typeof(UIElement), "DrawMpMatchSetup")]
     class JIPMatchSetup
     {
         public static void DrawMpMatchJIP(UIElement uie, ref Vector2 position)
@@ -570,7 +576,7 @@ namespace GameMod {
         }
     }
 
-    [HarmonyPatch(typeof(MenuManager), "MpMatchSetup")]
+    //[HarmonyPatch(typeof(MenuManager), "MpMatchSetup")]
     class JIPMatchSetupHandle
     {
         static void Postfix()
@@ -601,7 +607,7 @@ namespace GameMod {
     }
 
     // Send min_num_players 1 instead of 2 for creating join-in-progress match. Depends on FindPrivateMatchGrouping patch in MPMaxPlayer
-    [HarmonyPatch(typeof(NetworkMatch), "StartMatchMakerRequest")]
+    //[HarmonyPatch(typeof(NetworkMatch), "StartMatchMakerRequest")]
     class JIPMinPlayerPatch
     {
         public static void FinalizeRequest(MatchmakerPlayerRequest req)
@@ -716,7 +722,7 @@ namespace GameMod {
         public DisconnectedPlayerMatchState[] m_player_states;
     }
 
-    [HarmonyPatch(typeof(Client), "RegisterHandlers")]
+    //[HarmonyPatch(typeof(Client), "RegisterHandlers")]
     class JIPClientHandlers
     {
         private static void OnSetMatchStateMsg(NetworkMessage msg)
@@ -771,10 +777,13 @@ namespace GameMod {
 
         public static void SendAddMpStatus(string status)
         {
+		/*
             var msg = new StringMessage(status);
             foreach (var conn in NetworkServer.connections)
+/*
                 if (conn != null && MPTweaks.ClientHasMod(conn.connectionId)) // do not send unsupported message to stock game
                     conn.Send(MessageTypes.MsgAddMpStatus, msg);
+		    */
         }
 
         static void Postfix()
@@ -788,7 +797,7 @@ namespace GameMod {
     }
 
     // only reset time if state actually changes (JIP resends match state as part of SendMatchState for h2h->anarchy update)
-    [HarmonyPatch(typeof(NetworkMatch), "SetMatchState")]
+    //[HarmonyPatch(typeof(NetworkMatch), "SetMatchState")]
     class JIPSetMatchState
     {
         private static bool Prefix(MatchState state)
@@ -798,7 +807,7 @@ namespace GameMod {
     }
 
     // Consolidate scores for multiple copies of pilot name client-side
-    [HarmonyPatch(typeof(NetworkMatch), "SortAnarchyPlayerList")]
+    //[HarmonyPatch(typeof(NetworkMatch), "SortAnarchyPlayerList")]
     class MPJoinInProgress_NetworkMatch_SortAnarchyPlayerList
     {
         static void Prefix()
@@ -821,7 +830,7 @@ namespace GameMod {
         }
     }
 
-    [HarmonyPatch(typeof(PlayerShip), "TargetCreateDisconnectFlash")]
+    //[HarmonyPatch(typeof(PlayerShip), "TargetCreateDisconnectFlash")]
     class MPJoinInProgress_PlayerShip_TargetCreateDisconnectFlash
     {
         static void Postfix(PlayerShip __instance)

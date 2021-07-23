@@ -11,6 +11,7 @@ using UnityEngine;
  *       I plan to add further patches later.
  */
 namespace GameMod {
+/*
     [HarmonyPatch(typeof(GameManager), "Awake")]
     class ServerCleanup_GamaManager_Awake {
         static void Postifx() {
@@ -20,6 +21,7 @@ namespace GameMod {
             }
         }
     }
+*/
 
     /* enable this to hear the server's audio... 
     [HarmonyPatch(typeof(GameManager), "Update")]

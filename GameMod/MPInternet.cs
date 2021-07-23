@@ -123,7 +123,7 @@ namespace GameMod {
         }
     }
 
-    [HarmonyPatch(typeof(UIElement), "DrawMpMenu")]
+    //[HarmonyPatch(typeof(UIElement), "DrawMpMenu")]
     class MPInternetMainDraw
     {
         private static bool Prepare() {
@@ -153,7 +153,7 @@ namespace GameMod {
         }
     }
 
-    [HarmonyPatch(typeof(MenuManager), "MpMenuUpdate")]
+    //[HarmonyPatch(typeof(MenuManager), "MpMenuUpdate")]
     class MPInternetMainUpdate
     {
         private static bool Prepare() {
@@ -189,7 +189,7 @@ namespace GameMod {
         }
     }
 
-    [HarmonyPatch(typeof(MenuManager), "MpMatchSetup")]
+    //[HarmonyPatch(typeof(MenuManager), "MpMatchSetup")]
     class MPInternetMatchSetup
     {
         private static bool Prepare() {
@@ -246,7 +246,7 @@ namespace GameMod {
     }
 
     // rename password field if internet match selected
-    [HarmonyPatch(typeof(UIElement), "DrawMpMatchSetup")]
+    //[HarmonyPatch(typeof(UIElement), "DrawMpMatchSetup")]
     class MPInternetMatchSetupDraw
     {
         private static bool Prepare() {
@@ -270,7 +270,7 @@ namespace GameMod {
     }
 
     // remove olmod link
-    [HarmonyPatch(typeof(UIElement), "DrawMpMatchSetup")]
+    //[HarmonyPatch(typeof(UIElement), "DrawMpMatchSetup")]
     class MPInternetMatchSetupDrawOlMod
     {
         private static bool Prepare() {
@@ -297,7 +297,7 @@ namespace GameMod {
     }
 
     // after password entered: translate password to ip, adjust mp status
-    [HarmonyPatch(typeof(NetworkMatch), "SwitchToLobbyMenu")]
+    //[HarmonyPatch(typeof(NetworkMatch), "SwitchToLobbyMenu")]
     class MPInternetStart
     {
         private static bool Prepare() {
@@ -337,7 +337,7 @@ namespace GameMod {
     }
 
     // do not use interfaces for sending, instead send to listening socket (see below)
-    [HarmonyPatch(typeof(BroadcastState), "EnumerateNetworkInterfaces")]
+    //[HarmonyPatch(typeof(BroadcastState), "EnumerateNetworkInterfaces")]
     class MPInternetEnum
     {
         private static bool Prepare() {
@@ -353,7 +353,7 @@ namespace GameMod {
     }
 
     //  create connection to server and use it for sending and receiving
-    [HarmonyPatch(typeof(BroadcastState), MethodType.Constructor, new [] { typeof(int), typeof(int), typeof(IBroadcastStateReceiver) })]
+    //[HarmonyPatch(typeof(BroadcastState), MethodType.Constructor, new [] { typeof(int), typeof(int), typeof(IBroadcastStateReceiver) })]
     class MPInternetState
     {
         private static bool Prepare() {
@@ -444,7 +444,7 @@ namespace GameMod {
         }
     }
 
-    [HarmonyPatch(typeof(BroadcastState), "InitInternetMatch")]
+    //[HarmonyPatch(typeof(BroadcastState), "InitInternetMatch")]
     class MPInternetServer
     {
         private static FieldInfo _BroadcastState_m_receiveClient_Field = typeof(BroadcastState).GetField("m_receiveClient", BindingFlags.NonPublic | BindingFlags.Instance);
@@ -519,7 +519,7 @@ namespace GameMod {
     */
 
     // replace received server ip with the outgoing ip we used (server probably transmits internal ip)
-    [HarmonyPatch(typeof(LocalLANClient), "DoTick")]
+    //[HarmonyPatch(typeof(LocalLANClient), "DoTick")]
     class MPInternetConnInfo
     {
         private static bool Prepare() {
@@ -547,7 +547,7 @@ namespace GameMod {
         }
     }
 
-    [HarmonyPatch(typeof(BroadcastState), "InternalSendPacket")]
+    //[HarmonyPatch(typeof(BroadcastState), "InternalSendPacket")]
     class MPInternetServerSend
     {
         private static bool Prepare()
@@ -569,7 +569,7 @@ namespace GameMod {
     }
 
     // -host support, allows multiple servers with same ip but different hostnames
-    [HarmonyPatch(typeof(NetworkMatch), "TryLocalMatchmaking")]
+    //[HarmonyPatch(typeof(NetworkMatch), "TryLocalMatchmaking")]
     class MPServerHostFilter
     {
         static string HostArg;
