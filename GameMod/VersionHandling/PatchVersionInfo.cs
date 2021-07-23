@@ -7,7 +7,8 @@ using UnityEngine;
 
 namespace GameMod.VersionHandling
 {
-    
+       
+   /* 
     [HarmonyPatch(typeof(GameplayManager), "Initialize")]
     class PCheckNewOlmodVersion
     {
@@ -86,5 +87,12 @@ namespace GameMod.VersionHandling
             }
         }
     }
-
+*/
+    [HarmonyPatch(typeof(GameManager), "Awake")]
+    class XXX
+    {
+        private static void Postfix()
+        {
+        }
+    }
 }
