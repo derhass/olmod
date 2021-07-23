@@ -2,7 +2,9 @@
 using Overload;
 using System;
 using System.IO;
+using System.Collections;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Reflection.Emit;
 using UnityEngine;
 
@@ -89,22 +91,76 @@ namespace GameMod.VersionHandling
         }
     }
 */
-
     [HarmonyPatch(typeof(GameManager), "Awake")]
     class XXX
     {
+        public static IEnumerator FooCoroutine()
+        {
+                var foo = AccessTools.Method(typeof(GameManager), "GetLatestVersionNumber");
+                Debug.Log("XXXXXXXXXXXXXXXXXXXX FOOOOOOOOOOOOOOOOOOOOOOOOOO");
+                IEnumerator x = (IEnumerator)foo.Invoke(GameManager.m_gm,null);
+                Debug.LogFormat("XXXXXXXXXXXXXXXXXXXX {0} {1}",x, x.Current);
+                yield return x.Current;
+                while (x.MoveNext()) {
+                  Debug.LogFormat("XXXXXXXXXXXXXXXXXXXX {0} {1}",x, x.Current);
+                  yield return x.Current;
+                }
+                Debug.Log("XXXXXXXXXXXXXXXXXXXX FOOOOOOOOOOOOOOOOOOOOOOOOOO2");
+        }
+
+	public static Assembly GetOverloadAssembly()
+	{
+		return Assembly.GetAssembly(typeof(Overload.GameManager));
+	}
+
+        static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> codes)
+        {
+            // This patches the next call of Server.IsDedicatedServer() call after
+            // a StartCoroutine was called to just pushing true on the stack,
+            // which makes the Cheat Detection stuff being skipped also on the client
+            int state = 0;
+
+            foreach (var code in codes)
+            {
+                if (code.opcode == OpCodes.Call) {
+		       Debug.LogFormat("XXXXX {0}", ((MethodInfo)code.operand).Name);
+		}
+                if (code.opcode == OpCodes.Call && ((MethodInfo)code.operand).Name == "GetExecutingAssembly") {
+                    var foo = AccessTools.Method(typeof(XXX), "GetOverloadAssembly");
+                    yield return new CodeInstruction(OpCodes.Call,foo);
+                  Debug.Log("XXXX ASSSS");
+                    continue;
+                }
+                if (code.opcode == OpCodes.Call && ((MethodInfo)code.operand).Name == "GetLatestVersionNumber") {
+                    var foo = AccessTools.Method(typeof(XXX), "FooCoroutine");
+                    yield return new CodeInstruction(OpCodes.Pop);
+                    yield return new CodeInstruction(OpCodes.Call,foo);
+                    continue;
+                }
+                if (state == 0 && code.opcode == OpCodes.Call && ((MethodInfo)code.operand).Name == "StartCoroutine") {
+                    state =1;
+                } else if (state == 1 && code.opcode == OpCodes.Call && ((MethodInfo)code.operand).Name == "IsDedicatedServer") {
+                  yield return new CodeInstruction(OpCodes.Ldc_I4_1); // push true on the stack instead
+                  Debug.Log("XXXX bypass injection detection");
+                  state = 2;
+                  continue;
+                }
+
+                yield return code;
+            }
+        }
+
         private static void Prefix()
         {
-            StreamWriter sw = File.CreateText("/tmp/prefix.txt");
-            sw.WriteLine("Prefix");
         }
         private static void Postfix()
         {
-            StreamWriter sw = File.CreateText("/tmp/postfix.txt");
-            sw.WriteLine("Postfix");
+		Debug.LogFormat("XXX {0}",GameManager.Version);
         }
     }
-
+}
+   /* */
+/*
     [HarmonyPatch(typeof(GameManager), "GetLatestVersionNumber")]
     class XXY
     {
@@ -116,5 +172,5 @@ namespace GameMod.VersionHandling
         {
                 UnityEngine.Debug.Log("XXXXXXXXXXXXXX DONE");
         }
-    }
-}
+    }*/
+

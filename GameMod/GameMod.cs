@@ -34,6 +34,7 @@ namespace GameMod.Core {
             //Config.Init();
             //MPInternet.CheckInternetServer();
             Harmony.DEBUG = FindArg("-harmonydebug");
+            Harmony.DEBUG = true;
             var harmony = new Harmony("olmod.olmod");
             try
             {
