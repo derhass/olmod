@@ -1,6 +1,7 @@
 ﻿using HarmonyLib;
 using Overload;
 using System;
+using System.IO;
 using System.Collections.Generic;
 using System.Reflection.Emit;
 using UnityEngine;
@@ -88,20 +89,20 @@ namespace GameMod.VersionHandling
         }
     }
 */
-    [HarmonyPatch(typeof(GameManager), "FixCurrentDateFormat")]
+
+    [HarmonyPatch(typeof(GameManager), "Awake")]
     class XXX
     {
+        private static void Prefix()
+        {
+            StreamWriter sw = File.CreateText("/tmp/prefix.txt");
+            sw.WriteLine("Prefix");
+        }
         private static void Postfix()
         {
+            StreamWriter sw = File.CreateText("/tmp/postfix.txt");
+            sw.WriteLine("Postfix");
         }
-            /*
-        static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> codes) {
-            foreach (var code in codes)
-            {
-                yield return code;
-            }
-        }
-        */
     }
 
     [HarmonyPatch(typeof(GameManager), "GetLatestVersionNumber")]
