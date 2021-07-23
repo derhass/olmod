@@ -11,7 +11,15 @@ using UnityEngine;
  *       I plan to add further patches later.
  */
 namespace GameMod {
-    [HarmonyPatch(typeof(GameManager), "Awake")]
+    // Originally, this was meant as a Postfix to GameManager.Awake
+    // However, patching that method has the weird side effect that
+    // the co-routines started by that method won't get executed any more.
+    // This needs further investiagtion
+    //
+    // As a work-around, we use GameManager.FixCurrentDateFormat,
+    // which is called only by GameManer.Awake, and right at the end
+    // of that function, so this is as good as the orignal Postfix...
+    [HarmonyPatch(typeof(GameManager), "FixCurrentDateFormat")]
     class ServerCleanup_GamaManager_Awake {
         static void Postifx() {
             if (GameplayManager.IsDedicatedServer()) {
