@@ -88,7 +88,7 @@ namespace GameMod.VersionHandling
         }
     }
 */
-    [HarmonyPatch(typeof(GameManager), "Awake")]
+    [HarmonyPatch(typeof(GameManager), "FixCurrentDateFormat")]
     class XXX
     {
         private static void Postfix()

@@ -31,8 +31,8 @@ namespace GameMod.Core {
             GameVersion = typeof(GameManager).Assembly.GetName().Version;
             Debug.Log("Initializing " + OlmodVersion.FullVersionString + ", game " + GameVersion);
             Debug.Log("Command line " + String.Join(" ", Environment.GetCommandLineArgs()));
-            Config.Init();
-            MPInternet.CheckInternetServer();
+            //Config.Init();
+            //MPInternet.CheckInternetServer();
             Harmony.DEBUG = FindArg("-harmonydebug");
             var harmony = new Harmony("olmod.olmod");
             try
@@ -45,6 +45,7 @@ namespace GameMod.Core {
             }
             Debug.Log("Done initializing " + OlmodVersion.FullVersionString);
 
+	    /*
             if (Modded && Config.OLModDir != null && Config.OLModDir != "")
             {
                 Modded = false; // Modded mode was on, we turn it off here because we don't want to have it on if there aren't actually any mods.
@@ -73,6 +74,7 @@ namespace GameMod.Core {
                     Debug.Log(ex);
                 }
             }
+	    */
 
             if (Modded)
             {
