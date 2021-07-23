@@ -91,8 +91,30 @@ namespace GameMod.VersionHandling
     [HarmonyPatch(typeof(GameManager), "Awake")]
     class XXX
     {
+        private static void Postfix(GameManager __instance)
+        {
+                __instance.StartCoroutine(GetLatestVersionNumber);
+        }
+            /*
+        static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> codes) {
+            foreach (var code in codes)
+            {
+                yield return code;
+            }
+        }
+        */
+    }
+
+    [HarmonyPatch(typeof(GameManager), "GetLatestVersionNumber")]
+    class XXY
+    {
+        private static void Prefix()
+        {
+                UnityEngine.Debug.Log("XXXXXXXXXXXXXX STARTED");
+        }
         private static void Postfix()
         {
+                UnityEngine.Debug.Log("XXXXXXXXXXXXXX DONE");
         }
     }
 }
