@@ -11,7 +11,7 @@ namespace GameMod
 {
     /// <summary>
     ///  Goal:    allowing to access the same max speed and the same speed gain that max turn ramping on high provides
-    ///           
+    ///           EDIT: stuff is fucked, lets also make it linear, then 
     ///           
     ///  Author:  luponix 
     ///  Created: 2021-07-22
@@ -24,6 +24,7 @@ namespace GameMod
         public static bool server_support = true;               // indicates wether the current server supports the changed behaviour, has to be true outside of games to make the ui option accessible
 
 
+
         [HarmonyPatch(typeof(PlayerShip), "FixedUpdateProcessControlsInternal")]
         internal class JoystickRotationFix_FixedUpdateProcessControlsInternal
         {
@@ -34,11 +35,12 @@ namespace GameMod
                 _inst = __instance;
             }
 
-
-            // only send the flag if the server supports it
-
             static IEnumerable<CodeInstruction> Transpiler(ILGenerator ilGen, IEnumerable<CodeInstruction> instructions)
             {
+                var playerShip_c_player_Field = AccessTools.Field(typeof(PlayerShip), "c_player");
+                var player_cc_turn_vec_Field = AccessTools.Field(typeof(Player), "cc_turn_vec");
+
+                var joystickRotationFix_MaybeResetVector_Method = AccessTools.Method(typeof(JoystickRotationFix_FixedUpdateProcessControlsInternal), "MaybeResetVector");
                 var joystickRotationFix_MaybeScaleUpRotation_Method = AccessTools.Method(typeof(JoystickRotationFix_FixedUpdateProcessControlsInternal), "MaybeScaleUpRotation");
 
                 var codes = new List<CodeInstruction>(instructions);
@@ -50,14 +52,29 @@ namespace GameMod
                         state++;
                         if (state == 5)
                         {
-                            var newCodes = new[] {
+                            var resetNum20 = new[] {
+                                new CodeInstruction(OpCodes.Ldarg_0),
+                                new CodeInstruction(OpCodes.Ldfld, playerShip_c_player_Field),
+                                new CodeInstruction(OpCodes.Ldflda, player_cc_turn_vec_Field),
+                                new CodeInstruction(OpCodes.Ldfld, AccessTools.Field(typeof(UnityEngine.Vector3), "y")),
+                                new CodeInstruction(OpCodes.Call, joystickRotationFix_MaybeResetVector_Method)
+                            };
+                            var resetNum21 = new[] {
+                                new CodeInstruction(OpCodes.Ldarg_0),
+                                new CodeInstruction(OpCodes.Ldfld, playerShip_c_player_Field),
+                                new CodeInstruction(OpCodes.Ldflda, player_cc_turn_vec_Field),
+                                new CodeInstruction(OpCodes.Ldfld, AccessTools.Field(typeof(UnityEngine.Vector3), "x")),
+                                new CodeInstruction(OpCodes.Call, joystickRotationFix_MaybeResetVector_Method)
+                            };
+                            var adjustScaling = new[] {
                                 new CodeInstruction(OpCodes.Ldarg_0),
                                 new CodeInstruction(OpCodes.Call, joystickRotationFix_MaybeScaleUpRotation_Method),
                                 new CodeInstruction(OpCodes.Mul, null)
                             };
-                            codes.InsertRange(i + 22, newCodes);
-                            codes.InsertRange(i + 12, newCodes);
-
+                            codes.InsertRange(i + 22, adjustScaling);
+                            codes.InsertRange(i + 14, resetNum21);
+                            codes.InsertRange(i + 12, adjustScaling);
+                            codes.InsertRange(i + 4, resetNum20);
                             return codes;
                         }
                     }
@@ -66,11 +83,16 @@ namespace GameMod
 
             }
 
+            public static float MaybeResetVector(float original, float changed)
+            {
+                return MaybeChangeRotation() ? changed : original;
+            }
+
             public static float MaybeScaleUpRotation(PlayerShip ps)
             {
-                if (MaybeChangeRampingBehaviour(ps)) return 2.5f;
-                else return 1f;
+                return MaybeChangeRotation() ? PlayerShip.m_ramp_max[_inst.c_player.m_player_control_options.opt_joy_ramp] : 1f;
             }
+
 
 
             public static float ProbeFloat(float original)
@@ -79,7 +101,8 @@ namespace GameMod
                 return original;
             }
 
-            public static bool MaybeChangeRampingBehaviour(PlayerShip ps)
+
+            public static bool MaybeChangeRotation()
             {
                 // (Server) if this is the server lookup the current players setting with _inst
                 if (GameplayManager.IsDedicatedServer())
@@ -95,7 +118,7 @@ namespace GameMod
                             int val = 0;
                             client_settings.TryGetValue(ni.netId.Value, out val);
                             //Debug.Log("\n[Server] Found a key for " + ni.netId.Value + " " + _inst.c_player.m_mp_name+" returning " + (val == 1 ? "LINEAR" : "DEFAULT"));
-                            return val == 1 && ps.c_player.m_player_control_options.opt_joy_ramp == 0;
+                            return val == 1; //&& _inst.c_player.m_player_control_options.opt_joy_ramp == 0;
                         }
                             //else
                             //{
@@ -110,7 +133,8 @@ namespace GameMod
 
                 }
                 // (Client)
-                return alt_turn_ramp_mode && server_support && GameManager.m_local_player.m_player_control_options.opt_joy_ramp == 0;
+                //uConsole.Log((alt_turn_ramp_mode && server_support && GameManager.m_local_player.m_player_control_options.opt_joy_ramp == 0).ToString());
+                return alt_turn_ramp_mode && server_support; //&& GameManager.m_local_player.m_player_control_options.opt_joy_ramp == 0;
             }
         }
 
@@ -121,8 +145,6 @@ namespace GameMod
         {
             private static void OnSetJoystickRampMode(NetworkMessage rawMsg)
             {
-                //Debug.Log("\n\n\n[Server] Received a client flag");
-
                 var msg = rawMsg.ReadMessage<ScaleRotationFlagMessage>();
                 //Debug.Log("client NETID: "+msg.netId+" sent over NETID: "+rawMsg.conn.connectionId);
                 if (client_settings == null)
@@ -226,8 +248,8 @@ namespace GameMod
                 }
                 position.y += 62f;
                 uie.SelectAndDrawStringOptionItem(Loc.LS("sth"), position, 0, GetTurnRampMode(),
-                    Loc.LS("sth sth not usable along with turn ramping sth"), 1.5f,
-                    !server_support || GameManager.m_local_player.m_player_control_options.opt_joy_ramp != 0); // grey out this option if the current server doesnt support this setting
+                    Loc.LS(""), 1.5f,
+                    !server_support); // grey out this option if the current server doesnt support this setting
             }
 
             static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
