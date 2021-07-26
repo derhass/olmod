@@ -134,8 +134,7 @@ namespace GameMod
                 // (Server) if this is the server lookup the current players setting with _inst
                 if (GameplayManager.IsDedicatedServer())
                 {
-                    return true;
-                    /*
+
                     if (client_settings == null)
                     {
                         Debug.Log("client settings was empty in the maybechangerotation method");
@@ -148,7 +147,7 @@ namespace GameMod
                         {
                             int val = 0;
                             client_settings.TryGetValue(_inst.netId.Value, out val);
-                            Debug.Log("\n[Server] Found a key for " + _inst.netId.Value + " " + _inst.c_player.m_mp_name + " returning " + (val == 1 ? "LINEAR" : "DEFAULT"));
+                            //Debug.Log("\n[Server] Found a key for " + _inst.netId.Value + " " + _inst.c_player.m_mp_name + " returning " + (val == 1 ? "LINEAR" : "DEFAULT"));
                             return val == 1; //&& _inst.c_player.m_player_control_options.opt_joy_ramp == 0;
                         }
                         else
@@ -160,7 +159,7 @@ namespace GameMod
                     {
                         Debug.Log("Error in MaybeChangeRampingBehaviour: " + ex);
                     }
-                    return false;*/
+                    return false;
 
                 }
                 // (Client)
@@ -177,7 +176,7 @@ namespace GameMod
             private static void OnSetJoystickRampMode(NetworkMessage rawMsg)
             {
                 var msg = rawMsg.ReadMessage<ScaleRotationFlagMessage>();
-                //Debug.Log("client NETID: "+msg.netId+" sent over NETID: "+rawMsg.conn.connectionId);
+                Debug.Log("client NETID: "+msg.netId+" sent over NETID: "+rawMsg.conn.connectionId);
                 if (client_settings == null)
                 {
                     client_settings = new Dictionary<uint, int>();
@@ -190,12 +189,12 @@ namespace GameMod
                     Debug.Log("  Key:" + entry.Key + "  Value:" + entry.Value);
                 }
 
-                if (client_settings.ContainsKey((uint)rawMsg.conn.connectionId))
+                if (client_settings.ContainsKey(msg.netId))
                 {
-                    client_settings.Remove((uint)rawMsg.conn.connectionId);
+                    client_settings.Remove(msg.netId);
                     //Debug.Log("[Server] recognized an existing entry and deleted it");
                 }
-                client_settings.Add((uint)rawMsg.conn.connectionId, msg.mode);
+                client_settings.Add(msg.netId, msg.mode);
 
                 Debug.Log("[Server] printing Dictionary:");
                 foreach (KeyValuePair<uint, int> entry in client_settings)
@@ -224,7 +223,7 @@ namespace GameMod
                     return;
                 }
                 server_support = false;
-                Client.GetClient().Send(MessageTypes.MsgSetJoystickScaleRotation, new ScaleRotationFlagMessage { mode = alt_turn_ramp_mode ? 1 : 0 });
+                Client.GetClient().Send(MessageTypes.MsgSetJoystickScaleRotation, new ScaleRotationFlagMessage { mode = alt_turn_ramp_mode ? 1 : 0, netId = GameManager.m_local_player.netId.Value });
             }
         }
 
@@ -241,16 +240,21 @@ namespace GameMod
             }
         }
 
+       
+
         public class ScaleRotationFlagMessage : MessageBase
         {
             public int mode;
+            public uint netId;
             public override void Serialize(NetworkWriter writer)
             {
                 writer.Write(mode);
+                writer.Write(netId);
             }
             public override void Deserialize(NetworkReader reader)
             {
                 mode = reader.ReadInt32();
+                netId = reader.ReadUInt32();
             }
         }
 
@@ -320,7 +324,7 @@ namespace GameMod
                         return;
                     }
                     Debug.Log("Just sent the updated flag to the server: current: " + (alt_turn_ramp_mode ? "LINEAR" : "DEFAULT"));
-                    Client.GetClient().Send(MessageTypes.MsgSetJoystickScaleRotation, new ScaleRotationFlagMessage { mode = alt_turn_ramp_mode ? 1 : 0 });
+                    Client.GetClient().Send(MessageTypes.MsgSetJoystickScaleRotation, new ScaleRotationFlagMessage { mode = alt_turn_ramp_mode ? 1 : 0, netId = GameManager.m_local_player.netId.Value });
                 }
             }
 

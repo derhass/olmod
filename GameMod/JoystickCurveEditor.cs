@@ -55,11 +55,11 @@ namespace GameMod
                     }
                     pos.y += 38f;
                     __instance.DrawStringSmall("Turnrate        :", pos, 0.45f, StringOffset.LEFT, UIManager.m_col_ui1, 1f, -1f);
-                     pos.x += 260f;
+                     pos.x += 40f;
                     __instance.DrawStringSmall( GameManager.m_local_player.c_player_ship.c_rigidbody.angularVelocity.magnitude.ToString("n3"), pos, 0.45f, StringOffset.LEFT, UIManager.m_col_ui1, 1f, -1f);
                     pos.x -= 260f;
                     pos.y += 38f;
-                    __instance.DrawStringSmall("Error (ROT)     : " + ((1f - GameManager.m_local_player.m_error_rot.w) * 1000).ToString("n4"), pos, 0.45f, StringOffset.LEFT, UIManager.m_col_ui1, 1f, -1f);
+                    __instance.DrawStringSmall("Error (ROT)      : " + ((1f - GameManager.m_local_player.m_error_rot.w) * 1000).ToString("n4"), pos, 0.45f, StringOffset.LEFT, UIManager.m_col_ui1, 1f, -1f);
 
                 }
             }
