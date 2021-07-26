@@ -24,6 +24,33 @@ namespace GameMod
         public static bool server_support = true;               // indicates wether the current server supports the changed behaviour, has to be true outside of games to make the ui option accessible
 
 
+        // Debug
+        [HarmonyPatch(typeof(Player), "CmdSendFullChat")]
+        internal class JoystickRotationFix_CmdSendFullChat
+        {
+            static bool Prefix(int sender_connection_id, string sender_name, MpTeam sender_team, string msg)
+            {
+                if(msg.ToString().ToUpper().StartsWith("SHOW_JFS"))
+                {
+                    string msg3 = "empty settings";
+                    if (client_settings != null)
+                    {
+                        msg3 = "";
+                        foreach (KeyValuePair<uint, int> entry in client_settings)
+                        {
+                            msg3 +="  Key:" + entry.Key + "  Value:" + entry.Value;
+                        }
+                    }
+                    LobbyChatMessage msg2 = new LobbyChatMessage(sender_connection_id, "SERVER", MpTeam.ANARCHY, msg3, false);
+                    NetworkServer.SendToAll(75, msg2);
+                    return false;
+                }
+
+                return true;
+            }
+        }
+
+
 
         [HarmonyPatch(typeof(PlayerShip), "FixedUpdateProcessControlsInternal")]
         internal class JoystickRotationFix_FixedUpdateProcessControlsInternal
@@ -67,7 +94,7 @@ namespace GameMod
                                 new CodeInstruction(OpCodes.Call, joystickRotationFix_MaybeResetVector_Method)
                             };
                             var adjustScaling = new[] {
-                                new CodeInstruction(OpCodes.Ldarg_0),
+                                //new CodeInstruction(OpCodes.Ldarg_0),
                                 new CodeInstruction(OpCodes.Call, joystickRotationFix_MaybeScaleUpRotation_Method),
                                 new CodeInstruction(OpCodes.Mul, null)
                             };
@@ -88,7 +115,7 @@ namespace GameMod
                 return MaybeChangeRotation() ? changed : original;
             }
 
-            public static float MaybeScaleUpRotation(PlayerShip ps)
+            public static float MaybeScaleUpRotation()
             {
                 return MaybeChangeRotation() ? PlayerShip.m_ramp_max[_inst.c_player.m_player_control_options.opt_joy_ramp] : 1f;
             }
@@ -107,29 +134,33 @@ namespace GameMod
                 // (Server) if this is the server lookup the current players setting with _inst
                 if (GameplayManager.IsDedicatedServer())
                 {
-                    //return true;
-
-                    if (client_settings == null) client_settings = new Dictionary<uint, int>();
+                    return true;
+                    /*
+                    if (client_settings == null)
+                    {
+                        Debug.Log("client settings was empty in the maybechangerotation method");
+                        client_settings = new Dictionary<uint, int>();
+                    }
                     try
                     {
-                        NetworkIdentity ni = _inst.c_player.GetComponent<NetworkIdentity>();
-                        if (client_settings.ContainsKey(ni.netId.Value))//_inst.c_player.netId.Value))
+                        //NetworkIdentity ni = _inst.c_player.GetComponent<NetworkIdentity>();
+                        if (client_settings.ContainsKey(_inst.netId.Value))//_inst.c_player.netId.Value))
                         {
                             int val = 0;
-                            client_settings.TryGetValue(ni.netId.Value, out val);
-                            //Debug.Log("\n[Server] Found a key for " + ni.netId.Value + " " + _inst.c_player.m_mp_name+" returning " + (val == 1 ? "LINEAR" : "DEFAULT"));
+                            client_settings.TryGetValue(_inst.netId.Value, out val);
+                            Debug.Log("\n[Server] Found a key for " + _inst.netId.Value + " " + _inst.c_player.m_mp_name + " returning " + (val == 1 ? "LINEAR" : "DEFAULT"));
                             return val == 1; //&& _inst.c_player.m_player_control_options.opt_joy_ramp == 0;
                         }
-                            //else
-                            //{
-                            //Debug.Log("\n[Server] Couldnt find a key for "+ ni.netId.Value + " " + _inst.c_player.m_mp_name + " returning DEFAULT");
-                            //}
+                        else
+                        {
+                            Debug.Log("\n[Server] Couldnt find a key for " + _inst.netId.Value + " " + _inst.c_player.m_mp_name + " returning DEFAULT");
+                        }
                     }
                     catch (Exception ex)
                     {
                         Debug.Log("Error in MaybeChangeRampingBehaviour: " + ex);
                     }
-                    return false;
+                    return false;*/
 
                 }
                 // (Client)
@@ -150,14 +181,14 @@ namespace GameMod
                 if (client_settings == null)
                 {
                     client_settings = new Dictionary<uint, int>();
-                    //Debug.Log("[Server] client settings was empty, reset the dictionary");
+                    Debug.Log("[Server] client settings was empty, reset the dictionary");
                 }
-                /*
+
                 Debug.Log("[Server] printing Dictionary:");
                 foreach (KeyValuePair<uint, int> entry in client_settings)
                 {
                     Debug.Log("  Key:" + entry.Key + "  Value:" + entry.Value);
-                }*/
+                }
 
                 if (client_settings.ContainsKey((uint)rawMsg.conn.connectionId))
                 {
@@ -166,12 +197,12 @@ namespace GameMod
                 }
                 client_settings.Add((uint)rawMsg.conn.connectionId, msg.mode);
 
-                /*Debug.Log("[Server] printing Dictionary:");
+                Debug.Log("[Server] printing Dictionary:");
                 foreach (KeyValuePair<uint, int> entry in client_settings)
                 {
                     //Debug.Log(entry.ToString());
                     Debug.Log("  Key:" + entry.Key + "  Value:" + entry.Value);
-                }*/
+                }
 
             }
 
