@@ -15,6 +15,7 @@ namespace GameMod {
 
         private static int hackIsEnabled = 1;
         private static int hackError = 0;
+        private static Vector3 hackMove = Vector3.zero;
 
         private static void dump_transform(int level, Transform t)
         {
@@ -54,6 +55,18 @@ namespace GameMod {
                 }
                 UnityEngine.Debug.LogFormat("hack_error is now {0}", hackError);
         }
+        private static void hack_move_command() {
+                int n = uConsole.GetNumParameters();
+                Vector3 v = Vector3.zero;
+                if (n > 0) {
+                    v.x = uConsole.GetFloat();
+                } else {
+                    v.x = 1.0f;
+                }
+                UnityEngine.Debug.LogFormat("hack_move {0}", v.x);
+                hackMove = v;
+                //GameManager.m_local_player.transform.position += v;
+        }
 
         // start the manual interpolation phase
         // this disables Unity's automatic interpolation for the rigid body of the player ship
@@ -65,6 +78,7 @@ namespace GameMod {
                 GameManager.m_local_player.c_player_ship.c_rigidbody.interpolation = RigidbodyInterpolation.None;
                 currPosition = targetTransformNode.position;
                 currRotation = targetTransformNode.rotation;
+                UnityEngine.Debug.LogFormat("Manual Interpolation on node: {0}", targetTransformNode.name);
             }
         }
 
@@ -76,6 +90,7 @@ namespace GameMod {
             targetTransformNode = null;
             targetTransformOverridden = false;
             GameManager.m_local_player.c_player_ship.c_rigidbody.interpolation = RigidbodyInterpolation.Interpolate;
+            UnityEngine.Debug.LogFormat("Manual Interpolation disabled");
         }
 
         // override the transformation of the target node
@@ -128,17 +143,44 @@ namespace GameMod {
             }
         }
         */
+
+        [HarmonyPatch(typeof(Player), "UpdateSmoothingError")]
+        class MPErrorSmoothingFix_ErrUpdate {
+            static bool Prefix(Player __instance) {
+                if (hackError == 4) {
+                   // RemoveSmoothingError() before has already moved the ship to the
+                   // _corrected_ state. By resetting the error to zero here, the
+                   // AddSmoothingError() following us will not move the ship back to
+                   // the state with error again, so we do an instantaneous error
+                   // correction instead of smoothing out the error over several frames...
+                    __instance.m_error_pos = Vector3.zero;
+                    __instance.m_error_rot= Quaternion.identity;
+                   return false;
+
+                }
+                return true;
+            }
+        }
+
         [HarmonyPatch(typeof(Player), "AddSmoothingError")]
         class MPErrorSmoothingFix_ErrAdd {
             static bool Prefix(Player __instance) {
                 if (hackError == 1) {
                     return false;
-                }
-                if (hackError == 2) {
+                } else if (hackError == 2) {
                     __instance.c_player_ship.c_rigidbody.MovePosition(__instance.transform.position + __instance.m_error_pos);
                     __instance.c_player_ship.c_rigidbody.MoveRotation(__instance.m_error_rot * __instance.transform.rotation);
                     return false;
 
+                } else if (hackError == 3) {
+                    if (__instance.m_error_pos != Vector3.zero) {
+                        GameManager.m_player_ship.c_rigidbody.AddForce(__instance.m_error_pos);
+
+                    }
+                    if (__instance.m_error_rot != Quaternion.identity) {
+                        __instance.transform.rotation = __instance.m_error_rot * __instance.transform.rotation;
+                    }
+                    return false;
                 }
                 return true;
             }
@@ -146,7 +188,8 @@ namespace GameMod {
 
         [HarmonyPatch(typeof(Player), "RemoveSmoothingError")]
         class MPErrorSmoothingFix_ErrRemove {
-            static bool Prefix() {
+            static bool Prefix(Player __instance) {
+			    MPPlayerStateDump.buf.AddTransformDump(__instance.m_error_pos,__instance.m_error_rot,0,8,-1);
                 if (hackError == 1) {
                     return false;
                 }
@@ -160,6 +203,7 @@ namespace GameMod {
             static void Postfix() {
                 uConsole.RegisterCommand("hack_smooth", hack_smooth_command);
                 uConsole.RegisterCommand("hack_error", hack_error_command);
+                uConsole.RegisterCommand("hack_move", hack_move_command);
             }
         }
 
@@ -170,6 +214,10 @@ namespace GameMod {
                 if (!Server.IsActive() && GameplayManager.IsMultiplayerActive && NetworkMatch.InGameplay() && !GameManager.m_local_player.c_player_ship.m_dying) {
                     // undo potential override also before FixedUpdate
                     undoTransformOverride();
+                }
+                if (hackMove != Vector3.zero) {
+                    GameManager.m_local_player.transform.position +=hackMove;
+                    hackMove = Vector3.zero;
                 }
             }
 
