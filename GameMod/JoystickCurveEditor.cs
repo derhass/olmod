@@ -17,9 +17,10 @@ namespace GameMod
     /// </summary>
     class JoystickCurveEditor
     {
-        /*
+
         internal class DebugOutput
         {
+            public static bool show = false;
             public static InputAdjustment[] axes = new InputAdjustment[100];
 
             public class InputAdjustment
@@ -35,34 +36,40 @@ namespace GameMod
             {
                 static void Postfix(UIElement __instance)
                 {
-
-                    Vector2 pos = new Vector2(-625f, -300f);
-                    for (int i = 0; i < axes.Length; i++)
+                    if (show)
                     {
-                        if (axes[i] != null)
+                        Vector2 pos = new Vector2(-625f, -300f);
+                        for (int i = 0; i < axes.Length; i++)
                         {
-                            __instance.DrawStringSmall(Controls.m_controllers[axes[i].controller_num].name + ":" + axes[i].control_num, pos, 0.32f, StringOffset.LEFT, UIManager.m_col_ui1, 1f, -1f);
-                            pos.x += 260f;
-                            __instance.DrawStringSmall(axes[i].last_original_input.ToString("n3"), pos, 0.45f, StringOffset.LEFT, UIManager.m_col_ui1, 1f, -1f);
-                            pos.x += 65f;
-                            __instance.DrawStringSmall(axes[i].last_adjusted_input.ToString("n3"), pos, 0.45f, StringOffset.LEFT, UIManager.m_col_ui1, 1f, -1f);
-                            pos.y += 18f;
-                            pos.x -= 260f;
-                            pos.x -= 65f;
-                            axes[i].last_original_input = 0;
-                            axes[i].last_adjusted_input = 0;
+                            if (axes[i] != null)
+                            {
+                                __instance.DrawStringSmall(Controls.m_controllers[axes[i].controller_num].name + ":" + axes[i].control_num, pos, 0.32f, StringOffset.LEFT, UIManager.m_col_ui1, 1f, -1f);
+                                pos.x += 260f;
+                                __instance.DrawStringSmall(axes[i].last_original_input.ToString("n3"), pos, 0.45f, StringOffset.LEFT, UIManager.m_col_ui1, 1f, -1f);
+                                pos.x += 65f;
+                                __instance.DrawStringSmall(axes[i].last_adjusted_input.ToString("n3"), pos, 0.45f, StringOffset.LEFT, UIManager.m_col_ui1, 1f, -1f);
+                                pos.y += 18f;
+                                pos.x -= 260f;
+                                pos.x -= 65f;
+                                axes[i].last_original_input = 0;
+                                axes[i].last_adjusted_input = 0;
+                            }
                         }
+                        pos.y += 38f;
+                        __instance.DrawStringSmall("Turnrate        :", pos, 0.45f, StringOffset.LEFT, UIManager.m_col_ui1, 1f, -1f);
+                        pos.x += 260f;
+                        __instance.DrawStringSmall(GameManager.m_local_player.c_player_ship.c_rigidbody.angularVelocity.magnitude.ToString("n3"), pos, 0.45f, StringOffset.LEFT, UIManager.m_col_ui1, 1f, -1f);
+                        pos.x -= 260f;
+                        pos.y += 38f;
+                        __instance.DrawStringSmall("Error (ROT)     : " + ((1f - GameManager.m_local_player.m_error_rot.w) * 1000).ToString("n4"), pos, 0.45f, StringOffset.LEFT, UIManager.m_col_ui1, 1f, -1f);
+
                     }
-                    pos.y += 38f;
-                    __instance.DrawStringSmall("Turnrate        :", pos, 0.45f, StringOffset.LEFT, UIManager.m_col_ui1, 1f, -1f);
-                    pos.x += 260f;
-                    __instance.DrawStringSmall( GameManager.m_local_player.c_player_ship.c_rigidbody.angularVelocity.magnitude.ToString("n3"), pos, 0.45f, StringOffset.LEFT, UIManager.m_col_ui1, 1f, -1f);
                 }
             }
         }
-        */
 
-        
+
+
 
         // Adds an "EDIT CURVE" Button under "Options/Control Options/Joystick/Axis" 
         [HarmonyPatch(typeof(UIElement), "DrawControlsMenu")]
@@ -172,17 +179,17 @@ namespace GameMod
                                 Controller controller2 = Controls.m_controllers[MenuManager.m_calibration_current_controller];
                                 switch (UIManager.m_menu_selection)
                                 {
-                                   case 233:     // set linear button
-                                       MenuManager.PlaySelectSound(1f);
-                                       if (MenuManager.m_calibration_current_controller < Controllers.controllers.Count && MenuManager.m_calibration_current_axis < Controllers.controllers[MenuManager.m_calibration_current_controller].axes.Count)
-                                       {
+                                    case 233:     // set linear button
+                                        MenuManager.PlaySelectSound(1f);
+                                        if (MenuManager.m_calibration_current_controller < Controllers.controllers.Count && MenuManager.m_calibration_current_axis < Controllers.controllers[MenuManager.m_calibration_current_controller].axes.Count)
+                                        {
                                             Vector2 start = ExtendedConfig.Section_JoystickCurve.controllers[MenuManager.m_calibration_current_controller].axes[MenuManager.m_calibration_current_axis].curve_points[0];
                                             Vector2 end = ExtendedConfig.Section_JoystickCurve.controllers[MenuManager.m_calibration_current_controller].axes[MenuManager.m_calibration_current_axis].curve_points[3];
                                             ExtendedConfig.Section_JoystickCurve.controllers[MenuManager.m_calibration_current_controller].axes[MenuManager.m_calibration_current_axis].curve_points[1] = new Vector2(0.25f, start.y + 0.25f * (end.y - start.y));
                                             ExtendedConfig.Section_JoystickCurve.controllers[MenuManager.m_calibration_current_controller].axes[MenuManager.m_calibration_current_axis].curve_points[2] = new Vector2(0.75f, start.y + 0.75f * (end.y - start.y));
                                         }
-                                         break;
-                                   case 234:     // reset curve button
+                                        break;
+                                    case 234:     // reset curve button
                                         MenuManager.PlaySelectSound(1f);
                                         if (MenuManager.m_calibration_current_controller < Controllers.controllers.Count && MenuManager.m_calibration_current_axis < Controllers.controllers[MenuManager.m_calibration_current_controller].axes.Count)
                                         {
@@ -191,18 +198,18 @@ namespace GameMod
                                             ExtendedConfig.Section_JoystickCurve.controllers[MenuManager.m_calibration_current_controller].axes[MenuManager.m_calibration_current_axis].curve_points[2] = new Vector2(0.75f, 0.75f);
                                             ExtendedConfig.Section_JoystickCurve.controllers[MenuManager.m_calibration_current_controller].axes[MenuManager.m_calibration_current_axis].curve_points[3] = new Vector2(1f, 1f);
                                         }
-                                         break;
+                                        break;
                                     case 235: // apply to all axis
                                         MenuManager.PlaySelectSound(1f);
                                         if (MenuManager.m_calibration_current_controller < Controllers.controllers.Count && MenuManager.m_calibration_current_axis < Controllers.controllers[MenuManager.m_calibration_current_controller].axes.Count)
                                         {
                                             ExtendedConfig.Section_JoystickCurve.controllers[MenuManager.m_calibration_current_controller].axes[MenuManager.m_calibration_current_axis].curve_lookup = ExtendedConfig.Section_JoystickCurve.GenerateCurveLookupTable(ExtendedConfig.Section_JoystickCurve.controllers[MenuManager.m_calibration_current_controller].axes[MenuManager.m_calibration_current_axis].curve_points);
-                                            for( int i = 0; i < Controllers.controllers[MenuManager.m_calibration_current_controller].axes.Count; i++)
+                                            for (int i = 0; i < Controllers.controllers[MenuManager.m_calibration_current_controller].axes.Count; i++)
                                             {
-                                                if( ExtendedConfig.Section_JoystickCurve.controllers[MenuManager.m_calibration_current_controller].axes.Count > i )
+                                                if (ExtendedConfig.Section_JoystickCurve.controllers[MenuManager.m_calibration_current_controller].axes.Count > i)
                                                 {
-                                                    ExtendedConfig.Section_JoystickCurve.controllers[MenuManager.m_calibration_current_controller].axes[i].curve_points =  ExtendedConfig.Section_JoystickCurve.controllers[MenuManager.m_calibration_current_controller].axes[MenuManager.m_calibration_current_axis].CloneCurvePoints();
-                                                    ExtendedConfig.Section_JoystickCurve.controllers[MenuManager.m_calibration_current_controller].axes[i].curve_lookup =  ExtendedConfig.Section_JoystickCurve.GenerateCurveLookupTable(ExtendedConfig.Section_JoystickCurve.controllers[MenuManager.m_calibration_current_controller].axes[MenuManager.m_calibration_current_axis].curve_points);
+                                                    ExtendedConfig.Section_JoystickCurve.controllers[MenuManager.m_calibration_current_controller].axes[i].curve_points = ExtendedConfig.Section_JoystickCurve.controllers[MenuManager.m_calibration_current_controller].axes[MenuManager.m_calibration_current_axis].CloneCurvePoints();
+                                                    ExtendedConfig.Section_JoystickCurve.controllers[MenuManager.m_calibration_current_controller].axes[i].curve_lookup = ExtendedConfig.Section_JoystickCurve.GenerateCurveLookupTable(ExtendedConfig.Section_JoystickCurve.controllers[MenuManager.m_calibration_current_controller].axes[MenuManager.m_calibration_current_axis].curve_points);
                                                 }
                                                 else
                                                 {
@@ -510,7 +517,7 @@ namespace GameMod
         }
 
 
-        
+
 
 
 
@@ -520,7 +527,7 @@ namespace GameMod
         {
             static bool Prefix(ref float __result, Controller __instance, int controller_num, int control_num)
             {
-                if( string.IsNullOrEmpty(PilotManager.ActivePilot) )
+                if (string.IsNullOrEmpty(PilotManager.ActivePilot))
                 {
                     return true;
                 }
@@ -547,7 +554,8 @@ namespace GameMod
                         }
                         else if (i == 200)
                         {
-                            result = a.curve_lookup[199] + ((axis_value - 0.995f) / 0.005f * (1f - a.curve_lookup[199]));
+                            result = Mathf.Clamp(a.curve_lookup[199] + ((axis_value - 0.995f) / 0.005f * (a.curve_lookup[199] - a.curve_lookup[198])), 0f, 1f);
+                            //result = a.curve_lookup[199] + ((axis_value - 0.995f) / 0.005f * (1f - a.curve_lookup[199]));
                         }
                         else
                         {
@@ -555,9 +563,9 @@ namespace GameMod
                         }
                     }
                 }
-                catch( Exception ex )
+                catch (Exception ex)
                 {
-                    Debug.Log(" JoystickCurveEditor_OverloadController_GetAxis: Incorrect Device information: "+ex);
+                    Debug.Log(" JoystickCurveEditor_OverloadController_GetAxis: Incorrect Device information: " + ex);
                     ExtendedConfig.Section_JoystickCurve.SetDefault();
                     return true;
                 }
@@ -584,7 +592,7 @@ namespace GameMod
                 }
                 __result = result * (neg ? -1f : 1f);
 
-                /*
+
                 if (control_num < 100 && control_num > -1)
                 {
                     DebugOutput.axes[control_num] = new DebugOutput.InputAdjustment
@@ -594,13 +602,13 @@ namespace GameMod
                         last_original_input = axis_value,
                         last_adjusted_input = result
                     };
-                }*/
-        
+                }
+
                 return false;
 
             }
         }
-        
+
 
     }
 }
