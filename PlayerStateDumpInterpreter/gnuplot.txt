@@ -1,0 +1,19 @@
+ plot 'res_o100_p4_sim100_original.csv' u 9:($15/$14) w lp, 'res_o101_p4_sim101_olmod-0.3.6-rc2_max0_scale0_ping0.csv' u 9:($15/$14) w lp, 'res_o103_p4_sim103_olmod-0.3.6-rc3_max0_scale0_ping0_lag34.csv' u 9:($15/$14) w lp, 'res_o1_p4_raw_buffers.csv' u 9:10 w lp
+
+plot 'res_o100_p1138_sim100_original.csv' u 9:2 w l lw 2 t 'vanilla', 'res_o102_p1138_sim102_olmod-0.3.6-rc2_max100_scale100_ping100.csv' u 9:2 w l lw 2 t '0.3.6 RC2 100ms', 'res_o104_p1138_sim104_olmod-0.3.6-rc3_max100_scale100_ping100_lag0.csv' u 9:2 w l lw 2 t '0.3.6 RC3 100ms', 'res_o103_p1138_sim103_olmod-0.3.6-rc3_max0_scale0_ping0_lag34.csv' u 9:2 w l lw 2 t '0.3.6 RC3 0m + 34ms lag', 'res_o3_p1138_captured_results.csv' u 9:2 w
+l lw 2, 'res_o1_p1138_raw_buffers.csv' u ($0/60+199.07):2 w l lw 2 t 'server estimate'
+
+
+plot 'res_o1_p1138_raw_buffers.csv' u ($0/60+199.1635-0.02):2 w l lw 2 t 'estimated ground truth on server', 'res_o101_p1138_sim101_olmod-0.3.6-rc3_max100_scale0_ping20_lag34.csv' u 9:2 w l lw 2 t 'ping 20ms: off +34ms lag', 'res_o102_p1138_sim102_olmod-0.3.6-rc3_max100_scale0_ping20_lag0.csv' u 9:2 w l lw 2 t 'off +0ms lag', 'res_o103_p1138_sim103_olmod-0.3.6-rc3_max100_scale33.3333_ping20_lag0.csv' u 9:2 w l lw 2 t 'weak', 'res_o104_p1138_sim104_olmod-0.3.6-rc3_max100_scale66.6667_ping20_lag0.csv' u 9:2 w l lw 2 t 'medium', 'res_o105_p1138_sim105_olmod-0.3.6-rc3_max100_scale100_ping20_lag0.csv' u 9:2 w l lw 2 t 'strong'
+
+
+ plot 'res_o1_p1138_raw_buffers.csv' u ($0/60+199.1635-0.04):2 w l lw 2 t 'estimated ground truth on server', 'res_o106_p1138_sim106_olmod-0.3.6-rc3_max100_scale0_ping40_lag34.csv' u 9:2 w l lw 2 t 'off +34ms lag', 'res_o107_p1138_sim107_olmod-0.3.6-rc3_max100_scale0_ping40_lag0.csv' u 9:2 w l lw 2 t 'off +0ms lag', 'res_o108_p1138_sim108_olmod-0.3.6-rc3_max100_scale33.3333_ping40_lag0.csv' u 9:2 w l lw 2 t 'weak', 'res_o109_p1138_sim109_olmod-0.3.6-rc3_max100_scale66.6667_ping40_lag0.csv' u 9:2 w l lw 2 t 'medium', 'res_o110_p1138_sim110_olmod-0.3.6-rc3_max100_scale100_ping40_lag0.csv' u 9:2 w l lw 2 t 'strong'
+
+***********************************
+
+PERF:
+
+plot 'res_o0_p0_perf_stats_aux0.csv' u 1:9 w l t 'updateDiff', 'res_o0_p0_perf_stats_aux0.csv' u 1:13 w l t 'updateLen', 'res_o0_p0_perf_stats_aux0.csv' u 1:10 w l lw 2 t 'updateTime', 'res_o1_p0_perf_stats_aux0.csv'
+u 1:9 w l t 'fixedDiff', 'res_o1_p0_perf_stats_aux0.csv' u 1:13 w l t 'fixedLen', 'res_o1_p0_perf_stats_aux0.csv' u 1:11 w l t 'fixedUpdateTime'
+
+

@@ -31,7 +31,7 @@ namespace GameMod.VersionHandling
 
                     // do not include revision unless explicitly set to non-zero in the assembly version
                     string maybeRevision = RunningVersion.Revision > 0 ? $".{RunningVersion.Revision}" : "";
-                    _fullVersionString = $"olmod {RunningVersion.ToString(3)}{maybeRevision}{(Modded ? " **MODDED**" : " " + "joystick.fix 7.30 6")}";
+                    _fullVersionString = $"olmod {RunningVersion.ToString(3)}{maybeRevision}{(Modded ? " **MODDED**" : " " + "joystick.fix 7.30 6 PERFDUMP")}";
                 }
                 return _fullVersionString;
             }
