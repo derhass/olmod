@@ -152,7 +152,7 @@ namespace GameMod
                 if (MPObserver.Enabled)
                     return;
 
-                if (hackIsEnabled && !Server.IsActive() && GameplayManager.IsMultiplayerActive && NetworkMatch.InGameplay() && !GameManager.m_local_player.c_player_ship.m_dying)
+                if ((hackIsEnabled>0) && !Server.IsActive() && GameplayManager.IsMultiplayerActive && NetworkMatch.InGameplay() && !GameManager.m_local_player.c_player_ship.m_dying)
                 {
                     if (!doManualInterpolation)
                     {
