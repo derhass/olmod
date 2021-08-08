@@ -31,8 +31,8 @@ namespace GameMod.Core {
             GameVersion = typeof(GameManager).Assembly.GetName().Version;
             Debug.Log("Initializing " + OlmodVersion.FullVersionString + ", game " + GameVersion);
             Debug.Log("Command line " + String.Join(" ", Environment.GetCommandLineArgs()));
-            Config.Init();
-            MPInternet.CheckInternetServer();
+            //Config.Init();
+            //MPInternet.CheckInternetServer();
             Harmony.DEBUG = FindArg("-harmonydebug");
             var harmony = new Harmony("olmod.olmod");
             try
@@ -45,6 +45,7 @@ namespace GameMod.Core {
             }
             Debug.Log("Done initializing " + OlmodVersion.FullVersionString);
 
+	    /*
             if (Modded && Config.OLModDir != null && Config.OLModDir != "")
             {
                 Modded = false; // Modded mode was on, we turn it off here because we don't want to have it on if there aren't actually any mods.
@@ -73,6 +74,7 @@ namespace GameMod.Core {
                     Debug.Log(ex);
                 }
             }
+	    */
 
             if (Modded)
             {
@@ -104,7 +106,8 @@ namespace GameMod.Core {
     }
 
     // add monsterball mb_arena1 level to multiplayer levels
-    [HarmonyPatch(typeof(GameManager), "ScanForLevels")]
+    
+    ///[HarmonyPatch(typeof(GameManager), "ScanForLevels")]
     class MBLevelPatch
     {
         public static bool SLInit = false;
@@ -125,7 +128,7 @@ namespace GameMod.Core {
         }
     }
 
-    [HarmonyPatch(typeof(LocalLANHost), "GetServerLocation")]
+    ////[HarmonyPatch(typeof(LocalLANHost), "GetServerLocation")]
     class ServerLocationPatch
     {
         private static bool Prefix(ref string __result)
@@ -136,7 +139,7 @@ namespace GameMod.Core {
     }
 
     // Remove annoying Tobii errors.
-    [HarmonyPatch(typeof(Debug), "LogError", new Type[] { typeof(object) })]
+    ////[HarmonyPatch(typeof(Debug), "LogError", new Type[] { typeof(object) })]
     class RemoveTobiiErrors
     {
         static bool Prefix(object message)
@@ -146,7 +149,7 @@ namespace GameMod.Core {
     }
 
     // Remove 10 FPS floor for the game time in multiplayer matches.
-    [HarmonyPatch(typeof(GameManager), "Update")]
+    /////[HarmonyPatch(typeof(GameManager), "Update")]
     class MPRemove10FPSFloor
     {
         static float MaybeMin(float a, float b)
@@ -180,7 +183,7 @@ namespace GameMod.Core {
     }
 
     // GSync fix
-    [HarmonyPatch(typeof(GameManager), "UpdateTargetFramerate")]
+    ///[HarmonyPatch(typeof(GameManager), "UpdateTargetFramerate")]
     class GSyncFix
     {
         static bool Prefix()
@@ -198,7 +201,7 @@ namespace GameMod.Core {
     }
 
     // Shenanigans.
-    [HarmonyPatch(typeof(StringParse), "IsNiceWord")]
+    //////[HarmonyPatch(typeof(StringParse), "IsNiceWord")]
     class ReallyIsNiceWord
     {
         static bool Prefix(string s, ref bool __result)
@@ -214,7 +217,7 @@ namespace GameMod.Core {
     }
 
     // Fix next/previous resolution buttons.
-    [HarmonyPatch(typeof(MenuManager), "SelectNextResolution")]
+    /////[HarmonyPatch(typeof(MenuManager), "SelectNextResolution")]
     class FixSelectNextResolution
     {
         static bool Prefix()

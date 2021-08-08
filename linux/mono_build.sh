@@ -48,9 +48,13 @@ mcs \
     -target:library \
     -sdk:2 \
     -out:GameMod.dll \
-    ../GameMod/*.cs \
+    ../GameMod/GameMod.cs \
     ../GameMod/*/*.cs
 
+#    ../GameMod/GameMod.cs ../GameMod/MessageTypes.cs ../GameMod/Config.cs \
+#    ../GameMod/MPInternet.cs ../GameMod/MPJoinInProgress.cs \
+
+#    ../GameMod/GameMod.cs ../GameMod/MessageTypes.cs ../GameMod/Menus.cs ../GameMod/Config.cs \
 if [ $? -ne 0 ]; then
     exit 1
 fi
