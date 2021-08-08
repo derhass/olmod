@@ -27,7 +27,7 @@ if ! test -d "${OLPATH}/Overload_Data"; then
     exit 1
 fi
 
-echo ../GameMod/*.cs
+#echo ../GameMod/*.cs
 
 mcs \
     -r:"${OLPATH}"/Overload_Data/Managed/Assembly-CSharp.dll \
@@ -49,7 +49,8 @@ mcs \
     -sdk:2 \
     -out:GameMod.dll \
     ../GameMod/GameMod.cs \
-    ../GameMod/*/*.cs
+
+#    ../GameMod/VersionHandling/*.cs
 
 #    ../GameMod/GameMod.cs ../GameMod/MessageTypes.cs ../GameMod/Config.cs \
 #    ../GameMod/MPInternet.cs ../GameMod/MPJoinInProgress.cs \

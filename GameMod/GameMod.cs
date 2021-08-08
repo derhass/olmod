@@ -4,7 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
-using GameMod.VersionHandling;
+//using GameMod.VersionHandling;
 using HarmonyLib;
 using Overload;
 using UnityEngine;
@@ -29,7 +29,7 @@ namespace GameMod.Core {
             VREnabled = FindArg("-vrmode");
 
             GameVersion = typeof(GameManager).Assembly.GetName().Version;
-            Debug.Log("Initializing " + OlmodVersion.FullVersionString + ", game " + GameVersion);
+            Debug.Log("Initializing " + ", game " + GameVersion);
             Debug.Log("Command line " + String.Join(" ", Environment.GetCommandLineArgs()));
             //Config.Init();
             //MPInternet.CheckInternetServer();
@@ -37,13 +37,13 @@ namespace GameMod.Core {
             var harmony = new Harmony("olmod.olmod");
             try
             {
-                harmony.PatchAll(Assembly.GetExecutingAssembly());
+                //harmony.PatchAll(Assembly.GetExecutingAssembly());
             }
             catch (Exception ex)
             {
                 Debug.Log(ex.ToString());
             }
-            Debug.Log("Done initializing " + OlmodVersion.FullVersionString);
+            Debug.Log("Done initializing " );
 
 	    /*
             if (Modded && Config.OLModDir != null && Config.OLModDir != "")
@@ -78,7 +78,7 @@ namespace GameMod.Core {
 
             if (Modded)
             {
-                OlmodVersion.Modded = true; // Only display modded tag if you're playing modded.
+                //OlmodVersion.Modded = true; // Only display modded tag if you're playing modded.
             }
         }
 
@@ -133,7 +133,7 @@ namespace GameMod.Core {
     {
         private static bool Prefix(ref string __result)
         {
-            __result = OlmodVersion.FullVersionString.ToUpperInvariant();
+            //__result = OlmodVersion.FullVersionString.ToUpperInvariant();
             return false;
         }
     }
