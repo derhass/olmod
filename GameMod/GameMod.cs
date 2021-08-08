@@ -12,6 +12,7 @@ using UnityEngine;
 namespace GameMod.Core {
     public class GameMod
     {
+       // private static Harmony harmony;
         private static Version GameVersion;
         public static bool Modded = false;
         public static bool VREnabled = false;
@@ -19,6 +20,9 @@ namespace GameMod.Core {
 
         public static void Initialize()
         {
+         //   Harmony.DEBUG = FindArg("-harmonydebug");
+         //   harmony = new Harmony("olmod.olmod");
+//		return;
             if (GameVersion != null)
             {
                 Debug.Log("olmod Initialize called but is already initialized!");
