@@ -20,7 +20,20 @@ namespace GameMod {
         public static bool SingleMatchEnable = false;
 
         public static List<NetworkInstanceId> PlayersReady = new List<NetworkInstanceId>();
-        public static Queue<int> ClientsInJoinPhase = new Queue<int>();
+
+        public struct JIPClientInfo
+        {
+            public int connectionId;
+            public float timePregameEnds;
+
+            public JIPClientInfo(int connId, float timePregame)
+            {
+                connectionId = connId;
+                timePregameEnds = timePregame;
+            }
+        }
+
+        public static Queue<JIPClientInfo> ClientsInJoinPhase = new Queue<JIPClientInfo>();
 
         public static bool MatchHasStartedMod(bool m_match_has_started)
         {
@@ -368,37 +381,23 @@ namespace GameMod {
             return pregameWait;
         }
 
-        private static IEnumerator MatchStart(Queue<int> connectionIds)
+        private static IEnumerator MatchStart(Queue<MPJoinInProgress.JIPClientInfo> clients)
         {
-            while (connectionIds.Count > 0)
+            while (clients.Count > 0)
             {
-                int connectionId = connectionIds.Peek();
+                MPJoinInProgress.JIPClientInfo client = clients.Peek();
+                int connectionId = client.connectionId;
 
                 var newPlayer = Server.FindPlayerByConnectionId(connectionId);
                 if (newPlayer == null)
                 {
-                    connectionIds.Dequeue();
+                    clients.Dequeue();
                     continue;
                 }
 
-                float pregameWait = 3f;
-
-                if (!newPlayer.m_mp_name.StartsWith("OBSERVER"))
-                {
-                    foreach (Player player in Overload.NetworkManager.m_Players)
-                    {
-                        UnityEngine.Debug.LogFormat("XXXX SEND1PRE NewPlayer {0}, Player: {1}", newPlayer.netId, player.netId);
-                        if (MPTweaks.ClientHasTweak(player.connectionToClient.connectionId, "jip"))
-                        {
-                            NetworkServer.SendToClient(player.connectionToClient.connectionId, MessageTypes.MsgJIPJustJoined, new JIPJustJoinedMessage { playerId = newPlayer.netId, ready = false });
-                            UnityEngine.Debug.LogFormat("XXXX SEND1 NewPlayer {0}, Player: {1}, ready: false", newPlayer.netId, player.netId);
-                        }
-                    }
-                    MPJoinInProgress.SetReady(newPlayer, false);
-                }
-
-                pregameWait = SendPreGame(connectionId, pregameWait);
-                yield return new WaitForSeconds(pregameWait);
+                float remainingPregameWait = client.timePregameEnds - Time.unscaledTime;
+                if (remainingPregameWait > 0.0f)
+                    yield return new WaitForSeconds(remainingPregameWait);
 
                 Server.SendLoadoutDataToClients();
 
@@ -426,7 +425,7 @@ namespace GameMod {
 
                 if (NetworkMatch.GetMatchState() != MatchState.PLAYING)
                 {
-                    connectionIds.Dequeue();
+                    clients.Dequeue();
                     continue;
                 }
 
@@ -461,7 +460,7 @@ namespace GameMod {
                     });
                 }
                 ServerStatLog.Connected(newPlayer.m_mp_name);
-                connectionIds.Dequeue();
+                clients.Dequeue();
             }
         }
 
@@ -475,10 +474,32 @@ namespace GameMod {
 
             if (NetworkMatch.GetMatchState() == MatchState.PLAYING)
             {
-                // serialize joining clients, do not allow overlapping co-routines for different clients
-                MPJoinInProgress.ClientsInJoinPhase.Enqueue(connectionId);
-                if (MPJoinInProgress.ClientsInJoinPhase.Count <= 1) {
-                  GameManager.m_gm.StartCoroutine(MatchStart(MPJoinInProgress.ClientsInJoinPhase));
+                var newPlayer = Server.FindPlayerByConnectionId(connectionId);
+                if (newPlayer != null)
+                {
+                    float pregameWait = 3f;
+
+                    // disable the new player for all other clients
+                    if (!newPlayer.m_mp_name.StartsWith("OBSERVER"))
+                    {
+                        foreach (Player player in Overload.NetworkManager.m_Players)
+                        {
+                            if (MPTweaks.ClientHasTweak(player.connectionToClient.connectionId, "jip"))
+                            {
+                                NetworkServer.SendToClient(player.connectionToClient.connectionId, MessageTypes.MsgJIPJustJoined, new JIPJustJoinedMessage { playerId = newPlayer.netId, ready = false });
+                            }
+                        }
+                        MPJoinInProgress.SetReady(newPlayer, false);
+                    }
+
+                    // start the PreGame-Countdown for the new player
+                    pregameWait = SendPreGame(connectionId, pregameWait);
+
+                    // serialize joining clients, do not allow overlapping co-routines for different clients
+                    MPJoinInProgress.ClientsInJoinPhase.Enqueue(new MPJoinInProgress.JIPClientInfo(connectionId, Time.unscaledTime + pregameWait));
+                    if (MPJoinInProgress.ClientsInJoinPhase.Count <= 1) {
+                      GameManager.m_gm.StartCoroutine(MatchStart(MPJoinInProgress.ClientsInJoinPhase));
+                    }
                 }
             }
             else if (NetworkMatch.GetMatchState() == MatchState.PREGAME && NetworkMatch.m_pregame_countdown_active)
