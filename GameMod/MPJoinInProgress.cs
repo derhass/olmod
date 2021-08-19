@@ -364,13 +364,14 @@ namespace GameMod {
             return pregameWait;
         }
 
-        private static void SendJustJoinedToOthers(Player newPlayer, bool setReady)
+        private static void SendJustJoined(Player newPlayer, bool setReady)
         {
+            var msg =  new JIPJustJoinedMessage { playerId = newPlayer.netId, ready = setReady };
             foreach (Player player in Overload.NetworkManager.m_Players)
             {
                 if (MPTweaks.ClientHasTweak(player.connectionToClient.connectionId, "jip"))
                 {
-                    NetworkServer.SendToClient(player.connectionToClient.connectionId, MessageTypes.MsgJIPJustJoined, new JIPJustJoinedMessage { playerId = newPlayer.netId, ready = setReady });
+                    NetworkServer.SendToClient(player.connectionToClient.connectionId, MessageTypes.MsgJIPJustJoined, msg);
                 }
             }
         }
@@ -384,7 +385,7 @@ namespace GameMod {
 
             if (!isObserver)
             {
-                SendJustJoinedToOthers(newPlayer, false);
+                SendJustJoined(newPlayer, false);
                 MPJoinInProgress.SetReady(newPlayer, false);
             }
 
@@ -403,7 +404,7 @@ namespace GameMod {
             }
             else
             {
-                SendJustJoinedToOthers(newPlayer, true);
+                SendJustJoined(newPlayer, true);
                 MPJoinInProgress.SetReady(newPlayer, true);
             }
 
@@ -440,11 +441,14 @@ namespace GameMod {
                     use_loadout1 = player.m_use_loadout1
                 });
             }
-            // if there are multiple Clients joining at once, the RespawnMessage above
-            // will trigger the addition of this new player to the other clients, so send the 
-            // activation _again_ to also unlock these...
-            SendJustJoinedToOthers(newPlayer, true);
-            ServerStatLog.Connected(newPlayer.m_mp_name);
+            if (!isObserver) {
+                // if there are multiple Clients joining at once, the RespawnMessage above
+                // will trigger the addition of this new player to the other clients, so send the 
+                // activation _again_ to also unlock these...
+                yield return null;
+                SendJustJoined(newPlayer, true);
+                ServerStatLog.Connected(newPlayer.m_mp_name);
+           }
         }
 
         private static void Postfix(NetworkMessage msg)
