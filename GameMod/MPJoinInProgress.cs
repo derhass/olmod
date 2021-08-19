@@ -20,6 +20,7 @@ namespace GameMod {
         public static bool SingleMatchEnable = false;
 
         public static List<NetworkInstanceId> PlayersReady = new List<NetworkInstanceId>();
+        public static Queue<int> ClientsInJoinPhase = new Queue<int>();
 
         public static bool MatchHasStartedMod(bool m_match_has_started)
         {
@@ -39,6 +40,7 @@ namespace GameMod {
 
         public static void SetReady(Player player, bool ready)
         {
+            UnityEngine.Debug.LogFormat("XXXX READY: {0} = {1}", player.netId, ready);
             // Keep track of who has been set ready so we're not wasting CPU cycles making someone visible who is already visible.  Especially needed with the JIP visibility workaround.
             if (ready)
             {
@@ -106,6 +108,8 @@ namespace GameMod {
             }
 
             var msg = rawMsg.ReadMessage<JIPJustJoinedMessage>();
+
+            UnityEngine.Debug.LogFormat("XXXX RECV MESG: {0} {1}", msg.playerId, msg.ready);
 
             var player = Overload.NetworkManager.m_Players.Find(p => p.netId == msg.playerId);
 
@@ -364,83 +368,101 @@ namespace GameMod {
             return pregameWait;
         }
 
-        private static IEnumerator MatchStart(int connectionId)
+        private static IEnumerator MatchStart(Queue<int> connectionIds)
         {
-            var newPlayer = Server.FindPlayerByConnectionId(connectionId);
-
-            float pregameWait = 3f;
-
-            if (!newPlayer.m_mp_name.StartsWith("OBSERVER"))
+            while (connectionIds.Count > 0)
             {
-                foreach (Player player in Overload.NetworkManager.m_Players)
+                int connectionId = connectionIds.Peek();
+
+                var newPlayer = Server.FindPlayerByConnectionId(connectionId);
+                if (newPlayer == null)
                 {
-                    if (MPTweaks.ClientHasTweak(player.connectionToClient.connectionId, "jip"))
-                    {
-                        NetworkServer.SendToClient(player.connectionToClient.connectionId, MessageTypes.MsgJIPJustJoined, new JIPJustJoinedMessage { playerId = newPlayer.netId, ready = false });
-                    }
-                }
-                MPJoinInProgress.SetReady(newPlayer, false);
-            }
-
-            pregameWait = SendPreGame(connectionId, pregameWait);
-            yield return new WaitForSeconds(pregameWait);
-
-            Server.SendLoadoutDataToClients();
-
-            if (newPlayer.m_mp_name.StartsWith("OBSERVER"))
-            {
-                Debug.LogFormat("Enabling spectator for {0}", newPlayer.m_mp_name);
-                newPlayer.Networkm_spectator = true;
-                Debug.LogFormat("Enabled spectator for {0}", newPlayer.m_mp_name);
-
-                yield return null; // make sure spectator change is received before sending MatchStart
-            }
-            else
-            {
-                foreach (Player player in Overload.NetworkManager.m_Players)
-                {
-                    if (MPTweaks.ClientHasTweak(player.connectionToClient.connectionId, "jip"))
-                    {
-                        NetworkServer.SendToClient(player.connectionToClient.connectionId, MessageTypes.MsgJIPJustJoined, new JIPJustJoinedMessage { playerId = newPlayer.netId, ready = true });
-                    }
-                }
-                MPJoinInProgress.SetReady(newPlayer, true);
-            }
-
-            if (NetworkMatch.GetMatchState() != MatchState.PLAYING)
-                yield break;
-
-            IntegerMessage modeMsg = new IntegerMessage((int)NetworkMatch.GetMode());
-            NetworkServer.SendToClient(connectionId, CustomMsgType.MatchStart, modeMsg);
-            SendMatchState(connectionId);
-
-            NetworkSpawnPlayer.Respawn(newPlayer.c_player_ship);
-            MPTweaks.Send(connectionId);
-            //if (!newPlayer.m_spectator && RearView.MPNetworkMatchEnabled)
-            //    newPlayer.CallTargetAddHUDMessage(newPlayer.connectionToClient, "REARVIEW ENABLED", -1, true);
-            CTF.SendJoinUpdate(newPlayer);
-            Race.SendJoinUpdate(newPlayer);
-            foreach (Player player in Overload.NetworkManager.m_Players)
-            {
-                if (player.connectionToClient.connectionId == connectionId)
+                    connectionIds.Dequeue();
                     continue;
-                // Resend mode for existing player to move h2h -> anarchy
-                NetworkServer.SendToClient(player.connectionToClient.connectionId, CustomMsgType.MatchStart, modeMsg);
+                }
 
-                if (!newPlayer.m_spectator)
-                    player.CallTargetAddHUDMessage(player.connectionToClient, String.Format(Loc.LS("{0} JOINED MATCH"), newPlayer.m_mp_name), -1, true);
+                float pregameWait = 3f;
 
-                //Debug.Log("JIP: spawning on new client net " + player.netId + " lobby " + player.connectionToClient.connectionId);
-                NetworkServer.SendToClient(connectionId, CustomMsgType.Respawn, new RespawnMessage
+                if (!newPlayer.m_mp_name.StartsWith("OBSERVER"))
                 {
-                    m_net_id = player.netId,
-                    lobby_id = player.connectionToClient.connectionId,
-                    m_pos = player.transform.position,
-                    m_rotation = player.transform.rotation,
-                    use_loadout1 = player.m_use_loadout1
-                });
+                    foreach (Player player in Overload.NetworkManager.m_Players)
+                    {
+                        UnityEngine.Debug.LogFormat("XXXX SEND1PRE NewPlayer {0}, Player: {1}", newPlayer.netId, player.netId);
+                        if (MPTweaks.ClientHasTweak(player.connectionToClient.connectionId, "jip"))
+                        {
+                            NetworkServer.SendToClient(player.connectionToClient.connectionId, MessageTypes.MsgJIPJustJoined, new JIPJustJoinedMessage { playerId = newPlayer.netId, ready = false });
+                            UnityEngine.Debug.LogFormat("XXXX SEND1 NewPlayer {0}, Player: {1}, ready: false", newPlayer.netId, player.netId);
+                        }
+                    }
+                    MPJoinInProgress.SetReady(newPlayer, false);
+                }
+
+                pregameWait = SendPreGame(connectionId, pregameWait);
+                yield return new WaitForSeconds(pregameWait);
+
+                Server.SendLoadoutDataToClients();
+
+                if (newPlayer.m_mp_name.StartsWith("OBSERVER"))
+                {
+                    Debug.LogFormat("Enabling spectator for {0}", newPlayer.m_mp_name);
+                    newPlayer.Networkm_spectator = true;
+                    Debug.LogFormat("Enabled spectator for {0}", newPlayer.m_mp_name);
+
+                    yield return null; // make sure spectator change is received before sending MatchStart
+                }
+                else
+                {
+                    foreach (Player player in Overload.NetworkManager.m_Players)
+                    {
+                        UnityEngine.Debug.LogFormat("XXXX SEND2PRE NewPlayer {0}, Player: {1}", newPlayer.netId, player.netId);
+                        if (MPTweaks.ClientHasTweak(player.connectionToClient.connectionId, "jip"))
+                        {
+                            NetworkServer.SendToClient(player.connectionToClient.connectionId, MessageTypes.MsgJIPJustJoined, new JIPJustJoinedMessage { playerId = newPlayer.netId, ready = true });
+                            UnityEngine.Debug.LogFormat("XXXX SEND2 NewPlayer {0}, Player: {1}, ready: true", newPlayer.netId, player.netId);
+                        }
+                    }
+                    MPJoinInProgress.SetReady(newPlayer, true);
+                }
+
+                if (NetworkMatch.GetMatchState() != MatchState.PLAYING)
+                {
+                    connectionIds.Dequeue();
+                    continue;
+                }
+
+                IntegerMessage modeMsg = new IntegerMessage((int)NetworkMatch.GetMode());
+                NetworkServer.SendToClient(connectionId, CustomMsgType.MatchStart, modeMsg);
+                SendMatchState(connectionId);
+
+                NetworkSpawnPlayer.Respawn(newPlayer.c_player_ship);
+                MPTweaks.Send(connectionId);
+                //if (!newPlayer.m_spectator && RearView.MPNetworkMatchEnabled)
+                //    newPlayer.CallTargetAddHUDMessage(newPlayer.connectionToClient, "REARVIEW ENABLED", -1, true);
+                CTF.SendJoinUpdate(newPlayer);
+                Race.SendJoinUpdate(newPlayer);
+                foreach (Player player in Overload.NetworkManager.m_Players)
+                {
+                    if (player.connectionToClient.connectionId == connectionId)
+                        continue;
+                    // Resend mode for existing player to move h2h -> anarchy
+                    NetworkServer.SendToClient(player.connectionToClient.connectionId, CustomMsgType.MatchStart, modeMsg);
+
+                    if (!newPlayer.m_spectator)
+                        player.CallTargetAddHUDMessage(player.connectionToClient, String.Format(Loc.LS("{0} JOINED MATCH"), newPlayer.m_mp_name), -1, true);
+
+                    //Debug.Log("JIP: spawning on new client net " + player.netId + " lobby " + player.connectionToClient.connectionId);
+                    NetworkServer.SendToClient(connectionId, CustomMsgType.Respawn, new RespawnMessage
+                    {
+                        m_net_id = player.netId,
+                        lobby_id = player.connectionToClient.connectionId,
+                        m_pos = player.transform.position,
+                        m_rotation = player.transform.rotation,
+                        use_loadout1 = player.m_use_loadout1
+                    });
+                }
+                ServerStatLog.Connected(newPlayer.m_mp_name);
+                connectionIds.Dequeue();
             }
-            ServerStatLog.Connected(newPlayer.m_mp_name);
         }
 
         private static void Postfix(NetworkMessage msg)
@@ -453,7 +475,11 @@ namespace GameMod {
 
             if (NetworkMatch.GetMatchState() == MatchState.PLAYING)
             {
-                GameManager.m_gm.StartCoroutine(MatchStart(connectionId));
+                // serialize joining clients, do not allow overlapping co-routines for different clients
+                MPJoinInProgress.ClientsInJoinPhase.Enqueue(connectionId);
+                if (MPJoinInProgress.ClientsInJoinPhase.Count <= 1) {
+                  GameManager.m_gm.StartCoroutine(MatchStart(MPJoinInProgress.ClientsInJoinPhase));
+                }
             }
             else if (NetworkMatch.GetMatchState() == MatchState.PREGAME && NetworkMatch.m_pregame_countdown_active)
             {
