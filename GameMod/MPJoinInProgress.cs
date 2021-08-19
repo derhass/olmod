@@ -484,7 +484,7 @@ namespace GameMod {
                     {
                         foreach (Player player in Overload.NetworkManager.m_Players)
                         {
-                            if (MPTweaks.ClientHasTweak(player.connectionToClient.connectionId, "jip"))
+                            if ((player.connectionToClient.connectionId != connectionId) && MPTweaks.ClientHasTweak(player.connectionToClient.connectionId, "jip"))
                             {
                                 NetworkServer.SendToClient(player.connectionToClient.connectionId, MessageTypes.MsgJIPJustJoined, new JIPJustJoinedMessage { playerId = newPlayer.netId, ready = false });
                             }
