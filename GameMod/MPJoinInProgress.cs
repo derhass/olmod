@@ -395,9 +395,24 @@ namespace GameMod {
                     continue;
                 }
 
+                yield return null; // just wait one frame
+                if (!newPlayer.m_mp_name.StartsWith("OBSERVER"))
+                {
+                    foreach (Player player in Overload.NetworkManager.m_Players)
+                    {
+                        if ((player.connectionToClient.connectionId != connectionId) && MPTweaks.ClientHasTweak(player.connectionToClient.connectionId, "jip"))
+                        {
+                            NetworkServer.SendToClient(player.connectionToClient.connectionId, MessageTypes.MsgJIPJustJoined, new JIPJustJoinedMessage { playerId = newPlayer.netId, ready = false });
+                        }
+                    }
+                    MPJoinInProgress.SetReady(newPlayer, false);
+                }
+
                 float remainingPregameWait = client.timePregameEnds - Time.unscaledTime;
                 if (remainingPregameWait > 0.0f)
                     yield return new WaitForSeconds(remainingPregameWait);
+                else
+                    yield return null; // just wait one frame
 
                 Server.SendLoadoutDataToClients();
 
@@ -480,18 +495,6 @@ namespace GameMod {
                     float pregameWait = 3f;
 
                     // disable the new player for all other clients
-                    if (!newPlayer.m_mp_name.StartsWith("OBSERVER"))
-                    {
-                        foreach (Player player in Overload.NetworkManager.m_Players)
-                        {
-                            if ((player.connectionToClient.connectionId != connectionId) && MPTweaks.ClientHasTweak(player.connectionToClient.connectionId, "jip"))
-                            {
-                                NetworkServer.SendToClient(player.connectionToClient.connectionId, MessageTypes.MsgJIPJustJoined, new JIPJustJoinedMessage { playerId = newPlayer.netId, ready = false });
-                            }
-                        }
-                        MPJoinInProgress.SetReady(newPlayer, false);
-                    }
-
                     // start the PreGame-Countdown for the new player
                     pregameWait = SendPreGame(connectionId, pregameWait);
 
