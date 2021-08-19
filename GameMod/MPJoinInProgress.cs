@@ -364,21 +364,27 @@ namespace GameMod {
             return pregameWait;
         }
 
+        private static void SendJustJoinedToOthers(Player newPlayer, bool setReady)
+        {
+            foreach (Player player in Overload.NetworkManager.m_Players)
+            {
+                if (MPTweaks.ClientHasTweak(player.connectionToClient.connectionId, "jip"))
+                {
+                    NetworkServer.SendToClient(player.connectionToClient.connectionId, MessageTypes.MsgJIPJustJoined, new JIPJustJoinedMessage { playerId = newPlayer.netId, ready = setReady });
+                }
+            }
+        }
+
         private static IEnumerator MatchStart(int connectionId)
         {
             var newPlayer = Server.FindPlayerByConnectionId(connectionId);
 
             float pregameWait = 3f;
+            bool isObserver =  newPlayer.m_mp_name.StartsWith("OBSERVER");
 
-            if (!newPlayer.m_mp_name.StartsWith("OBSERVER"))
+            if (!isObserver)
             {
-                foreach (Player player in Overload.NetworkManager.m_Players)
-                {
-                    if (MPTweaks.ClientHasTweak(player.connectionToClient.connectionId, "jip"))
-                    {
-                        NetworkServer.SendToClient(player.connectionToClient.connectionId, MessageTypes.MsgJIPJustJoined, new JIPJustJoinedMessage { playerId = newPlayer.netId, ready = false });
-                    }
-                }
+                SendJustJoinedToOthers(newPlayer, false);
                 MPJoinInProgress.SetReady(newPlayer, false);
             }
 
@@ -387,7 +393,7 @@ namespace GameMod {
 
             Server.SendLoadoutDataToClients();
 
-            if (newPlayer.m_mp_name.StartsWith("OBSERVER"))
+            if (isObserver)
             {
                 Debug.LogFormat("Enabling spectator for {0}", newPlayer.m_mp_name);
                 newPlayer.Networkm_spectator = true;
@@ -397,13 +403,7 @@ namespace GameMod {
             }
             else
             {
-                foreach (Player player in Overload.NetworkManager.m_Players)
-                {
-                    if (MPTweaks.ClientHasTweak(player.connectionToClient.connectionId, "jip"))
-                    {
-                        NetworkServer.SendToClient(player.connectionToClient.connectionId, MessageTypes.MsgJIPJustJoined, new JIPJustJoinedMessage { playerId = newPlayer.netId, ready = true });
-                    }
-                }
+                SendJustJoinedToOthers(newPlayer, true);
                 MPJoinInProgress.SetReady(newPlayer, true);
             }
 
@@ -440,6 +440,10 @@ namespace GameMod {
                     use_loadout1 = player.m_use_loadout1
                 });
             }
+            // if there are multiple Clients joining at once, the RespawnMessage above
+            // will trigger the addition of this new player to the other clients, so send the 
+            // activation _again_ to also unlock these...
+            SendJustJoinedToOthers(newPlayer, true);
             ServerStatLog.Connected(newPlayer.m_mp_name);
         }
 
