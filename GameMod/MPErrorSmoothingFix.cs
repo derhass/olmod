@@ -14,6 +14,9 @@ namespace GameMod
         private static bool targetTransformOverridden = false;
         private static Transform targetTransformNode = null;
 
+        private static int hackIsEnabled = 1;
+        private static int hackError = 0;
+
         /* These were for debugging only
         private static int hackIsEnabled = 0;
 
@@ -54,6 +57,26 @@ namespace GameMod
             }
         }
         */
+        private static void hack_smooth_command() {
+                int n = uConsole.GetNumParameters();
+                if (n > 0) {
+                        int value = uConsole.GetInt();
+                        hackIsEnabled = value;
+                } else {
+                        hackIsEnabled = (hackIsEnabled >0)?0:1;
+                }
+                UnityEngine.Debug.LogFormat("hack_smooth is now {0}", hackIsEnabled);
+        }
+        private static void hack_error_command() {
+                int n = uConsole.GetNumParameters();
+                if (n > 0) {
+                        int value = uConsole.GetInt();
+                        hackError = value;
+                } else {
+                        hackError = (hackError>0)?0:1;
+                }
+                UnityEngine.Debug.LogFormat("hack_error is now {0}", hackError);
+        }
 
         // start the manual interpolation phase
         // this disables Unity's automatic interpolation for the rigid body of the player ship
@@ -86,6 +109,9 @@ namespace GameMod
         {
             // interpolate the position
             float fract = (Time.time - Time.fixedTime) / Time.fixedDeltaTime;
+            if (hackIsEnabled > 1) {
+                fract += 1.0f;
+            }
             targetTransformNode.position = Vector3.LerpUnclamped(lastPosition, currPosition, fract);
             targetTransformNode.rotation = Quaternion.SlerpUnclamped(lastRotation, currRotation, fract);
 
@@ -119,7 +145,7 @@ namespace GameMod
             static void Postfix()
             {
                 // only on the Client, in Multiplayer, in an active game, not during death or death roll or pregame:
-                if (!Server.IsActive() && GameplayManager.IsMultiplayerActive && NetworkMatch.InGameplay() && !GameManager.m_local_player.c_player_ship.m_dying && !GameManager.m_local_player.c_player_ship.m_dead && !GameManager.m_local_player.m_pregame && !MPObserver.Enabled)
+                if ((hackIsEnabled>0) && !Server.IsActive() && GameplayManager.IsMultiplayerActive && NetworkMatch.InGameplay() && !GameManager.m_local_player.c_player_ship.m_dying && !GameManager.m_local_player.c_player_ship.m_dead && !GameManager.m_local_player.m_pregame && !MPObserver.Enabled)
                 {
                     if (!doManualInterpolation)
                     {
@@ -137,6 +163,41 @@ namespace GameMod
                 {
                     disableManualInterpolation();
                 }
+            }
+        }
+
+        [HarmonyPatch(typeof(Player), "AddSmoothingError")]
+        class MPErrorSmoothingFix_ErrAdd {
+            static bool Prefix(Player __instance) {
+                if (hackError == 1) {
+                    return false;
+                }
+                if (hackError == 2) {
+                    __instance.c_player_ship.c_rigidbody.MovePosition(__instance.transform.position + __instance.m_error_pos);
+                    __instance.c_player_ship.c_rigidbody.MoveRotation(__instance.m_error_rot * __instance.transform.rotation);
+                    return false;
+
+                }
+                return true;
+            }
+        }
+
+        [HarmonyPatch(typeof(Player), "RemoveSmoothingError")]
+        class MPErrorSmoothingFix_ErrRemove {
+            static bool Prefix() {
+                if (hackError == 1) {
+                    return false;
+                }
+                return true;
+            }
+        }
+
+
+        [HarmonyPatch(typeof(GameManager), "Awake")]
+        class MPErrorSmoothingFix_Controller {
+            static void Postfix() {
+                uConsole.RegisterCommand("hack_smooth", hack_smooth_command);
+                uConsole.RegisterCommand("hack_error", hack_error_command);
             }
         }
 
