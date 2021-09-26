@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using Harmony;
+using HarmonyLib;
 using Overload;
 using UnityEngine;
 
@@ -192,8 +192,6 @@ namespace GameMod
                         Active = 0
                     });
                 }
-
-                Debug.Log($"MPPrimaries - Added {weaponType}, budget {weapon.percent}");
             }
 
             // Spawn in initial primaries.

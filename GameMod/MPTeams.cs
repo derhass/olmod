@@ -1,4 +1,4 @@
-﻿using Harmony;
+﻿using HarmonyLib;
 using Overload;
 using System;
 using System.Collections.Generic;
@@ -332,61 +332,7 @@ namespace GameMod
             return false;
         }
     }
-
-    [HarmonyPatch(typeof(UIElement), "DrawHUDScoreInfo")]
-    static class MPTeamsHUDScore
-    {
-        static bool Prefix(UIElement __instance, ref Vector2 pos)
-        {
-            if (!GameplayManager.IsMultiplayerActive || NetworkMatch.GetMode() == MatchMode.ANARCHY || MPTeams.NetworkMatchTeamCount == 2)
-                return true;
-
-            var uie = __instance;
-            pos.x -= 4f;
-            pos.y -= 5f;
-            Vector2 temp_pos;
-            temp_pos.y = pos.y;
-            temp_pos.x = pos.x - 100f;
-            uie.DrawStringSmall(NetworkMatch.GetModeString(MatchMode.NUM), temp_pos, 0.4f, StringOffset.LEFT, UIManager.m_col_ub0, 1f, 130f);
-            temp_pos.x = pos.x + 95f;
-            int match_time_remaining = NetworkMatch.m_match_time_remaining;
-            int num3 = (int)NetworkMatch.m_match_elapsed_seconds;
-            uie.DrawDigitsTime(temp_pos, (float)match_time_remaining, 0.45f,
-                (num3 <= 10 || match_time_remaining >= 10) ? UIManager.m_col_ui2 : UIManager.m_col_em5, uie.m_alpha, false);
-            temp_pos.x = pos.x - 100f;
-            temp_pos.y = temp_pos.y - 20f;
-            uie.DrawPing(temp_pos);
-            pos.y += 24f;
-
-            MpTeam myTeam = GameManager.m_local_player.m_mp_team;
-            foreach (var team in MPTeams.TeamsByScore)
-            {
-                MPTeams.DrawTeamScoreSmall(__instance, pos, team, NetworkMatch.GetTeamScore(team), 98f, team == myTeam);
-                pos.y += 28f;
-            }
-            pos.y += 6f - 28f;
-
-            pos.y += 22f;
-
-            pos.x += 100f;
-            uie.DrawRecentKillsMP(pos);
-            if (GameManager.m_player_ship.m_wheel_select_state == WheelSelectState.QUICK_CHAT)
-            {
-                pos.y = UIManager.UI_TOP + 128f;
-                pos.x = -448f;
-                uie.DrawQuickChatWheel(pos);
-            }
-            else
-            {
-                pos.y = UIManager.UI_TOP + 60f;
-                pos.x = UIManager.UI_LEFT + 5f;
-                uie.DrawQuickChatMP(pos);
-            }
-
-            return false;
-        }
-    }
-
+    
     [HarmonyPatch(typeof(UIElement), "DrawMpScoreboardRaw")]
     static class MPTeamsScore
     {
@@ -461,6 +407,9 @@ namespace GameMod
             MpTeam myTeam = GameManager.m_local_player.m_mp_team;
             foreach (var team in MPTeams.TeamsByScore)
             {
+                if (!NetworkManager.m_PlayersForScoreboard.Any(x => x.m_mp_team == team))
+                    continue;
+
                 pos.y += 28f;
                 int score = NetworkMatch.GetTeamScore(team);
                 MPTeams.DrawTeamScoreSmall(__instance, pos, team, score, 98f, team == myTeam);
@@ -1156,29 +1105,30 @@ namespace GameMod
         }
     }
 
-    // Colors shown on kill feed - still lacks >2 team support
-    [HarmonyPatch(typeof(UIElement), "GetMessageColor")]
-    class MPTeams_UIElement_GetMessageColor
+    // Colors shown on kill feed
+    // Transpiled due to odd results when modifying struct return val
+    [HarmonyPatch(typeof(UIElement), "DrawRecentKillsMP")]
+    class MPTeams_UIElement_DrawRecentKillsMP
     {
-        static bool Prefix(MpMessageColor mpmc, float flash, ref Color __result)
+        static Color GetMessageColor(UIElement uie, MpMessageColor mpmc, float flash)
         {
             switch (mpmc)
             {
                 case MpMessageColor.LOCAL:
-                    __result = Color.Lerp(UIManager.m_col_hi2, UIManager.m_col_hi7, flash);
-                    break;
+                    return Color.Lerp(UIManager.m_col_hi2, UIManager.m_col_hi7, flash);
                 case MpMessageColor.ANARCHY:
                 case MpMessageColor.NONE:
-                    __result = Color.Lerp(UIManager.m_col_ui0, UIManager.m_col_ui3, flash);
-                    break;
+                    return Color.Lerp(UIManager.m_col_ui0, UIManager.m_col_ui3, flash);
                 default:
                     Color c1 = MPTeams.TeamColor(MPTeams.GetMpTeamFromMessageColor((int)mpmc), 0);
                     Color c2 = MPTeams.TeamColor(MPTeams.GetMpTeamFromMessageColor((int)mpmc), 0);
-                    __result = Color.Lerp(c1, c2, flash);
-                    break;
+                    return Color.Lerp(c1, c2, flash);
             }
+        }
 
-            return false;
+        static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> codes)
+        {
+            return codes.MethodReplacer(AccessTools.Method(typeof(UIElement), "GetMessageColor"), AccessTools.Method(typeof(MPTeams_UIElement_DrawRecentKillsMP), "GetMessageColor"));
         }
     }
 
@@ -1191,11 +1141,22 @@ namespace GameMod
             return MPTeams.TeamMessageColor(team);
         }
 
+        static MatchMode IsExtMatchModeAnarchy()
+        {
+            if (NetworkMatch.IsTeamMode(NetworkMatch.GetMode()))
+                return MatchMode.TEAM_ANARCHY;
+
+            return MatchMode.ANARCHY;
+        }
+
         static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> codes)
         {
             int state = 0;
             foreach (var code in codes)
             {
+                if (code.opcode == OpCodes.Call && code.operand == AccessTools.Method(typeof(NetworkMatch), "GetMode"))
+                    code.operand = AccessTools.Method(typeof(MPTeams_NetworkMessageManager_AddKillMessage), "IsExtMatchModeAnarchy");
+
                 if (code.opcode == OpCodes.Ldc_I4_3)
                 {
                     state++;
@@ -1203,7 +1164,7 @@ namespace GameMod
                     code.operand = state == 1 ? 5 : 2;
                     yield return code;
                     yield return new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(MPTeams_NetworkMessageManager_AddKillMessage), "GetMessageColorIndex"));
-                    continue;          
+                    continue;
                 }
                 yield return code;
             }
@@ -1267,7 +1228,7 @@ namespace GameMod
         {
             if (mpmc == MpMessageColor.ANARCHY)
                 return UIManager.m_col_ui3;
-            
+
             return MPTeams.TeamColor(MPTeams.GetMpTeamFromMessageColor((int)mpmc), 0);
         }
 

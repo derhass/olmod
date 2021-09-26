@@ -1,4 +1,4 @@
-﻿using Harmony;
+﻿using HarmonyLib;
 using Overload;
 using System.Collections.Generic;
 using System.Reflection.Emit;
@@ -102,6 +102,11 @@ namespace GameMod
 
             if (RearView.rearTex == null || RearView.rearCam == null || RearView.rearCam.gameObject == null)
                 RearView.Init();
+
+            if (GameManager.m_local_player.m_hitpoints <= 0) {
+                RearView.Pause();
+                return;
+            }
 
             RearView.rearCam.enabled = true;
             var pos = new Vector2(288f, 288f);

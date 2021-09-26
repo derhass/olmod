@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
-using Harmony;
+using HarmonyLib;
 using Overload;
 using UnityEngine;
 
@@ -222,6 +222,7 @@ namespace GameMod {
                 ExtMenuManager.mms_ext_lap_limit = ModPrefs.GetInt("MP_PM_LAP_LIMIT", ExtMenuManager.mms_ext_lap_limit);
                 Console.KeyEnabled = ModPrefs.GetBool("O_CONSOLE_KEY", Console.KeyEnabled);
                 Console.CustomUIColor = ModPrefs.GetInt("O_CUSTOM_UI_COLOR", Console.CustomUIColor);
+                JoystickRotationFix.alt_turn_ramp_mode = ModPrefs.GetBool("SCALE_UP_ROTATION", JoystickRotationFix.alt_turn_ramp_mode);
                 Menus.mms_scale_respawn_time = ModPrefs.GetBool("MP_PM_SCALE_RESPAWN_TIME", Menus.mms_scale_respawn_time);
                 if (Core.GameMod.HasInternetMatch())
                     MPInternet.MenuIPAddress = ModPrefs.GetString("MP_PM_IP_ADDRESS", MPInternet.MenuIPAddress);
@@ -234,6 +235,8 @@ namespace GameMod {
                 Menus.mms_lag_compensation_ship_added_lag = ModPrefs.GetInt("MP_PM_LAG_COMPENSATION_SHIP_ADDED_LAG", Menus.mms_lag_compensation_ship_added_lag);
                 Menus.mms_ship_lag_compensation_scale = ModPrefs.GetInt("MP_PM_SHIP_LAG_COMPENSATION_SCALE", Menus.mms_ship_lag_compensation_scale);
                 Menus.mms_weapon_lag_compensation_scale = ModPrefs.GetInt("MP_PM_WEAPON_LAG_COMPENSATION_SCALE", Menus.mms_weapon_lag_compensation_scale);
+                Menus.mms_sticky_death_summary = ModPrefs.GetBool("MP_PM_STICKY_DEATH_SUMMARY", Menus.mms_sticky_death_summary);
+                MPDeathReview.stickyDeathReview = Menus.mms_sticky_death_summary;
                 Menus.mms_damageeffect_alpha_mult = ModPrefs.GetInt("MP_PM_DAMAGEEFFECT_ALPHA_MULT", Menus.mms_damageeffect_alpha_mult);
                 Menus.mms_damageeffect_drunk_blur_mult = ModPrefs.GetInt("MP_PM_DAMAGEEFFECT_DRUNK_BLUR_MULT", Menus.mms_damageeffect_drunk_blur_mult);
                 Menus.mms_match_time_limit = ModPrefs.GetInt("MP_PM_MATCH_TIME_LIMIT", Menus.mms_match_time_limit);
@@ -276,6 +279,7 @@ namespace GameMod {
             ModPrefs.SetInt("MP_PM_LAP_LIMIT", ExtMenuManager.mms_ext_lap_limit);
             ModPrefs.SetBool("O_CONSOLE_KEY", Console.KeyEnabled);
             ModPrefs.SetInt("O_CUSTOM_UI_COLOR", Console.CustomUIColor);
+            ModPrefs.SetBool("SCALE_UP_ROTATION", JoystickRotationFix.alt_turn_ramp_mode);
             ModPrefs.SetString("MP_PM_IP_ADDRESS", MPInternet.MenuIPAddress);
             ModPrefs.SetBool("MP_PM_SCALE_RESPAWN_TIME", Menus.mms_scale_respawn_time);
             ModPrefs.SetInt("MP_PM_LAG_COMPENSATION", Menus.mms_lag_compensation);
@@ -287,6 +291,7 @@ namespace GameMod {
             ModPrefs.SetInt("MP_PM_LAG_COMPENSATION_SHIP_ADDED_LAG", Menus.mms_lag_compensation_ship_added_lag);
             ModPrefs.SetInt("MP_PM_WEAPON_LAG_COMPENSATION_SCALE", Menus.mms_weapon_lag_compensation_scale);
             ModPrefs.SetInt("MP_PM_SHIP_LAG_COMPENSATION_SCALE", Menus.mms_ship_lag_compensation_scale);
+            ModPrefs.SetBool("MP_PM_STICKY_DEATH_SUMMARY", Menus.mms_sticky_death_summary);
             ModPrefs.SetInt("MP_PM_DAMAGEEFFECT_ALPHA_MULT", Menus.mms_damageeffect_alpha_mult);
             ModPrefs.SetInt("MP_PM_DAMAGEEFFECT_DRUNK_BLUR_MULT", Menus.mms_damageeffect_drunk_blur_mult);
             ModPrefs.SetInt("MP_PM_MATCH_TIME_LIMIT", Menus.mms_match_time_limit);

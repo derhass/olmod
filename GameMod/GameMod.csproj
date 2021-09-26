@@ -101,7 +101,7 @@
     <Compile Include="Config.cs" />
     <Compile Include="Console.cs" />
     <Compile Include="Controllers.cs" />
-    <Compile Include="CTF.cs" />
+    <Compile Include="MatchModeCTF.cs" />
     <Compile Include="CustomDoorAutomap.cs" />
     <Compile Include="CustomLevelResources.cs" />
     <Compile Include="DisableTimeCheat.cs" />
@@ -109,7 +109,9 @@
     <Compile Include="FastLoad.cs" />
     <Compile Include="FrameTime.cs" />
     <Compile Include="GameMod.cs" />
+    <Compile Include="GSyncFix.cs" />
     <Compile Include="JoystickCurveEditor.cs" />
+    <Compile Include="JoystickRotationFix.cs" />
     <Compile Include="LevelError.cs" />
     <Compile Include="MatchModeRace.cs" />
     <Compile Include="MessageTypes.cs" />
@@ -127,6 +129,8 @@
     <Compile Include="MPCreeperSync.cs" />
     <Compile Include="MPCustomModeFile.cs" />
     <Compile Include="MPDamageEffects.cs" />
+    <Compile Include="MPDeathReview.cs" />
+    <Compile Include="MPErrorSmoothingFix.cs" />
     <Compile Include="MPFixGhostProjectiles.cs" />
     <Compile Include="MPHUDMessage.cs" />
     <Compile Include="MPLongPwd.cs" />
@@ -140,11 +144,12 @@
     <Compile Include="MPPickupCheck.cs" />
     <Compile Include="MPPrimaries.cs" />
     <Compile Include="MPRespawn.cs" />
-    <Compile Include="MPScores.cs" />
+    <Compile Include="MPScoreboards.cs" />
     <Compile Include="MPServerBrowser.cs" />
     <Compile Include="MPSmash.cs" />
     <Compile Include="MPSniperPackets.cs" />
     <Compile Include="MPSpawnInitialization.cs" />
+    <Compile Include="MPSpew.cs" />
     <Compile Include="MPSuddenDeath.cs" />
     <Compile Include="MPSuperCheck.cs" />
     <Compile Include="MPTags.cs" />
@@ -174,6 +179,7 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="PresetData.cs" />
     <Compile Include="RearView.cs" />
+    <Compile Include="Debugging.cs" />
     <Compile Include="ServerCleanup.cs" />
     <Compile Include="ServerPing.cs" />
     <Compile Include="ServerPort.cs" />
@@ -184,6 +190,7 @@
     <Compile Include="UIMeshColliderNoRender.cs" />
     <Compile Include="VersionHandling\OlmodVersion.cs" />
     <Compile Include="VersionHandling\PatchVersionInfo.cs" />
+    <Compile Include="VRScale.cs" />
     <Compile Include="VSync.cs" />
   </ItemGroup>
   <ItemGroup>

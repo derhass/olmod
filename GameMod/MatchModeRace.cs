@@ -3,12 +3,13 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
-using Harmony;
+using HarmonyLib;
 using Overload;
 using UnityEngine;
 using UnityEngine.Networking;
 
-namespace GameMod {
+namespace GameMod
+{
     public static class Race
     {
         public static List<RacePlayer> Players = new List<RacePlayer>();
@@ -315,6 +316,13 @@ namespace GameMod {
         public List<Lap> Laps;
         public Vector3? LastDeathVec;
         public bool lastTriggerForward;
+        public bool isFinished
+        {
+            get
+            {
+                return MPModPrivateData.LapLimit > 0 && Laps.Count() >= MPModPrivateData.LapLimit;
+            }
+        }
 
         public RacePlayer(Player _player)
         {
@@ -490,7 +498,7 @@ namespace GameMod {
             if (MPModPrivateData.LapLimit == 0)
                 return true;
 
-            if (Race.Players.Any(x => x.Laps.Count() >= MPModPrivateData.LapLimit))
+            if (Race.Players.All(x => x.isFinished))
                 NetworkMatch.End();
 
             return false;
@@ -509,7 +517,7 @@ namespace GameMod {
             if (MPModPrivateData.LapLimit == 0)
                 return true;
 
-            if (Race.Players.Any(x => x.Laps.Count() >= MPModPrivateData.LapLimit))
+            if (Race.Players.All(x => x.isFinished))
                 NetworkMatch.End();
 
             return false;
@@ -541,13 +549,21 @@ namespace GameMod {
             PlayerLapMessage plm = rawMsg.ReadMessage<PlayerLapMessage>();
             var rp = Race.Players.FirstOrDefault(x => x.player.netId.Value == plm.m_player_id.Value);
             rp.Laps.Add(new RacePlayer.Lap { Num = plm.lapNum, Time = plm.lapTime });
+
             if (GameManager.m_local_player == rp.player)
             {
                 var lastLap = TimeSpan.FromSeconds(rp.Laps.LastOrDefault().Time);
                 var personalBest = TimeSpan.FromSeconds(rp.Laps.Min(x => x.Time));
                 var matchBest = TimeSpan.FromSeconds(Race.Players.SelectMany(x => x.Laps).Min(y => y.Time));
                 GameplayManager.AddHUDMessage($"Last Lap ({lastLap.Minutes:0}:{lastLap.Seconds:00}.{lastLap.Milliseconds:000}), Personal Best ({personalBest.Minutes:0}:{personalBest.Seconds:00}.{personalBest.Milliseconds:000}), Match Best ({matchBest.Minutes:0}:{matchBest.Seconds:00}.{matchBest.Milliseconds:000})", -1, true);
+
+                if (rp.isFinished)
+                {
+                    GameManager.m_local_player.m_spectator = true;
+                    MPObserver.Enable();
+                }
             }
+
             Race.Sort();
         }
 
@@ -612,6 +628,10 @@ namespace GameMod {
                         if (rp.lastTriggerForward && lapTime > 4f)
                         {
                             NetworkServer.SendToAll(MessageTypes.MsgLapCompleted, new PlayerLapMessage { m_player_id = playerShip.c_player.netId, lapNum = (uint)rp.Laps.Count() + 1, lapTime = lapTime });
+                            if (MPModPrivateData.LapLimit > 0 && rp.Laps.Count() + 1 >= MPModPrivateData.LapLimit)
+                            {
+                                rp.player.Networkm_spectator = true;
+                            }
                         }
                         rp.lastTriggerForward = true;
                     }
@@ -628,6 +648,24 @@ namespace GameMod {
         }
     }
 
+    // Remove Players who are strictly observers from scoreboard
+    [HarmonyPatch(typeof(Client), "OnMatchStart")]
+    class MatchModeRace_Client_OnMatchStart
+    {
+        static void Postfix()
+        {
+            if (MPModPrivateData.MatchMode != ExtMatchMode.RACE)
+                return;
+
+            foreach (var player in Overload.NetworkManager.m_Players)
+            {
+                var rp = Race.Players.FirstOrDefault(x => x.player.netId == player.netId);
+                if (player.m_spectator)
+                    Race.Players.Remove(rp);
+            }
+        }
+    }
+
     [HarmonyPatch(typeof(Overload.NetworkManager), "AddPlayer")]
     class NetworkManager_AddPlayer
     {
@@ -636,7 +674,7 @@ namespace GameMod {
             if (MPModPrivateData.MatchMode != ExtMatchMode.RACE)
                 return;
 
-            if (!Race.Players.Any(x => x.player == player))
+            if (!Race.Players.Any(x => x.player.netId == player.netId))
                 Race.Players.Add(new RacePlayer(player));
         }
     }
@@ -720,7 +758,7 @@ namespace GameMod {
     {
         static void Postfix(UIElement __instance)
         {
-            if (!GameplayManager.IsMultiplayerActive || MPModPrivateData.MatchMode != ExtMatchMode.RACE)
+            if (!GameplayManager.IsMultiplayerActive || MPModPrivateData.MatchMode != ExtMatchMode.RACE || MPObserver.Enabled)
                 return;
 
             if (!GameplayManager.ShowHud)
@@ -750,192 +788,9 @@ namespace GameMod {
             vector.y += 24f;
             __instance.DrawStringSmall($"Total: {TimeSpan.FromSeconds(NetworkMatch.m_match_elapsed_seconds).Minutes:0}:{TimeSpan.FromSeconds(NetworkMatch.m_match_elapsed_seconds).Seconds:00}.{TimeSpan.FromSeconds(NetworkMatch.m_match_elapsed_seconds).Milliseconds:000}", vector, 0.4f, StringOffset.LEFT, UIManager.m_col_damage, 1f);
             vector.y += 24F;
-            //var rps = Race.Players.Where(x => x.player.m_mp_name.Length > 2);
-            //if (rps.Count() > 1)
-            //{
-            //    var rp1 = rps.ElementAt(0);
-            //    var rp2 = rps.ElementAt(1);
-            //    int pathlength;
-            //    Pathfinding.FindConnectedDistancePointPoint(rp1.player.c_player_ship.SegmentIndex, rp2.player.c_player_ship.SegmentIndex, rp1.player.c_player_ship.c_transform.position, rp2.player.c_player_ship.c_transform.position, out pathlength);
-            //    __instance.DrawStringSmall("Distance: " + pathlength.ToString(), vector, 0.4f, StringOffset.CENTER, UIManager.m_col_damage, 1f);
-            //    vector.y += 24f;
-            //    __instance.DrawStringSmall("Pathfinding: " + Pathfinding.m_precomputed_paths_valid.ToString(), vector, 0.4f, StringOffset.CENTER, UIManager.m_col_damage, 1f);
-            //}
         }
     }
-
-    [HarmonyPatch(typeof(UIElement), "DrawHUDScoreInfo")]
-    class MatchModeRace_UIElement_DrawHUDScoreInfo
-    {
-        static bool Prefix(Vector2 pos, UIElement __instance, Vector2 ___temp_pos)
-        {
-            if (MPModPrivateData.MatchMode != ExtMatchMode.RACE)
-                return true;
-
-            pos.x -= 4f;
-            pos.y -= 5f;
-            ___temp_pos.y = pos.y;
-            ___temp_pos.x = pos.x - 100f;
-            __instance.DrawStringSmall(NetworkMatch.GetModeString(MatchMode.NUM), ___temp_pos, 0.4f, StringOffset.LEFT, UIManager.m_col_ub0, 1f, 130f);
-            ___temp_pos.x = pos.x + 95f;
-            int match_time_remaining = NetworkMatch.m_match_time_remaining;
-            int num3 = (int)NetworkMatch.m_match_elapsed_seconds;
-            __instance.DrawDigitsTime(___temp_pos, (float)match_time_remaining, 0.45f, (num3 <= 10 || match_time_remaining >= 10) ? UIManager.m_col_ui2 : UIManager.m_col_em5, __instance.m_alpha, false);
-            ___temp_pos.x = pos.x - 100f;
-            ___temp_pos.y = ___temp_pos.y - 20f;
-            __instance.DrawPing(___temp_pos);
-            pos.y += 24f;
-
-            pos.y -= 12f;
-            pos.x += 6f;
-            UIManager.DrawQuadUI(pos, 100f, 1.2f, UIManager.m_col_ub1, __instance.m_alpha, 21);
-            pos.y += 10f;
-            ___temp_pos.x = pos.x;
-            ___temp_pos.x = ___temp_pos.x + 90f;
-            for (int i = 0; i < Race.Players.Count; i++)
-            {
-                ___temp_pos.y = pos.y;
-                Player player = Race.Players[i].player;
-                if (player && !player.m_spectator)
-                {
-                    var rp = Race.Players[i];
-                    Color color3 = (!player.isLocalPlayer) ? UIManager.m_col_ui1 : UIManager.m_col_hi3;
-                    float num4 = (!player.gameObject.activeInHierarchy) ? 0.3f : 1f;
-                    __instance.DrawDigitsVariable(___temp_pos, rp.Laps.Count(), 0.4f, StringOffset.RIGHT, color3, __instance.m_alpha * num4);
-                    ___temp_pos.x = ___temp_pos.x - 35f;
-                    __instance.DrawStringSmall(player.m_mp_name, ___temp_pos, 0.35f, StringOffset.RIGHT, color3, num4, -1f);
-                    ___temp_pos.x = ___temp_pos.x + 8f;
-                    if (UIManager.ShouldDrawPlatformId(player.m_mp_platform))
-                    {
-                        UIManager.DrawSpriteUI(___temp_pos, 0.1f, 0.1f, color3, num4 * 0.6f, (int)(226 + player.m_mp_platform));
-                    }
-                    ___temp_pos.x = ___temp_pos.x + 27f;
-                    pos.y += 16f;
-                }
-            }
-            pos.y -= 6f;
-            UIManager.DrawQuadUI(pos, 100f, 1.2f, UIManager.m_col_ub1, __instance.m_alpha, 21);
-            pos.x -= 6f;
-            pos.y -= 6f;
-
-            pos.y += 22f;
-            pos.x += 100f;
-            __instance.DrawRecentKillsMP(pos);
-            if (GameManager.m_player_ship.m_wheel_select_state == WheelSelectState.QUICK_CHAT)
-            {
-                pos.y = UIManager.UI_TOP + 128f;
-                pos.x = -448f;
-                __instance.DrawQuickChatWheel(pos);
-            }
-            else
-            {
-                pos.y = UIManager.UI_TOP + 60f;
-                pos.x = UIManager.UI_LEFT + 5f;
-                __instance.DrawQuickChatMP(pos);
-            }
-
-
-            return false;
-        }
-    }
-
-
-    [HarmonyPatch(typeof(UIElement), "DrawMpScoreboardRaw")]
-    class MatchModeRace_UIElement_DrawMpScoreboardRaw
-    {
-        static bool Prefix(Vector2 pos, UIElement __instance)
-        {
-            if (MPModPrivateData.MatchMode != ExtMatchMode.RACE)
-                return true;
-
-            DrawMpScoreboardRaw(ref pos, __instance);
-            return false;
-        }
-
-        public static void DrawMpScoreboardRaw(ref Vector2 pos, UIElement uie)
-        {
-            float col = -380f;
-            float col2 = -40f;
-            float col3 = 100f;
-            float col4 = 240f;
-            float col5 = 330f;
-            float col6 = 400f;
-            float col7 = 470f;
-            DrawScoreHeader(uie, pos, col, col2, col3, col4, col5, col6, col7, true);
-            pos.y += 15f;
-            uie.DrawVariableSeparator(pos, 450f);
-            pos.y += 20f;
-            DrawScoresWithoutTeams(uie, pos, col, col2, col3, col4, col5, col6, col7);
-        }
-
-        static void DrawScoreHeader(UIElement uie, Vector2 pos, float col1, float col2, float col3, float col4, float col5, float col6, float col7, bool score = false)
-        {
-            uie.DrawStringSmall(Loc.LS("PLAYER"), pos + Vector2.right * col1, 0.4f, StringOffset.LEFT, UIManager.m_col_ui0, 1f, -1f);
-            uie.DrawStringSmall(Loc.LS("TOTAL"), pos + Vector2.right * col2, 0.4f, StringOffset.CENTER, UIManager.m_col_ui0, 1f, 85f);
-            uie.DrawStringSmall(Loc.LS("BEST"), pos + Vector2.right * col3, 0.4f, StringOffset.CENTER, UIManager.m_col_ui0, 1f, 85f);
-            uie.DrawStringSmall(Loc.LS("LAPS"), pos + Vector2.right * col4, 0.4f, StringOffset.CENTER, UIManager.m_col_ui0, 1f, 85f);
-            uie.DrawStringSmall(Loc.LS("KILLS"), pos + Vector2.right * col5, 0.4f, StringOffset.CENTER, UIManager.m_col_ui0, 1f, 85f);
-            uie.DrawStringSmall(Loc.LS("DEATHS"), pos + Vector2.right * col6, 0.4f, StringOffset.CENTER, UIManager.m_col_ui0, 1f, 85f);
-            UIManager.DrawSpriteUI(pos + Vector2.right * col7, 0.13f, 0.13f, UIManager.m_col_ui0, uie.m_alpha, 204);
-        }
-
-        static void DrawScoresWithoutTeams(UIElement uie, Vector2 pos, float col1, float col2, float col3, float col4, float col5, float col6, float col7)
-        {
-            for (int j = 0; j < Race.Players.Count; j++)
-            {
-                Player player = Race.Players[j].player;
-                if (player && !player.m_spectator)
-                {
-                    float num = (!player.gameObject.activeInHierarchy) ? 0.3f : 1f;
-                    if (j % 2 == 0)
-                    {
-                        UIManager.DrawQuadUI(pos, 400f, 13f, UIManager.m_col_ub0, uie.m_alpha * num * 0.1f, 13);
-                    }
-                    Color c;
-                    Color c2;
-                    if (player.isLocalPlayer)
-                    {
-                        UIManager.DrawQuadUI(pos, 510f, 12f, UIManager.m_col_ui0, uie.m_alpha * num * UnityEngine.Random.Range(0.2f, 0.22f), 20);
-                        c = Color.Lerp(UIManager.m_col_ui5, UIManager.m_col_ui6, UnityEngine.Random.Range(0f, 0.5f));
-                        c2 = UIManager.m_col_hi5;
-                        UIManager.DrawQuadUI(pos - Vector2.up * 12f, 400f, 1.2f, c, uie.m_alpha * num * 0.5f, 4);
-                        UIManager.DrawQuadUI(pos + Vector2.up * 12f, 400f, 1.2f, c, uie.m_alpha * num * 0.5f, 4);
-                    }
-                    else
-                    {
-                        c = UIManager.m_col_ui1;
-                        c2 = UIManager.m_col_hi1;
-                    }
-                    UIManager.DrawSpriteUI(pos + Vector2.right * (col1 - 35f), 0.11f, 0.11f, c, uie.m_alpha * num, Player.GetMpModifierIcon(player.m_mp_mod1, true));
-                    UIManager.DrawSpriteUI(pos + Vector2.right * (col1 - 15f), 0.11f, 0.11f, c, uie.m_alpha * num, Player.GetMpModifierIcon(player.m_mp_mod2, false));
-                    float max_width = col2 - col1 - (float)((!NetworkMatch.m_head_to_head) ? 130 : 10);
-                    uie.DrawPlayerNameBasic(pos + Vector2.right * col1, player.m_mp_name, c, player.m_mp_rank_true, 0.6f, num, player.m_mp_platform, max_width);
-
-                    var total = TimeSpan.Zero;
-                    if (j == 0)
-                    {
-                        total = TimeSpan.FromSeconds(Race.Players[j].Laps.Sum(x => x.Time));
-                    }
-                    uie.DrawStringSmall(j == 0 ? $"{total.Minutes:0}:{total.Seconds:00}.{total.Milliseconds:000}" : "", pos + Vector2.right * col2, 0.65f, StringOffset.CENTER, c, uie.m_alpha * num);
-
-                    var best = TimeSpan.Zero;
-                    if (Race.Players[j].Laps.Count > 0)
-                    {
-                        best = TimeSpan.FromSeconds(Race.Players[j].Laps.Min(x => x.Time));
-                    }
-                    uie.DrawStringSmall(Race.Players[j].Laps.Count > 0 ? $"{best.Minutes:0}:{best.Seconds:00}.{best.Milliseconds:000}" : "", pos + Vector2.right * col3, 0.65f, StringOffset.CENTER, c, uie.m_alpha * num);
-
-                    uie.DrawDigitsVariable(pos + Vector2.right * col4, Race.Players[j].Laps.Count(), 0.65f, StringOffset.CENTER, c, uie.m_alpha * num);
-                    uie.DrawDigitsVariable(pos + Vector2.right * col5, player.m_kills, 0.65f, StringOffset.CENTER, c, uie.m_alpha * num);
-                    uie.DrawDigitsVariable(pos + Vector2.right * col6, player.m_deaths, 0.65f, StringOffset.CENTER, c, uie.m_alpha * num);
-                    c = uie.GetPingColor(player.m_avg_ping_ms);
-                    uie.DrawDigitsVariable(pos + Vector2.right * col7, player.m_avg_ping_ms, 0.65f, StringOffset.CENTER, c, uie.m_alpha * num);
-                    pos.y += 25f;
-                }
-            }
-        }
-    }
-
+    
     [HarmonyPatch(typeof(TriggerWindTunnel), "Start")]
     class MatchModeRace_TriggerWindTunnel_Start
     {
@@ -1476,9 +1331,11 @@ namespace GameMod {
     [HarmonyPatch(typeof(NetworkMatch), "NetSystemShutdown")]
     class DisableWindTunnels
     {
-        static void Prefix() {
+        static void Prefix()
+        {
             foreach (var wt in UnityEngine.Object.FindObjectsOfType<TriggerWindTunnel>())
                 wt.gameObject.SetActive(false);
         }
     }
+
 }

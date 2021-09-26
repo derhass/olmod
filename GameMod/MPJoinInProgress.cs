@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
-using Harmony;
+using HarmonyLib;
 using Overload;
 using UnityEngine;
 using UnityEngine.Networking;
@@ -37,7 +37,7 @@ namespace GameMod {
             return GameManager.MultiplayerMission.GetLevelFileName(m_match_force_playlist_level_idx);
         }
 
-        public static void SetReady(Player player, bool ready)
+        public static void SetReady(Player player, bool ready, bool serverPreReady = false)
         {
             // Keep track of who has been set ready so we're not wasting CPU cycles making someone visible who is already visible.  Especially needed with the JIP visibility workaround.
             if (ready)
@@ -61,8 +61,8 @@ namespace GameMod {
             player.c_player_ship.gameObject.layer = ready ? 9 : 2;
             player.c_player_ship.enabled = ready;
             player.c_player_ship.gameObject.SetActive(ready);
-            player.enabled = ready;
-            player.gameObject.SetActive(ready);
+            player.enabled = ready || serverPreReady;
+            player.gameObject.SetActive(ready || serverPreReady);
 
             if (ready)
             {
@@ -115,6 +115,12 @@ namespace GameMod {
             }
 
             MPJoinInProgress.SetReady(player, msg.ready);
+
+            // Check if we should be using 1v1 scoring
+            if (NetworkMatch.GetMode() == MatchMode.ANARCHY)
+            {
+                NetworkMatch.m_head_to_head = (NetworkMatch.m_players.Count(x => !x.Value.m_name.StartsWith("OBSERVER")) < 3);
+            }
         }
 
         static void Postfix()
@@ -311,6 +317,12 @@ namespace GameMod {
                 };
             NetworkServer.SendToClient(connectionId, MessageTypes.MsgSetMatchState, msg);
 
+            // Check if we should be using 1v1 scoring
+            if (NetworkMatch.GetMode() == MatchMode.ANARCHY)
+            {
+                NetworkMatch.m_head_to_head = (NetworkMatch.m_players.Count(x => !x.Value.m_name.StartsWith("OBSERVER")) < 3);
+            }
+
             // Send disconnected pilot stats as separate message
             if (MPTweaks.ClientHasTweak(connectionId, "jip"))
             {
@@ -333,7 +345,19 @@ namespace GameMod {
                     };
                 }
                 NetworkServer.SendToClient(connectionId, MessageTypes.MsgSetDisconnectedMatchState, dcmsg);
-            }            
+            }
+
+            // CTF Stats
+            if (MPModPrivateData.MatchMode == ExtMatchMode.CTF)
+            {
+                NetworkServer.SendToClient(connectionId, MessageTypes.MsgCTFPlayerStats, new CTF.PlayerStatesMessage() { m_player_states = CTF.PlayerStats });
+            }
+
+            // Monsterball Stats
+            if (MPModPrivateData.MatchMode == ExtMatchMode.MONSTERBALL)
+            {
+                NetworkServer.SendToClient(connectionId, MessageTypes.MsgMonsterballPlayerStats, new MonsterballAddon.PlayerStatesMessage() { m_player_states = MonsterballAddon.PlayerStats });
+            }
         }
 
         private static float SendPreGame(int connectionId, float pregameWait)
@@ -367,7 +391,7 @@ namespace GameMod {
                         NetworkServer.SendToClient(player.connectionToClient.connectionId, MessageTypes.MsgJIPJustJoined, new JIPJustJoinedMessage { playerId = newPlayer.netId, ready = false });
                     }
                 }
-                MPJoinInProgress.SetReady(newPlayer, false);
+                MPJoinInProgress.SetReady(newPlayer, false, true); // special case: do not disable the player completely, as this would prevent this player to be sent to new clients joining before we finally switch to ready
             }
 
             pregameWait = SendPreGame(connectionId, pregameWait);
