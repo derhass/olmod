@@ -485,11 +485,38 @@ namespace GameMod {
             player.c_player_ship.c_mesh_collider_trans.localPosition = player.c_player_ship.c_transform.localPosition;
         }
 
-        public static void extrapolatePlayer(Player player, NewPlayerSnapshot snapshot, float t){
+        public static void extrapolatePlayer(Player player, NewPlayerSnapshot snapshot, float t, bool withCollision){
             if (HandlePlayerRespawn(player,snapshot)) {
                 return;
             }
-            player.c_player_ship.c_transform.localPosition = Vector3.LerpUnclamped(snapshot.m_pos, snapshot.m_pos+snapshot.m_vel, t);
+            Vector3 newPos = Vector3.LerpUnclamped(snapshot.m_pos, snapshot.m_pos+snapshot.m_vel, t);
+            if (withCollision) {
+                const float radius = 0.95f; /// the ship's collider is radius 1, we use a bit smaller one
+                Vector3 basePos = snapshot.m_pos;
+                Vector3 deltaPos = newPos - basePos;
+                float dist = deltaPos.magnitude;
+                if (dist > 0.01f) { // only if ship is moved by a significant amount
+                    Vector3 direction = (1.0f/dist) * deltaPos;
+                    // NOTE: we only test against LAVA and LEVEL, not other players, because that
+                    //       would have two drawbacks:
+                    //       - we would test against the player ship itslef, it speed and ping
+                    //         is high enough (I tired to disable that collider, but that didn't work(
+                    //       - if multipe opponents collide, the first one we processed here
+                    //         would get maximal movement and the others would be cut short, which
+                    //         is not correct either...
+                    const int layerMask = (1<<(int)UnityObjectLayers.LEVEL) | (1<<(int)UnityObjectLayers.LAVA);
+                    RaycastHit hitInfo;
+
+                    if (Physics.SphereCast(basePos, radius, direction, out hitInfo, dist + radius, layerMask, QueryTriggerInteraction.Ignore)) {
+                        //Debug.LogFormat("XXXX hit at dist {0} maxDist {1}", hitInfo.distance, dist);
+                        if (hitInfo.distance < dist) {
+                            // collision with something, don't extrapolate beyond that
+                            newPos = basePos + (hitInfo.distance) * direction;
+                        }
+                    }
+                }
+            }
+            player.c_player_ship.c_transform.localPosition = newPos;
             player.c_player_ship.c_transform.rotation = Quaternion.SlerpUnclamped(snapshot.m_rot, snapshot.m_rot*Quaternion.Euler(snapshot.m_vrot), t);
             player.c_player_ship.c_mesh_collider_trans.localPosition = player.c_player_ship.c_transform.localPosition;
         }
@@ -617,7 +644,7 @@ namespace GameMod {
                     } else {
                         NewPlayerSnapshot snapshot = GetPlayerSnapshot(msgB, player);
                         if(snapshot != null){
-                            extrapolatePlayer(player, snapshot, delta_t);
+                            extrapolatePlayer(player, snapshot, delta_t, (MPClientExtrapolation_Controller.hackIsEnabled > 0));
                         }
                     }
                 }
@@ -659,6 +686,26 @@ namespace GameMod {
                 return;
             }
             MPClientShipReckoning.ResetForNewMatch();
+        }
+    }
+
+    [HarmonyPatch(typeof(GameManager), "Awake")]
+    class MPClientExtrapolation_Controller {
+        public static int hackIsEnabled = 0;
+
+        private static void hack_lag_collision() {
+                int n = uConsole.GetNumParameters();
+                if (n > 0) {
+                        int value = uConsole.GetInt();
+                        hackIsEnabled = value;
+                } else {
+                        hackIsEnabled = (hackIsEnabled >0)?0:1;
+                }
+                UnityEngine.Debug.LogFormat("hack_lag_collision is now {0}", hackIsEnabled);
+        }
+
+        static void Postfix() {
+            uConsole.RegisterCommand("hack_lag_collision", hack_lag_collision);
         }
     }
 
