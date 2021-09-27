@@ -146,6 +146,7 @@ namespace GameMod {
             mms_lag_compensation_advanced = false;
             mms_lag_compensation_strength = 2;
             mms_lag_compensation_use_interpolation = 0;
+            mms_lag_compensation_collision_limit = 100;
         }
 
         public static int mms_weapon_lag_compensation_max = 100;
@@ -157,6 +158,7 @@ namespace GameMod {
         public static int mms_lag_compensation = 3;
         public static int mms_lag_compensation_strength = 2;
         public static int mms_lag_compensation_use_interpolation = 0;
+        public static int mms_lag_compensation_collision_limit = 100;
         public static string mms_mp_projdata_fn = "STOCK";
         public static bool mms_sticky_death_summary = false;
         public static int mms_damageeffect_alpha_mult = 30;
@@ -762,6 +764,9 @@ namespace GameMod {
                                 case 10:
                                     Menus.mms_lag_compensation_ship_added_lag = (int)(UIElement.SliderPos * 50f);
                                     break;
+                                case 11:
+                                    Menus.mms_lag_compensation_collision_limit = (int)(UIElement.SliderPos * 100f+0.5f);
+                                    break;
                                 case 100:
                                     MenuManager.PlaySelectSound(1f);
                                     m_menu_state_timer = 0f;
@@ -839,6 +844,8 @@ namespace GameMod {
                 SelectAndDrawSliderItem(uie, Loc.LS("SHIP LAG COMPENSATION SCALE"), position, 9, Menus.mms_ship_lag_compensation_scale, 100, "THE SCALE AT WHICH SHIP LAG IS COMPENSATED MEASURED AS A PERCENTAGE OF THE AMOUNT OF PING YOU ARE COMPENSATING FOR." + Environment.NewLine + "A SCALE OF 100% WILL MAKE YOUR SHOTS THAT HIT SHIPS CLOSELY MATCH THE SERVER WHEN YOUR PING IS LESS THAN YOUR MAX PING TO COMPENSATE FOR SHIPS", Menus.mms_lag_compensation == 0 || Menus.mms_lag_compensation == 2);
                 position.y += 62f;
                 SelectAndDrawSliderItem(uie, Loc.LS("SHIP LAG ADDED"), position, 10, Menus.mms_lag_compensation_ship_added_lag, 50, "ADDS A SET AMOUNT OF LAG TO THE END OF THE SHIP LAG COMPENSATION CALCULATIONS. USEFUL WHEN SHIP LAG COMPENSATION IS TURNED OFF." + Environment.NewLine + "A HIGHER SETTING WILL BETTER SHOW SHIP POSITIONS WITHOUT GUESSING, BUT REQUIRE YOU TO LEAD SHIPS MORE");
+                position.y += 62f;
+                SelectAndDrawSliderItem(uie, Loc.LS("LIMIT SHIP DIVING INTO WALLS"), position, 11, Menus.mms_lag_compensation_collision_limit, 100, "LIMIT HOW FAR THE SHIP MIGHT DIVE INTO WALLS, IN PERCENT OF THE DIAMETER OF THE SHIP'S ENCLOSING SPHERE." + Environment.NewLine + "AT 0, THE SHIP NEVER DIVES INTO/THROUGH WALLS, AT 50, THE SHIP CENTER IS ALWAYS VISIBLE, 100 IS UNLIMITED");
                 position.y += 62f;
             }
             position.y = UIManager.UI_BOTTOM - 120f;
