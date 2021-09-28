@@ -812,10 +812,10 @@ namespace GameMod {
             uie.DrawMenuBG();
             Vector2 position = uie.m_position;
             position.y = UIManager.UI_TOP + 64f;
-            uie.DrawHeaderMedium(Vector2.up * (UIManager.UI_TOP + 30f), Loc.LS("LAG COMPENSATION SETTINGS"), 265f);
-            position.y += 20f;
+            uie.DrawHeaderMedium(Vector2.up * (UIManager.UI_TOP + 25f), Loc.LS("LAG COMPENSATION SETTINGS"), 265f);
+            position.y += 14f;
             uie.DrawMenuSeparator(position);
-            position.y += 40f;
+            position.y += 24f;
             uie.SelectAndDrawStringOptionItem(Loc.LS("LAG COMPENSATION"), position, 1, Menus.GetMMSLagCompensation(), "ENABLE LAG COMPENSATION FOR MULTIPLAYER GAMES", 1.5f, false);
             position.y += 62f;
             uie.SelectAndDrawStringOptionItem(Loc.LS("USE ADVANCED SETTINGS"), position, 2, Menus.GetMMSLagCompensationAdvanced(), "SHOW ADVANCED SETTINGS TO FURTHER FINE TUNE YOUR LAG COMPENSATION", 1.5f, false);
@@ -845,10 +845,10 @@ namespace GameMod {
                 position.y += 62f;
                 SelectAndDrawSliderItem(uie, Loc.LS("SHIP LAG ADDED"), position, 10, Menus.mms_lag_compensation_ship_added_lag, 50, "ADDS A SET AMOUNT OF LAG TO THE END OF THE SHIP LAG COMPENSATION CALCULATIONS. USEFUL WHEN SHIP LAG COMPENSATION IS TURNED OFF." + Environment.NewLine + "A HIGHER SETTING WILL BETTER SHOW SHIP POSITIONS WITHOUT GUESSING, BUT REQUIRE YOU TO LEAD SHIPS MORE");
                 position.y += 62f;
-                SelectAndDrawSliderItem(uie, Loc.LS("LIMIT SHIP DIVING INTO WALLS"), position, 11, Menus.mms_lag_compensation_collision_limit, 100, "LIMIT HOW FAR THE SHIP MIGHT DIVE INTO WALLS, IN PERCENT OF THE DIAMETER OF THE SHIP'S ENCLOSING SPHERE." + Environment.NewLine + "AT 0, THE SHIP NEVER DIVES INTO/THROUGH WALLS, AT 50, THE SHIP CENTER IS ALWAYS VISIBLE, 100 IS UNLIMITED");
+                SelectAndDrawSliderItem(uie, Loc.LS("LIMIT SHIPS DIVING INTO WALLS"), position, 11, Menus.mms_lag_compensation_collision_limit, 100, "LIMIT HOW FAR SHIPS MIGHT DIVE INTO WALLS, IN PERCENT OF THE DIAMETER OF THE SHIPS' ENCLOSING SPHERE." + Environment.NewLine + "AT 0, THE SHIP NEVER DIVES INTO/THROUGH WALLS, AT 50, THE SHIP CENTER IS ALWAYS VISIBLE, 100 IS UNLIMITED");
                 position.y += 62f;
             }
-            position.y = UIManager.UI_BOTTOM - 120f;
+            position.y = UIManager.UI_BOTTOM - 118f;
             uie.DrawMenuSeparator(position);
             position.y += 5f;
             DrawMenuToolTipMultiline(uie, position, 15f);
