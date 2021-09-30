@@ -238,6 +238,7 @@ namespace GameMod {
                 Menus.mms_lag_compensation_collision_limit = ModPrefs.GetInt("MP_PM_SHIP_LAG_COMPENSATION_COLLISION_LIMIT", Menus.mms_lag_compensation_collision_limit);
                 Menus.mms_sticky_death_summary = ModPrefs.GetBool("MP_PM_STICKY_DEATH_SUMMARY", Menus.mms_sticky_death_summary);
                 MPDeathReview.stickyDeathReview = Menus.mms_sticky_death_summary;
+                Menus.mms_reduced_ship_explosions = ModPrefs.GetBool("MP_PM_REDUCED_SHIP_EXPLOSIONS", Menus.mms_reduced_ship_explosions);
                 Menus.mms_damageeffect_alpha_mult = ModPrefs.GetInt("MP_PM_DAMAGEEFFECT_ALPHA_MULT", Menus.mms_damageeffect_alpha_mult);
                 Menus.mms_damageeffect_drunk_blur_mult = ModPrefs.GetInt("MP_PM_DAMAGEEFFECT_DRUNK_BLUR_MULT", Menus.mms_damageeffect_drunk_blur_mult);
                 Menus.mms_match_time_limit = ModPrefs.GetInt("MP_PM_MATCH_TIME_LIMIT", Menus.mms_match_time_limit);
@@ -294,6 +295,7 @@ namespace GameMod {
             ModPrefs.SetInt("MP_PM_SHIP_LAG_COMPENSATION_SCALE", Menus.mms_ship_lag_compensation_scale);
             ModPrefs.SetInt("MP_PM_SHIP_LAG_COMPENSATION_COLLISION_LIMIT", Menus.mms_lag_compensation_collision_limit);
             ModPrefs.SetBool("MP_PM_STICKY_DEATH_SUMMARY", Menus.mms_sticky_death_summary);
+            ModPrefs.SetBool("MP_PM_REDUCED_SHIP_EXPLOSIONS", Menus.mms_reduced_ship_explosions);
             ModPrefs.SetInt("MP_PM_DAMAGEEFFECT_ALPHA_MULT", Menus.mms_damageeffect_alpha_mult);
             ModPrefs.SetInt("MP_PM_DAMAGEEFFECT_DRUNK_BLUR_MULT", Menus.mms_damageeffect_drunk_blur_mult);
             ModPrefs.SetInt("MP_PM_MATCH_TIME_LIMIT", Menus.mms_match_time_limit);
