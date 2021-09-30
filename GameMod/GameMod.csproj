@@ -101,6 +101,7 @@
     <Compile Include="Config.cs" />
     <Compile Include="Console.cs" />
     <Compile Include="Controllers.cs" />
+    <Compile Include="CrusherTrails.cs" />
     <Compile Include="MatchModeCTF.cs" />
     <Compile Include="CustomDoorAutomap.cs" />
     <Compile Include="CustomLevelResources.cs" />
@@ -129,6 +130,7 @@
     <Compile Include="MPCreeperSync.cs" />
     <Compile Include="MPCustomModeFile.cs" />
     <Compile Include="MPDamageEffects.cs" />
+    <Compile Include="MPDeathExplosion.cs" />
     <Compile Include="MPDeathReview.cs" />
     <Compile Include="MPErrorSmoothingFix.cs" />
     <Compile Include="MPFixGhostProjectiles.cs" />
