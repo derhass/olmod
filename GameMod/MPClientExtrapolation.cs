@@ -491,6 +491,7 @@ namespace GameMod {
                 return;
             }
             Vector3 newPos = Vector3.LerpUnclamped(snapshot.m_pos, snapshot.m_pos+snapshot.m_vel, t);
+            // limit ship dive-in if enabled:
             if (Menus.mms_lag_compensation_collision_limit > 0) {
                 const float radius = 0.98f; /// the ship's collider is radius 1, we use a bit smaller one
                 Vector3 basePos = snapshot.m_pos;
