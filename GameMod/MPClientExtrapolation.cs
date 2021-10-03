@@ -499,8 +499,8 @@ namespace GameMod {
                 if (dist > 0.05f) { // only if ship is moved by a significant amount
                     // NOTE: we only test against LAVA and LEVEL, not other players, because that
                     //       would have two drawbacks:
-                    //       - we would test against the player ship itslef, it speed and ping
-                    //         is high enough (I tired to disable that collider, but that didn't work(
+                    //       - we would test against the player ship itslef, if speed and ping
+                    //         is high enough (I tried to disable that collider, but that didn't work)
                     //       - if multipe opponents collide, the first one we processed here
                     //         would get maximal movement and the others would be cut short, which
                     //         is not correct either...
