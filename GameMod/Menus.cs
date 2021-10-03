@@ -148,7 +148,7 @@ namespace GameMod {
             mms_lag_compensation_advanced = false;
             mms_lag_compensation_strength = 2;
             mms_lag_compensation_use_interpolation = 0;
-            mms_lag_compensation_collision_limit = 100;
+            mms_lag_compensation_collision_limit = 0;
         }
 
         public static int mms_weapon_lag_compensation_max = 100;
@@ -160,7 +160,7 @@ namespace GameMod {
         public static int mms_lag_compensation = 3;
         public static int mms_lag_compensation_strength = 2;
         public static int mms_lag_compensation_use_interpolation = 0;
-        public static int mms_lag_compensation_collision_limit = 100;
+        public static int mms_lag_compensation_collision_limit = 0;
         public static string mms_mp_projdata_fn = "STOCK";
         public static bool mms_sticky_death_summary = false;
         public static int mms_damageeffect_alpha_mult = 30;
@@ -904,11 +904,11 @@ namespace GameMod {
             UIManager.ui_bg_dark = true;
             uie.DrawMenuBG();
             Vector2 position = uie.m_position;
-            position.y = UIManager.UI_TOP + 64f;
+            position.y = UIManager.UI_TOP + 40f;
             uie.DrawHeaderMedium(Vector2.up * (UIManager.UI_TOP + 25f), Loc.LS("LAG COMPENSATION SETTINGS"), 265f);
-            position.y += 14f;
+            position.y += 12f;
             uie.DrawMenuSeparator(position);
-            position.y += 24f;
+            position.y += 32f;
             uie.SelectAndDrawStringOptionItem(Loc.LS("LAG COMPENSATION"), position, 1, Menus.GetMMSLagCompensation(), "ENABLE LAG COMPENSATION FOR MULTIPLAYER GAMES", 1.5f, false);
             position.y += 62f;
             uie.SelectAndDrawStringOptionItem(Loc.LS("USE ADVANCED SETTINGS"), position, 2, Menus.GetMMSLagCompensationAdvanced(), "SHOW ADVANCED SETTINGS TO FURTHER FINE TUNE YOUR LAG COMPENSATION", 1.5f, false);
@@ -938,7 +938,7 @@ namespace GameMod {
                 position.y += 62f;
                 SelectAndDrawSliderItem(uie, Loc.LS("SHIP LAG ADDED"), position, 10, Menus.mms_lag_compensation_ship_added_lag, 50, "ADDS A SET AMOUNT OF LAG TO THE END OF THE SHIP LAG COMPENSATION CALCULATIONS. USEFUL WHEN SHIP LAG COMPENSATION IS TURNED OFF." + Environment.NewLine + "A HIGHER SETTING WILL BETTER SHOW SHIP POSITIONS WITHOUT GUESSING, BUT REQUIRE YOU TO LEAD SHIPS MORE");
                 position.y += 62f;
-                SelectAndDrawSliderItem(uie, Loc.LS("LIMIT SHIPS DIVING INTO WALLS"), position, 11, Menus.mms_lag_compensation_collision_limit, 100, "LIMIT HOW FAR SHIPS MIGHT DIVE INTO WALLS, IN PERCENT OF THE DIAMETER OF THE SHIPS' ENCLOSING SPHERE." + Environment.NewLine + "AT 0, THE SHIP NEVER DIVES INTO/THROUGH WALLS, AT 50, THE SHIP CENTER IS ALWAYS VISIBLE, 100 IS UNLIMITED");
+                SelectAndDrawSliderItem(uie, Loc.LS("LIMIT SHIPS DIVING INTO WALLS"), position, 11, Menus.mms_lag_compensation_collision_limit, 100, "LIMIT HOW FAR SHIPS MIGHT DIVE INTO WALLS (BUT SHIPS MIGHT APPER STUCK AT THE WALLS FOR SHORT MOMENTS INSTEAD)." + Environment.NewLine + "0 FOR UNLIMITED (NO CALCULATION OVERHEAD), OTHERWISE PERCENTAGE OF SHIP DIAMETER WHICH MUST REMAIN VISIBLE (100 = NO DIVE IN AT ALL).");
                 position.y += 62f;
             }
             position.y = UIManager.UI_BOTTOM - 118f;
