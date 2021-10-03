@@ -492,12 +492,12 @@ namespace GameMod {
             }
             Vector3 newPos = Vector3.LerpUnclamped(snapshot.m_pos, snapshot.m_pos+snapshot.m_vel, t);
             if (Menus.mms_lag_compensation_collision_limit < 100) {
-                const float radius = 0.95f; /// the ship's collider is radius 1, we use a bit smaller one
+                const float radius = 0.98f; /// the ship's collider is radius 1, we use a bit smaller one
                 float maxDive = ((float)Menus.mms_lag_compensation_collision_limit)/50.0f * radius;
                 Vector3 basePos = snapshot.m_pos;
                 Vector3 deltaPos = newPos - basePos;
                 float dist = deltaPos.magnitude;
-                if (dist > 0.01f) { // only if ship is moved by a significant amount
+                if (dist > 0.05f) { // only if ship is moved by a significant amount
                     Vector3 direction = (1.0f/dist) * deltaPos;
                     // NOTE: we only test against LAVA and LEVEL, not other players, because that
                     //       would have two drawbacks:
@@ -509,11 +509,27 @@ namespace GameMod {
                     const int layerMask = (1<<(int)UnityObjectLayers.LEVEL) | (1<<(int)UnityObjectLayers.LAVA);
                     RaycastHit hitInfo;
 
-                    if (Physics.SphereCast(basePos, radius, direction, out hitInfo, dist + radius, layerMask, QueryTriggerInteraction.Ignore)) {
+                    if (Physics.SphereCast(basePos, radius, direction, out hitInfo, dist, layerMask, QueryTriggerInteraction.Ignore)) {
                         //Debug.LogFormat("XXXX hit at dist {0} maxDist {1}", hitInfo.distance, dist);
                         if (hitInfo.distance + maxDive < dist) {
                             // collision with something, don't extrapolate beyond that
-                            newPos = basePos + (hitInfo.distance + maxDive) * direction;
+                            float diveIn = dist - hitInfo.distance;
+                            if (maxDive < 0.01f) {
+                                // no dive-in allowed, abrupt stop
+                                diveIn = maxDive;
+                            } else {
+                                // slow down dive-in gradually  to not get abrupt stop
+                                const float smoothness = 1.0f; // 0.0 would be abrupt
+                                float smoothcoeff = (1.0f + smoothness) * (1.0f + smoothness);
+                                float coeff = (-smoothness) / smoothcoeff;
+                                float relDiveIn = diveIn / maxDive;
+                                float maxRelDiveIn = smoothcoeff / (2.0f * smoothness);
+                                if (relDiveIn > maxRelDiveIn) {
+                                    relDiveIn = maxRelDiveIn;
+                                }
+                                diveIn = (coeff * relDiveIn + 1.0f) * relDiveIn * maxDive;
+                            }
+                            newPos = basePos + (hitInfo.distance + diveIn) * direction;
                         }
                     }
                 }
