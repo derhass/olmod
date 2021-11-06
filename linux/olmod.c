@@ -301,7 +301,7 @@ __attribute__((constructor)) static void olmod_init(void)
 		abort();
 	} else {
 		// Use the versioned one to look up the unversioned version, as this might be a different one.
-		DLSYM_PROC_T *ptr = (DLSYM_PROC_T)org_dlsym(RTLD_NEXT, "dlsym");
+		DLSYM_PROC_T ptr = (DLSYM_PROC_T)org_dlsym(RTLD_NEXT, "dlsym");
 		if (ptr && (ptr != org_dlsym)) {
 			org_dlsym = ptr;
 		}
