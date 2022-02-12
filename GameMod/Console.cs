@@ -113,9 +113,7 @@ namespace GameMod {
             uConsole.Log("UI Color changed");
         }
 
-        static void CmdToggleDebugging() {
-            Debugging.Enabled = !Debugging.Enabled;
-        }
+
 
         static void CmdDumpSegments() {
             for (int segmentIndex = 0; segmentIndex < GameManager.m_level_data.Segments.Length; segmentIndex++) {
@@ -160,7 +158,6 @@ namespace GameMod {
             uConsole.RegisterCommand("dump_segments", "Dump segment data", new uConsole.DebugCommand(CmdDumpSegments));
             uConsole.RegisterCommand("mipmap_bias", "Set Mipmap bias (-16 ... 15.99)", new uConsole.DebugCommand(CmdMipmapBias));
             uConsole.RegisterCommand("reload_missions", "Reload missions", new uConsole.DebugCommand(CmdReloadMissions));
-            uConsole.RegisterCommand("toggle_debugging", "Toggle the display of debugging info", new uConsole.DebugCommand(CmdToggleDebugging));
             uConsole.RegisterCommand("ui_color", "Set UI color #aabbcc", new uConsole.DebugCommand(CmdUIColor));
             // Not working.  See VRScale.cs.
             // uConsole.RegisterCommand("vr_scale", "Set VR scale (0.1 to 10)", new uConsole.DebugCommand(CmdVRScale));
