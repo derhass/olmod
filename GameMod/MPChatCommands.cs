@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using HarmonyLib;
 using Overload;
 using UnityEngine;
@@ -11,6 +12,7 @@ namespace GameMod {
         public enum Command {
             None, // not a known command
             // List of Commands
+            Auth,
             Kick,
             Ban,
         }
@@ -20,11 +22,17 @@ namespace GameMod {
         public string cmdName;
         public string arg;
         public int sender_conn;
+        public bool needAuth;
+
+        // this Dictionary contains the set of authenticated players
+        // Authentication is done based on Player.m_player_id / PlayerLobbyData.m_player_id
+        private static Dictionary<string,bool> authenticatedConnections = new Dictionary<string,bool>();
 
         // Construct a MPChatCommand from a Chat message
         public MPChatCommand(string message, int sender_connection_id) {
             cmd = Command.None;
             sender_conn = sender_connection_id;
+            needAuth = false;
 
             if (message == null || message.Length < 2 || message[0] != '/') {
                 // not a valid command
@@ -43,23 +51,35 @@ namespace GameMod {
                 cmdName = message.Substring(1,message.Length - 1);
             }
 
-            /// detect the command
+            // detect the command
             cmdName = cmdName.ToUpper();
-            if (cmdName == "KICK") {
+            if (cmdName == "A" || cmdName == "AUTH") {
+                cmd = Command.Auth;
+            } else if (cmdName == "K" || cmdName == "KICK") {
                 cmd = Command.Kick;
+                needAuth = true;
             }
 
         }
 
-        // Execute a message: Returns true if the caller should forward the chat message
+        // Execute a command: Returns true if the caller should forward the chat message
         // to the clients, and false if not (when it was a special command for the server)
         public bool Execute(bool inLobby) {
-            if (cmd == null || cmd == Command.None) {
+            if (cmd == Command.None) {
                 return true;
             }
             Debug.LogFormat("CHATCMD {0}: {1} {2}", cmd, cmdName, arg);
+            if (needAuth) {
+                if (!CheckPermission(inLobby)) {
+                    Debug.LogFormat("CHATCMD {0}: client is not authenticated!", cmd);
+                    return false;
+                }
+            }
             bool result = false;
             switch (cmd) {
+                case Command.Auth:
+                    result = DoAuth(inLobby);
+                    break;
                 case Command.Kick:
                     result = DoKick(inLobby);
                     break;
@@ -71,22 +91,81 @@ namespace GameMod {
             return result;
         }
 
+        // Execute the AUTH command
+        public bool DoAuth(bool inLobby) {
+            string id = FindPlayerIDForConnection(sender_conn, inLobby);
+            if (id.Length < 1) {
+                Debug.LogFormat("AUTH: could not determine client's player ID!");
+                return false;
+            }
+
+            // TODO: get the auth password from somewhere...
+            if (arg != null && arg.ToUpper() == "ABCDE") {
+                Debug.LogFormat("AUTH: client {0} is authenticated", id);
+                if (!authenticatedConnections.ContainsKey(id)) {
+                    authenticatedConnections.Add(id, true);
+                }
+            } else {
+                // de-auth
+                Debug.LogFormat("AUTH: client {0} is NOT authenticated: {1} is wrong", id, arg);
+                if (authenticatedConnections.ContainsKey(id)) {
+                    authenticatedConnections.Remove(id);
+                }
+            }
+            return false;
+        }
+
         // Execute the KICK command
         public bool DoKick(bool inLobby) {
             Debug.LogFormat("KICK request for {0}", arg);
-            // TODO: manage kick permissions? E.g only the player who hosted it?
             if (inLobby) {
-                // TODO: implement in-Lobby player name matching and Kicking
+                PlayerLobbyData p = FindPlayerInLobby();
+                if (p == null) {
+                    Debug.LogFormat("KICK {0}: no player found in LOBBY", arg);
+                } else {
+                    Debug.LogFormat("KICK {0}: kicking player {1} from LOBBY", arg, p.m_name);
+                    if (p.m_id < NetworkServer.connections.Count && NetworkServer.connections[p.m_id] != null) {
+                        NetworkServer.connections[p.m_id].Disconnect();
+                    }
+                }
             } else {
                 Player p = FindPlayer();
                 if (p == null) {
                     Debug.LogFormat("KICK {0}: no player found", arg);
                 } else {
-                    Debug.LogFormat("KICK {0}: kicking player {1}", arg, p.m_mp_name);
+                    Debug.LogFormat("KICK {0}: kicking player {1} from GAME", arg, p.m_mp_name);
                     p.connectionToClient.Disconnect();
                 }
             }
             return false;
+        }
+
+        // Find the player ID string based on a connection ID
+        public string FindPlayerIDForConnection(int conn_id, bool inLobby) {
+            if (inLobby) {
+                foreach (KeyValuePair<int, PlayerLobbyData> p in NetworkMatch.m_players) {
+                    if (p.Value != null && p.Value.m_id == conn_id) {
+                        return p.Value.m_player_id;
+                    }
+                }
+            } else {
+                foreach (var p in Overload.NetworkManager.m_Players) {
+                    if (p != null && p.connectionToClient != null && p.connectionToClient.connectionId == conn_id) {
+                        return p.m_mp_player_id;
+                    }
+                }
+            }
+            return "";
+        }
+
+        // Check if the sender of the message is authenticated
+        public bool CheckPermission(bool inLobby) {
+            string id = FindPlayerIDForConnection(sender_conn, inLobby);
+            if (id.Length < 1) {
+                Debug.LogFormat("CHATCMD: could not determine client's player ID!");
+                return false;
+            }
+            return (authenticatedConnections.ContainsKey(id) && authenticatedConnections[id] == true);
         }
 
         // Match a player name versus the player name pattern
@@ -135,12 +214,40 @@ namespace GameMod {
             }
             return bestPlayer;
         }
+
+        // Find the best match for a player in the arg field
+        // Search the active players in the lobby
+        // May return null if no match can be found
+        public PlayerLobbyData FindPlayerInLobby() {
+            if (arg == null || arg.Length < 1) {
+                return null;
+            }
+
+            int bestScore = -1000000000;
+            PlayerLobbyData bestPlayer = null;
+            string pattern = arg.ToUpper();
+
+            foreach (KeyValuePair<int, PlayerLobbyData> p in NetworkMatch.m_players) {
+                int score = MatchPlayerName(p.Value.m_name.ToUpper(), pattern);
+                if (score > 0) {
+                    return p.Value;
+                }
+                if (score < 0 && score > bestScore) {
+                    bestScore = score;
+                    bestPlayer = p.Value;
+                }
+            }
+            if (bestPlayer == null) {
+                Debug.LogFormat("CHATCMD: did not find a player matching {0}", pattern);
+            }
+            return bestPlayer;
+        }
     }
 
     [HarmonyPatch(typeof(NetworkMatch), "ProcessLobbyChatMessageOnServer")]
     class MPChatCommands_ProcessLobbyMessage {
         private static bool Prefix(int sender_connection_id, LobbyChatMessage msg) {
-            MPChatCommand cmd = new MPChatCommand(msg.m_text, sender_connection_id);
+            MPChatCommand cmd = new MPChatCommand(NetworkMessageManager.StripTeamPrefix(msg.m_text), sender_connection_id);
             return cmd.Execute(true);
         }
     }
