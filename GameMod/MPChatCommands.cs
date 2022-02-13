@@ -23,16 +23,18 @@ namespace GameMod {
         public string arg;
         public int sender_conn;
         public bool needAuth;
+        public bool inLobby;
 
         // this Dictionary contains the set of authenticated players
         // Authentication is done based on Player.m_player_id / PlayerLobbyData.m_player_id
         private static Dictionary<string,bool> authenticatedConnections = new Dictionary<string,bool>();
 
         // Construct a MPChatCommand from a Chat message
-        public MPChatCommand(string message, int sender_connection_id) {
+        public MPChatCommand(string message, int sender_connection_id, bool isInLobby) {
             cmd = Command.None;
             sender_conn = sender_connection_id;
             needAuth = false;
+            inLobby = isInLobby;
 
             if (message == null || message.Length < 2 || message[0] != '/') {
                 // not a valid command
@@ -64,13 +66,13 @@ namespace GameMod {
 
         // Execute a command: Returns true if the caller should forward the chat message
         // to the clients, and false if not (when it was a special command for the server)
-        public bool Execute(bool inLobby) {
+        public bool Execute() {
             if (cmd == Command.None) {
                 return true;
             }
             Debug.LogFormat("CHATCMD {0}: {1} {2}", cmd, cmdName, arg);
             if (needAuth) {
-                if (!CheckPermission(inLobby)) {
+                if (!CheckPermission()) {
                     Debug.LogFormat("CHATCMD {0}: client is not authenticated!", cmd);
                     return false;
                 }
@@ -78,10 +80,10 @@ namespace GameMod {
             bool result = false;
             switch (cmd) {
                 case Command.Auth:
-                    result = DoAuth(inLobby);
+                    result = DoAuth();
                     break;
                 case Command.Kick:
-                    result = DoKick(inLobby);
+                    result = DoKick();
                     break;
                 default:
                     Debug.LogFormat("CHATCMD {0}: {1} {2} was not handled by server", cmd, cmdName, arg);
@@ -92,7 +94,7 @@ namespace GameMod {
         }
 
         // Execute the AUTH command
-        public bool DoAuth(bool inLobby) {
+        public bool DoAuth() {
             string id = FindPlayerIDForConnection(sender_conn, inLobby);
             if (id.Length < 1) {
                 Debug.LogFormat("AUTH: could not determine client's player ID!");
@@ -116,7 +118,7 @@ namespace GameMod {
         }
 
         // Execute the KICK command
-        public bool DoKick(bool inLobby) {
+        public bool DoKick() {
             Debug.LogFormat("KICK request for {0}", arg);
             if (inLobby) {
                 PlayerLobbyData p = FindPlayerInLobby();
@@ -159,7 +161,7 @@ namespace GameMod {
         }
 
         // Check if the sender of the message is authenticated
-        public bool CheckPermission(bool inLobby) {
+        public bool CheckPermission() {
             string id = FindPlayerIDForConnection(sender_conn, inLobby);
             if (id.Length < 1) {
                 Debug.LogFormat("CHATCMD: could not determine client's player ID!");
@@ -247,16 +249,16 @@ namespace GameMod {
     [HarmonyPatch(typeof(NetworkMatch), "ProcessLobbyChatMessageOnServer")]
     class MPChatCommands_ProcessLobbyMessage {
         private static bool Prefix(int sender_connection_id, LobbyChatMessage msg) {
-            MPChatCommand cmd = new MPChatCommand(NetworkMessageManager.StripTeamPrefix(msg.m_text), sender_connection_id);
-            return cmd.Execute(true);
+            MPChatCommand cmd = new MPChatCommand(NetworkMessageManager.StripTeamPrefix(msg.m_text), sender_connection_id, true);
+            return cmd.Execute();
         }
     }
 
     [HarmonyPatch(typeof(Player), "CmdSendFullChat")]
     class MPChatCommands_ProcessIngameMessage {
         private static bool Prefix(int sender_connection_id, string sender_name, MpTeam sender_team, string msg) {
-            MPChatCommand cmd = new MPChatCommand(msg, sender_connection_id);
-            return cmd.Execute(false);
+            MPChatCommand cmd = new MPChatCommand(msg, sender_connection_id, false);
+            return cmd.Execute();
         }
     }
 }
