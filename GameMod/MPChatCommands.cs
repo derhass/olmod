@@ -73,6 +73,7 @@ namespace GameMod {
             Debug.LogFormat("CHATCMD {0}: {1} {2}", cmd, cmdName, arg);
             if (needAuth) {
                 if (!CheckPermission()) {
+                    ReturnToSender("You do not have the permission for this command!");
                     Debug.LogFormat("CHATCMD {0}: client is not authenticated!", cmd);
                     return false;
                 }
@@ -104,12 +105,14 @@ namespace GameMod {
             // TODO: get the auth password from somewhere...
             if (arg != null && arg.ToUpper() == "ABCDE") {
                 Debug.LogFormat("AUTH: client {0} is authenticated", id);
+                ReturnToSender("Authentication successfull.");
                 if (!authenticatedConnections.ContainsKey(id)) {
                     authenticatedConnections.Add(id, true);
                 }
             } else {
                 // de-auth
                 Debug.LogFormat("AUTH: client {0} is NOT authenticated: {1} is wrong", id, arg);
+                ReturnToSender("Authentication failed.");
                 if (authenticatedConnections.ContainsKey(id)) {
                     authenticatedConnections.Remove(id);
                 }
@@ -124,6 +127,7 @@ namespace GameMod {
                 PlayerLobbyData p = FindPlayerInLobby();
                 if (p == null) {
                     Debug.LogFormat("KICK {0}: no player found in LOBBY", arg);
+                    ReturnToSender("KICK: player not found in LOBBY");
                 } else {
                     Debug.LogFormat("KICK {0}: kicking player {1} from LOBBY", arg, p.m_name);
                     if (p.m_id < NetworkServer.connections.Count && NetworkServer.connections[p.m_id] != null) {
@@ -134,9 +138,31 @@ namespace GameMod {
                 Player p = FindPlayer();
                 if (p == null) {
                     Debug.LogFormat("KICK {0}: no player found", arg);
+                    ReturnToSender("KICK: player not found in GAME");
                 } else {
                     Debug.LogFormat("KICK {0}: kicking player {1} from GAME", arg, p.m_mp_name);
                     p.connectionToClient.Disconnect();
+                }
+            }
+            return false;
+        }
+
+        // Send a chat message back to the sender of the command
+        // HA: An Elvis reference!
+        public bool ReturnToSender(string msg) {
+            if (sender_conn >= NetworkServer.connections.Count ||  NetworkServer.connections[sender_conn] == null) {
+                return false;
+            }
+            if (inLobby) {
+                var lmsg = new LobbyChatMessage(sender_conn, "server", MpTeam.TEAM0, msg, false);
+                NetworkServer.SendToClient(sender_conn, 75, lmsg);
+                return true;
+            } else {
+                foreach (var p in Overload.NetworkManager.m_Players) {
+                    if (p != null && p.connectionToClient != null && p.connectionToClient.connectionId == sender_conn) {
+                        p.CallTargetSendFullChat(p.connectionToClient, sender_conn, "server", MpTeam.TEAM0, msg);
+                        return true;
+                    }
                 }
             }
             return false;
