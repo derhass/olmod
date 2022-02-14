@@ -188,16 +188,12 @@ namespace GameMod {
         static FieldInfo FieldPlayerId = null;
         static FieldInfo FieldTimeSlotReserved = null;
 
-        private static void Postfix(ref bool __result, int connection_id, int version, string player_name, string player_session_id, string player_id, string player_uid) {
-            if (__result) {
-                MPBanEntry candidate = new MPBanEntry(player_name, connection_id, player_id);
-                if (MPBanPlayers.IsBanned(candidate)) {
-                    // Player is banned
-                    MPChatTools.SendTo(String.Format("blocked BANNED player {0} from joining",player_name), -1, connection_id);
-                    __result = false;
-                }
-            }
-            if (!__result) {
+        private static bool Prefix(ref bool __result, int connection_id, int version, string player_name, string player_session_id, string player_id, string player_uid) {
+            MPBanEntry candidate = new MPBanEntry(player_name, connection_id, player_id);
+            if (MPBanPlayers.IsBanned(candidate)) {
+                // Player is banned
+                MPChatTools.SendTo(String.Format("blocked BANNED player {0} from joining",player_name), -1, connection_id);
+                __result = false;
                 /* hack to prevent matchmaking from waiting for this player to join...
                  * This is ugly as hell as we have to iterate over a Dictionary with
                  * internal Data Types, wich is intsels stored in an internal data type... */
@@ -207,7 +203,7 @@ namespace GameMod {
                 var HAMI = FieldNMHostActiveInfo.GetValue(null);
                 if (HAMI == null) {
                     Debug.LogFormat("MPBanPlayers: failed to get HAMI");
-                    return;
+                    return false;
                 }
                 if (FieldLastGamesessionMatchmakerDatas == null) {
                     FieldLastGamesessionMatchmakerDatas = AccessTools.Field(HAMI.GetType(), "m_last_gamesession_matchmaker_datas");
@@ -215,7 +211,7 @@ namespace GameMod {
                 var datas = FieldLastGamesessionMatchmakerDatas.GetValue(HAMI);
                 if (datas == null) {
                     Debug.LogFormat("MPBanPlayers: failed to get matchmaker datas");
-                    return;
+                    return false;
                 }
                 IDictionary dataDict = datas as IDictionary;
                 if (dataDict != null) {
@@ -235,14 +231,17 @@ namespace GameMod {
                                 // after the connection is closed, and server woudl wait for timeout (1 Minute)
                                 // instead...
                                 DateTime t = (DateTime)FieldTimeSlotReserved.GetValue(data);
-                                t -= TimeSpan.FromSeconds(3600);
-                                Debug.LogFormat("BAN: timing out disconnected player id {0}", id);
+                                t = DateTime.Now - TimeSpan.FromSeconds(57); // Timeout is 60 seconds by default, let it time out in 3 sec
+                                Debug.LogFormat("BAN: timing out banned player id {0}", id);
                                 FieldTimeSlotReserved.SetValue(data,t);
                             }
                         }
                     }
                 }
+                return false;
             }
+            // run the method as intented
+            return true;
         }
     }
 
