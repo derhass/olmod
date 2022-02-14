@@ -1,6 +1,8 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using HarmonyLib;
 using Overload;
 using UnityEngine;
@@ -172,50 +174,66 @@ namespace GameMod {
 
     [HarmonyPatch(typeof(NetworkMatch), "AcceptNewConnection")]
     class MPBanPlayers_AcceptNewConnection {
-        private static bool Prefix(ref bool __result, int connection_id, int version, string player_name, string player_session_id, string player_id, string player_uid) {
-            MPBanEntry candidate = new MPBanEntry(player_name, connection_id, player_id);
-            if (MPBanPlayers.IsBanned(candidate)) {
-                // Player is banned
-                // TODO: this results in server stuck in "player joining", ARGH!!!
-                MPChatTools.SendTo("blocked BANNED player {0} from joining", -1, connection_id);
-                __result = false;
-                return false;
-            }
-            // run normal AcceptNewConnection
-            return true;
-        }
-    }
+        static FieldInfo FieldNMHostActiveInfo = null;
+        static FieldInfo FieldLastGamesessionMatchmakerDatas = null;
+        static FieldInfo FieldPlayerId = null;
+        static FieldInfo FieldTimeSlotReserved = null;
 
-    /*
-    // Fix for Server being Stuck in "player joining" Phase is client disconnects at the wrong time
-    [HarmonyPatch(typeof(HostPlayerMatchmakerInfo), "GetStatus")]
-    class MPBanPlayers_HostPlayerMatchmakerInfoFixPending {
-        private static void Postfix(ref bool __result, ref NetworkMatch.HostPlayerMatchmakerInfo __instance) {
-            if (__result == HostPlayerMatchmakerInfo.Status.Pending && __instance != null) {
-                // Check if the client is actually still connected
-                bool foundIt = false;
-                foreach (KeyValuePair<int, PlayerLobbyData> p in NetworkMatch.m_players) {
-                    if (p.Value != null && p.Value.m_player_id == __instance.m_playerId) {
-                        foundIt = true;
-                        break;
-                    }
+        private static void Postfix(ref bool __result, int connection_id, int version, string player_name, string player_session_id, string player_id, string player_uid) {
+            if (__result) {
+                MPBanEntry candidate = new MPBanEntry(player_name, connection_id, player_id);
+                if (MPBanPlayers.IsBanned(candidate)) {
+                    // Player is banned
+                    MPChatTools.SendTo(String.Format("blocked BANNED player {0} from joining",player_name), -1, connection_id);
+                    __result = false;
                 }
-                if (!foundIt) {
-                    foreach (var p in Overload.NetworkManager.m_Players) {
-                        if (p != null && p.m_player_id == __instance.m_playerId) {
-                            foundIt = true;
-                            break;
+            }
+            if (!__result) {
+                /* hack to prevent matchmaking from waiting for this player to join...
+                 * This is ugly as hell as we have to iterate over a Dictionary with
+                 * internal Data Types, wich is intsels stored in an internal data type... */
+                if (FieldNMHostActiveInfo == null) {
+                    FieldNMHostActiveInfo = AccessTools.Field( AccessTools.TypeByName("NetworkMatch"), "m_host_active_info");
+                }
+                var HAMI = FieldNMHostActiveInfo.GetValue(null);
+                if (HAMI == null) {
+                    Debug.LogFormat("MPBanPlayers: failed to get HAMI");
+                    return;
+                }
+                if (FieldLastGamesessionMatchmakerDatas == null) {
+                    FieldLastGamesessionMatchmakerDatas = AccessTools.Field(HAMI.GetType(), "m_last_gamesession_matchmaker_datas");
+                }
+                var datas = FieldLastGamesessionMatchmakerDatas.GetValue(HAMI);
+                if (datas == null) {
+                    Debug.LogFormat("MPBanPlayers: failed to get matchmaker datas");
+                    return;
+                }
+                IDictionary dataDict = datas as IDictionary;
+                if (dataDict != null) {
+                    var it = dataDict.GetEnumerator();
+                    while (it.MoveNext()) {
+                        var data = it.Value;
+                        if (FieldPlayerId == null) {
+                            FieldPlayerId = AccessTools.Field(data.GetType(), "m_playerId");
+                        }
+                        if (FieldTimeSlotReserved == null) {
+                            FieldTimeSlotReserved = AccessTools.Field(data.GetType(), "m_time_slot_reserved");
+                        }
+                        if (FieldPlayerId != null && FieldTimeSlotReserved != null) {
+                            string id = (string)FieldPlayerId.GetValue(data);
+                            if (id == player_id) {
+                                // modify the timeout for this player as the entry still survises
+                                // after the connection is closed, and server woudl wait for timeout (1 Minute)
+                                // instead...
+                                DateTime t = (DateTime)FieldTimeSlotReserved.GetValue(data);
+                                t -= TimeSpan.FromSeconds(3600);
+                                Debug.LogFormat("BAN: timing out disconnected player id {0}", id);
+                                FieldTimeSlotReserved.SetValue(data,t);
+                            }
                         }
                     }
                 }
-                if (!foundIt) {
-                    // actually leave the pending state
-                    Debug.LogFormat("Joinging Player {0} has vanished", __instance.m_playerId);
-                    __instance.m_time_slot_reserved -= TimeSpan.FromSeconds(300);
-                    __result = HostPlayerMatchmakerInfo.Status.TimedOut;
-                }
             }
         }
     }
-    */
 }
