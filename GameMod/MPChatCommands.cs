@@ -209,15 +209,21 @@ namespace GameMod {
         {
             string op = (give)?"GIVEPERM":"REVOKEPERM";
             if (!SelectPlayer(arg)) {
-                Debug.LogFormat("{0}: no player {1} found", op, arg);
-                ReturnToSender(String.Format("{0}: player {1} not found",op, arg));
-                return false;
+                if (give) {
+                    Debug.LogFormat("{0}: no player {1} found", op, arg);
+                    ReturnToSender(String.Format("{0}: player {1} not found",op, arg));
+                    return false;
+                } else {
+                    authenticatedConnections.Clear();
+                    Debug.LogFormat("{0}: all client permissions revoked", op, arg);
+                    ReturnToSender(String.Format("{0}: all client permissions revoked",op));
+                }
             }
 
             if (SetAuth(give, selectedPlayerEntry.id)) {
                 ReturnToSender(String.Format("{0}: player {1} applied",op,selectedPlayerEntry.name));
                 if (selectedPlayerConnectionId >= 0) {
-                    ReturnTo("You have been granted CHAT COMMAND permissions.",selectedPlayerConnectionId);
+                    ReturnTo(String.Format("You have been {0} CHAT COMMAND permissions.",(give)?"granted":"revoked"),selectedPlayerConnectionId);
                 }
             } else {
                 ReturnToSender(String.Format("{0}: player {1} failed",op,selectedPlayerEntry.name));
