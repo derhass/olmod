@@ -75,6 +75,8 @@ namespace GameMod {
             Ban,
             KickBan,
             Unban,
+            End,
+            Start,
         }
 
         // properties:
@@ -136,6 +138,12 @@ namespace GameMod {
             } else if (cmdName == "UB" || cmdName == "UNBAN") {
                 cmd = Command.Unban;
                 needAuth = true;
+            } else if (cmdName == "E" || cmdName == "END") {
+                cmd = Command.End;
+                needAuth = true;
+            } else if (cmdName == "S" || cmdName == "START") {
+                cmd = Command.Start;
+                needAuth = true;
             }
         }
 
@@ -172,6 +180,12 @@ namespace GameMod {
                     break;
                 case Command.Unban:
                     result = DoUnban(MPBanMode.Ban);
+                    break;
+                case Command.End:
+                    result = DoEnd();
+                    break;
+                case Command.Start:
+                    result = DoStart();
                     break;
                 default:
                     Debug.LogFormat("CHATCMD {0}: {1} {2} was not handled by server", cmd, cmdName, arg);
@@ -280,6 +294,27 @@ namespace GameMod {
                 ReturnTo(String.Format("{0} players have been UNBANNED from {1} list", cnt, banMode));
                 return (cnt > 0);
             }
+            return false;
+        }
+
+        public bool DoEnd()
+        {
+            Debug.LogFormat("END request via chat command");
+            ReturnTo("manual match END request");
+            NetworkMatch.End();
+            return false;
+        }
+
+        public bool DoStart()
+        {
+            if (!inLobby) {
+                Debug.LogFormat("START request via chat command ignored in non-LOBBY state");
+                ReturnTo("START: not possible because I'm not in the Lobby");
+                return false;
+            }
+            Debug.LogFormat("START request via chat command");
+            ReturnTo("manual match START request");
+            MPChatCommands_ModifyLobbyStartTime.StartMatch = true;
             return false;
         }
 
@@ -478,6 +513,17 @@ namespace GameMod {
         private static bool Prefix(int sender_connection_id, string sender_name, MpTeam sender_team, string msg) {
             MPChatCommand cmd = new MPChatCommand(msg, sender_connection_id, false);
             return cmd.Execute();
+        }
+    }
+
+    [HarmonyPatch(typeof(NetworkMatch), "NetSystemHostGetLobbyInformation")]
+    class MPChatCommands_ModifyLobbyStartTime {
+        public static bool StartMatch = false;
+        private static void Postfix(ref NetworkMatch.HostLobbyInformation __result, object hai) {
+            if (hai != null && StartMatch) {
+                __result.ForceMatchStartTime = DateTime.Now;
+                StartMatch = false;
+            }
         }
     }
 }
