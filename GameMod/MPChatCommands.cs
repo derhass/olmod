@@ -75,6 +75,7 @@ namespace GameMod {
             Ban,
             KickBan,
             Unban,
+            Annoy,
             End,
             Start,
         }
@@ -132,6 +133,9 @@ namespace GameMod {
             } else if (cmdName == "B" || cmdName == "BAN") {
                 cmd = Command.Ban;
                 needAuth = true;
+            } else if (cmdName == "A" || cmdName == "ANNOY") {
+                cmd = Command.Annoy;
+                needAuth = true;
             } else if (cmdName == "KB" || cmdName == "KICKBAN") {
                 cmd = Command.KickBan;
                 needAuth = true;
@@ -151,6 +155,13 @@ namespace GameMod {
         // to the clients, and false if not (when it was a special command for the server)
         public bool Execute() {
             if (cmd == Command.None) {
+                // there might be Annoy-Banned players, and we can just ignore their ramblings
+                if (MPBanPlayers.GetList(MPBanMode.Annoy).Count > 0) {
+                    MPBanEntry we = FindPlayerEntryForConnection(sender_conn, inLobby);
+                    if (we != null && MPBanPlayers.IsBanned(we, MPBanMode.Annoy)) {
+                        return false;
+                    }
+                }
                 return true;
             }
             Debug.LogFormat("CHATCMD {0}: {1} {2}", cmd, cmdName, arg);
@@ -174,6 +185,9 @@ namespace GameMod {
                     break;
                 case Command.Ban:
                     result = DoKickBan(false, true, MPBanMode.Ban);
+                    break;
+                case Command.Annoy:
+                    result = DoKickBan(false, true, MPBanMode.Annoy);
                     break;
                 case Command.KickBan:
                     result = DoKickBan(true, true, MPBanMode.Ban);

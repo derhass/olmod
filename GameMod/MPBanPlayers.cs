@@ -133,6 +133,35 @@ namespace GameMod {
             return false;
         }
 
+        // Annoys a player
+        public static void AnnoyPlayer(Player p)
+        {
+            if (p != null) {
+                if (p.m_spectator == false) {
+                    p.m_spectator = true;
+                    Debug.LogFormat("BAN ANNOY player {0}",p.m_mp_name);
+                    if (p.connectionToClient != null) {
+                        MPChatTools.SendTo(String.Format("annoyed BANNED player {0}",p.m_mp_name), -1, p.connectionToClient.connectionId);
+                    }
+                }
+            }
+        }
+
+        // Annoys all Players which are actively annoy-banned
+        public static void AnnoyPlayers()
+        {
+            if (GetList(MPBanMode.Annoy).Count < 1) {
+                // no bans active
+                return;
+            }
+            foreach(var p in Overload.NetworkManager.m_Players) {
+                MPBanEntry candidate = new MPBanEntry(p);
+                if (IsBanned(candidate, MPBanMode.Annoy)) {
+                    AnnoyPlayer(p);
+                }
+            }
+        }
+
         // Add a player to the Ban List
         public static bool Ban(MPBanEntry candidate, MPBanMode mode = MPBanMode.Ban, bool permanent = false)
         {
@@ -146,7 +175,10 @@ namespace GameMod {
                 }
             }
             banList.Add(candidate);
-            Debug.LogFormat("BAN: player {0} is NOW banned", candidate.Describe());
+            if (mode == MPBanMode.Annoy) {
+                AnnoyPlayers();
+            }
+            Debug.LogFormat("BAN: player {0} is NOW banned as", candidate.Describe(), mode);
             return true;
         }
 
@@ -242,6 +274,14 @@ namespace GameMod {
             }
             // run the method as intented
             return true;
+        }
+    }
+
+    // Apply the Annoy-Ban when the match starts
+    [HarmonyPatch(typeof(NetworkMatch), "StartPlaying")]
+    class MPBanPlayers_OnStartPlaying {
+        private static void Postfix() {
+            MPBanPlayers.AnnoyPlayers();
         }
     }
 

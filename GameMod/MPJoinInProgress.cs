@@ -452,6 +452,7 @@ namespace GameMod {
                     use_loadout1 = player.m_use_loadout1
                 });
             }
+            MPBanPlayers.AnnoyPlayers(); // make sure the Annoy-bans are applied to the new player
             ServerStatLog.Connected(newPlayer.m_mp_name);
         }
 
