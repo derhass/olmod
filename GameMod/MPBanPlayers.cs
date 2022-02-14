@@ -7,6 +7,7 @@ using HarmonyLib;
 using Overload;
 using UnityEngine;
 using UnityEngine.Networking;
+using UnityEngine.Networking.NetworkSystem;
 
 namespace GameMod {
     // the set of ban modes we support
@@ -141,13 +142,14 @@ namespace GameMod {
                     p.m_spectator = true;
                     Debug.LogFormat("BAN ANNOY player {0}",p.m_mp_name);
                     if (p.connectionToClient != null) {
-                        MPChatTools.SendTo(String.Format("annoyed BANNED player {0}",p.m_mp_name), -1, p.connectionToClient.connectionId);
+                        MPChatTools.SendTo(String.Format("ANNOY BANNED player {0}",p.m_mp_name), -1, p.connectionToClient.connectionId);
                     }
                 }
             }
         }
 
         // Annoys all Players which are actively annoy-banned
+        // Doesn't work in the lobby
         public static void AnnoyPlayers()
         {
             if (GetList(MPBanMode.Annoy).Count < 1) {
@@ -160,6 +162,75 @@ namespace GameMod {
                     AnnoyPlayer(p);
                 }
             }
+        }
+
+        // Kicks a player by a connection id. Also works in the Lobby
+        public static void KickPlayer(int connection_id, string name="")
+        {
+            if (connection_id < 0 || connection_id >= NetworkServer.connections.Count) {
+                return;
+            }
+            if (NetworkServer.connections[connection_id] != null) {
+                MPChatTools.SendTo(String.Format("KICKED player {0}",name), -1, connection_id);
+                // SendPostGame(), prevents that the client immediately re-joins when in GAME
+                // (doesn't help in Lobby)
+                NetworkServer.SendToClient(connection_id,74, new IntegerMessage(0));
+                // Goodbye
+                NetworkServer.connections[connection_id].Disconnect();
+            }
+
+        }
+
+        // Kicks an active Player
+        public static void KickPlayer(Player p)
+        {
+            if (p != null && p.connectionToClient != null) {
+                KickPlayer(p.connectionToClient.connectionId, p.m_mp_name);
+            }
+        }
+
+        // Kicks an Player in Lobby State
+        public static void KickPlayer(PlayerLobbyData p)
+        {
+            if (p != null) {
+                KickPlayer(p.m_id, p.m_name);
+            }
+        }
+
+        // Kicks all players who are BANNED (Lobby and otherwise)
+        public static void KickBannedPlayers()
+        {
+            if (GetList(MPBanMode.Ban).Count < 1) {
+                // no bans active
+                return;
+            }
+            MatchState s = NetworkMatch.GetMatchState();
+            bool inLobby = (s == MatchState.LOBBY || s == MatchState.LOBBY_LOAD_COUNTDOWN);
+            if (inLobby) {
+                // Kick Lobby Players
+                foreach (KeyValuePair<int, PlayerLobbyData> p in NetworkMatch.m_players) {
+                    if (p.Value != null) {
+                        MPBanEntry candidate = new MPBanEntry(p.Value);
+                        if (IsBanned(candidate, MPBanMode.Ban)) {
+                            KickPlayer(p.Value);
+                        }
+                    }
+                }
+            } else {
+                foreach(var p in Overload.NetworkManager.m_Players) {
+                    MPBanEntry candidate = new MPBanEntry(p);
+                    if (IsBanned(candidate, MPBanMode.Ban)) {
+                        KickPlayer(p);
+                    }
+                }
+            }
+        }
+
+        // Appy all bans to all all active players in Game
+        public static void ApplyAllBans()
+        {
+            AnnoyPlayers();
+            KickBannedPlayers();
         }
 
         // Add a player to the Ban List
@@ -176,6 +247,8 @@ namespace GameMod {
             }
             banList.Add(candidate);
             if (mode == MPBanMode.Annoy) {
+                // apply Annoy bans directly, but not normal bans, as we have the specil KICK and KICKBAN commands
+                // that way, we can ban players without having them to be immediately kicked
                 AnnoyPlayers();
             }
             Debug.LogFormat("BAN: player {0} is NOW banned as", candidate.Describe(), mode);
@@ -212,6 +285,8 @@ namespace GameMod {
 
     }
 
+    /*
+    // THIS APPROACH DOES'T WORK TOO WELL, DISABLED FOR NOW
     // Apply the ban when a new player connects
     [HarmonyPatch(typeof(NetworkMatch), "AcceptNewConnection")]
     class MPBanPlayers_AcceptNewConnection {
@@ -226,9 +301,9 @@ namespace GameMod {
                 // Player is banned
                 MPChatTools.SendTo(String.Format("blocked BANNED player {0} from joining",player_name), -1, connection_id);
                 __result = false;
-                /* hack to prevent matchmaking from waiting for this player to join...
-                 * This is ugly as hell as we have to iterate over a Dictionary with
-                 * internal Data Types, wich is intsels stored in an internal data type... */
+                // hack to prevent matchmaking from waiting for this player to join...
+                // This is ugly as hell as we have to iterate over a Dictionary with
+                // internal Data Types, wich is intsels stored in an internal data type...
                 if (FieldNMHostActiveInfo == null) {
                     FieldNMHostActiveInfo = AccessTools.Field( AccessTools.TypeByName("NetworkMatch"), "m_host_active_info");
                 }
@@ -276,16 +351,19 @@ namespace GameMod {
             return true;
         }
     }
+    */
 
     // Apply the Annoy-Ban when the match starts
     [HarmonyPatch(typeof(NetworkMatch), "StartPlaying")]
     class MPBanPlayers_OnStartPlaying {
         private static void Postfix() {
-            MPBanPlayers.AnnoyPlayers();
+            MPBanPlayers.ApplyAllBans();
         }
     }
 
-    // Initialize the bans
+    // Reset the bans when a new lobby starts
+    // TODO: find a nice way to orevent banned players from creating a game on the
+    //       server
     [HarmonyPatch(typeof(NetworkMatch), "NetSystemOnGameSessionStart")]
     class MPBanPlayers_OnNewGameSession {
         private static void Postfix() {

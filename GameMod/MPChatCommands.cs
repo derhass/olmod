@@ -281,16 +281,23 @@ namespace GameMod {
                 return false;
             }
 
+            if(selectedPlayerConnectionId >= 0 && sender_conn == selectedPlayerConnectionId) {
+                Debug.LogFormat("{0}: won't self-apply", op, arg);
+                ReturnToSender(String.Format("{0}: won't self-apply",op, arg));
+                return false;
+            }
+
             if (doBan) {
-                Debug.LogFormat("{0}: banning player {1})", op, selectedPlayerEntry.name);
                 MPBanPlayers.Ban(selectedPlayerEntry, banMode);
                 ReturnTo(String.Format("{0} player {1}", banOp, selectedPlayerEntry.name), -1, selectedPlayerConnectionId);
             }
             if (doKick) {
-                Debug.LogFormat("{0}: kicking player {1}", op, selectedPlayerEntry.name);
-                ReturnTo(String.Format("KICK player {0}", selectedPlayerEntry.name), -1, selectedPlayerConnectionId);
-                if (selectedPlayerConnectionId >= 0) {
-                    NetworkServer.connections[selectedPlayerConnectionId].Disconnect();
+                if (selectedPlayer != null) {
+                    MPBanPlayers.KickPlayer(selectedPlayer);
+                } else if (selectedPlayerLobbyData != null) {
+                    MPBanPlayers.KickPlayer(selectedPlayerLobbyData);
+                } else {
+                    MPBanPlayers.KickPlayer(selectedPlayerConnectionId, selectedPlayerEntry.name);
                 }
             }
             return false;
