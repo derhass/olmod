@@ -7,11 +7,21 @@ using UnityEngine;
 using UnityEngine.Networking;
 
 namespace GameMod {
+    // the set of ban modes we support
+    public enum MPBanMode : int {
+        Ban=0,
+        Annoy,
+        Count // End Marker, always add before
+    }
+
+    // Class for entries of the ban list
+    // also used for candidate entries to check ban lists against
     public class MPBanEntry {
         public string name = null;
         public string address = null;
         public string id = null;
         public bool permanent = false;
+        public DateTime timeCreated;
 
         // generate MPBanEntry from individual entries
         public MPBanEntry(string playerName, string connAddress, string playerId) {
@@ -42,6 +52,7 @@ namespace GameMod {
             name = (String.IsNullOrEmpty(playerName))?null:playerName.ToUpper();
             address = (String.IsNullOrEmpty(connAddress))?null:connAddress.ToUpper().Trim();
             id = (String.IsNullOrEmpty(playerId))?null:playerId.ToUpper().Trim();
+            timeCreated = DateTime.Now;
         }
 
         // Set MPBanEntry from name, connection_id, and id
@@ -58,6 +69,7 @@ namespace GameMod {
         // Set MPBanEntry from another entry
         public void Set(MPBanEntry other) {
             Set(other.name, other.address, other.id);
+            timeCreated = other.timeCreated;
         }
 
         // Describe the entry as human-readable string
@@ -93,12 +105,23 @@ namespace GameMod {
         }
     }
 
+    // class for managing banned players
     public class MPBanPlayers {
         // this is the Ban List
-        private static List<MPBanEntry> banList = new List<MPBanEntry>();
+        private static List<MPBanEntry>[] banLists = new List<MPBanEntry>[(int)MPBanMode.Count];
+
+        // Get the ban list
+        public static List<MPBanEntry> GetList(MPBanMode mode = MPBanMode.Ban) {
+            int m = (int)mode;
+            if (banLists[m] == null) {
+                banLists[m] = new List<MPBanEntry>();
+            }
+            return banLists[m];
+        }
 
         // Check if this player is banned
-        public static bool IsBanned(MPBanEntry candidate) {
+        public static bool IsBanned(MPBanEntry candidate, MPBanMode mode = MPBanMode.Ban) {
+            var banList=GetList(mode);
             foreach (var entry in banList) {
                 if (entry.matches(candidate, "BAN CHECK: ")) {
                     return true;
@@ -109,9 +132,10 @@ namespace GameMod {
         }
 
         // Add a player to the Ban List
-        public static bool Ban(MPBanEntry candidate, bool permanent = false)
+        public static bool Ban(MPBanEntry candidate, MPBanMode mode = MPBanMode.Ban, bool permanent = false)
         {
             candidate.permanent = permanent;
+            var banList=GetList(mode);
             foreach (var entry in banList) {
                 if (entry.matches(candidate, "BAN already matched: ")) {
                     // Update it
@@ -125,19 +149,22 @@ namespace GameMod {
         }
 
         // Remove all entries matching a candidate from the ban list
-        public static bool Unban(MPBanEntry candidate)
+        public static bool Unban(MPBanEntry candidate, MPBanMode mode = MPBanMode.Ban)
         {
+            var banList = GetList(mode);
             int cnt = banList.RemoveAll(entry => entry.matches(candidate,"UNBAN: "));
             return (cnt > 0);
         }
 
         // Remove all bans
-        public static void UnbanAll() {
+        public static void UnbanAll(MPBanMode mode = MPBanMode.Ban) {
+            var banList = GetList(mode);
             banList.Clear();
         }
 
         // Remove all non-Permanent bans
-        public static void UnbanAllNonPermanent() {
+        public static void UnbanAllNonPermanent(MPBanMode mode = MPBanMode.Ban) {
+            var banList = GetList(mode);
             banList.RemoveAll(entry => entry.permanent == false);
         }
 
@@ -150,6 +177,7 @@ namespace GameMod {
             if (MPBanPlayers.IsBanned(candidate)) {
                 // Player is banned
                 // TODO: this results in server stuck in "player joining", ARGH!!!
+                MPChatTools.SendTo("blocked BANNED player {0} from joining", -1, connection_id);
                 __result = false;
                 return false;
             }
@@ -157,4 +185,37 @@ namespace GameMod {
             return true;
         }
     }
+
+    /*
+    // Fix for Server being Stuck in "player joining" Phase is client disconnects at the wrong time
+    [HarmonyPatch(typeof(HostPlayerMatchmakerInfo), "GetStatus")]
+    class MPBanPlayers_HostPlayerMatchmakerInfoFixPending {
+        private static void Postfix(ref bool __result, ref NetworkMatch.HostPlayerMatchmakerInfo __instance) {
+            if (__result == HostPlayerMatchmakerInfo.Status.Pending && __instance != null) {
+                // Check if the client is actually still connected
+                bool foundIt = false;
+                foreach (KeyValuePair<int, PlayerLobbyData> p in NetworkMatch.m_players) {
+                    if (p.Value != null && p.Value.m_player_id == __instance.m_playerId) {
+                        foundIt = true;
+                        break;
+                    }
+                }
+                if (!foundIt) {
+                    foreach (var p in Overload.NetworkManager.m_Players) {
+                        if (p != null && p.m_player_id == __instance.m_playerId) {
+                            foundIt = true;
+                            break;
+                        }
+                    }
+                }
+                if (!foundIt) {
+                    // actually leave the pending state
+                    Debug.LogFormat("Joinging Player {0} has vanished", __instance.m_playerId);
+                    __instance.m_time_slot_reserved -= TimeSpan.FromSeconds(300);
+                    __result = HostPlayerMatchmakerInfo.Status.TimedOut;
+                }
+            }
+        }
+    }
+    */
 }
