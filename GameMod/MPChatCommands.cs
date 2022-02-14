@@ -15,6 +15,8 @@ namespace GameMod {
             Auth,
             Kick,
             Ban,
+            KickBan,
+            Unban,
         }
 
         // properties:
@@ -60,8 +62,16 @@ namespace GameMod {
             } else if (cmdName == "K" || cmdName == "KICK") {
                 cmd = Command.Kick;
                 needAuth = true;
+            } else if (cmdName == "B" || cmdName == "BAN") {
+                cmd = Command.Ban;
+                needAuth = true;
+            } else if (cmdName == "KB" || cmdName == "KICKBAN") {
+                cmd = Command.KickBan;
+                needAuth = true;
+            } else if (cmdName == "UB" || cmdName == "UNBAN") {
+                cmd = Command.Unban;
+                needAuth = true;
             }
-
         }
 
         // Execute a command: Returns true if the caller should forward the chat message
@@ -84,7 +94,16 @@ namespace GameMod {
                     result = DoAuth();
                     break;
                 case Command.Kick:
-                    result = DoKick();
+                    result = DoKickBan(true, false);
+                    break;
+                case Command.Ban:
+                    result = DoKickBan(false, true);
+                    break;
+                case Command.KickBan:
+                    result = DoKickBan(true, true);
+                    break;
+                case Command.Unban:
+                    result = DoUnban();
                     break;
                 default:
                     Debug.LogFormat("CHATCMD {0}: {1} {2} was not handled by server", cmd, cmdName, arg);
@@ -120,30 +139,65 @@ namespace GameMod {
             return false;
         }
 
-        // Execute the KICK command
-        public bool DoKick() {
-            Debug.LogFormat("KICK request for {0}", arg);
+        // Execute KICK or BAN command
+        public bool DoKickBan(bool doKick, bool doBan) {
+            string op;
+            if (doKick && doBan) {
+                op = "KICKBAN";
+            } else if (doKick) {
+                op = "KICK";
+            } else if (doBan) {
+                op = "BAN";
+            } else {
+                return false;
+            }
+
+            Debug.LogFormat("{0} request for {1}", op, arg);
             if (inLobby) {
                 PlayerLobbyData p = FindPlayerInLobby();
                 if (p == null) {
-                    Debug.LogFormat("KICK {0}: no player found in LOBBY", arg);
-                    ReturnToSender("KICK: player not found in LOBBY");
+                    Debug.LogFormat("{0}: no player {1} found in LOBBY", op, arg);
+                    ReturnToSender(String.Format("{0}: player {1} not found in LOBBY",op, arg));
                 } else {
-                    Debug.LogFormat("KICK {0}: kicking player {1} from LOBBY", arg, p.m_name);
-                    if (p.m_id < NetworkServer.connections.Count && NetworkServer.connections[p.m_id] != null) {
-                        NetworkServer.connections[p.m_id].Disconnect();
+                    if (doBan) {
+                        Debug.LogFormat("{0}: banning player {1} (while in LOBBY)", op, p.m_name);
+                        MPBanPlayers.Ban(new MPBanEntry(p));
+                        ReturnToAll(String.Format("player {0} has been BANNED", p.m_name), p.m_id);
+                    }
+                    if (doKick) {
+                        Debug.LogFormat("{0}: kicking player {1} from LOBBY", op, p.m_name);
+                        ReturnToAll(String.Format("player {0} has been KICKED", p.m_name), p.m_id);
+                        if (p.m_id < NetworkServer.connections.Count && NetworkServer.connections[p.m_id] != null) {
+                            NetworkServer.connections[p.m_id].Disconnect();
+                        }
                     }
                 }
             } else {
                 Player p = FindPlayer();
                 if (p == null) {
-                    Debug.LogFormat("KICK {0}: no player found", arg);
-                    ReturnToSender("KICK: player not found in GAME");
+                    Debug.LogFormat("{0}: no player {1} found in GAME", op, arg);
+                    ReturnToSender(String.Format("{0}: player {1} not found in GAME",op, arg));
                 } else {
-                    Debug.LogFormat("KICK {0}: kicking player {1} from GAME", arg, p.m_mp_name);
-                    p.connectionToClient.Disconnect();
+                    if (doBan) {
+                        Debug.LogFormat("{0}: banning player {1} (while in GAME)", op, p.m_mp_name);
+                        MPBanPlayers.Ban(new MPBanEntry(p));
+                        ReturnToAll(String.Format("player {0} has been BANNED", p.m_mp_name), (p.connectionToClient!=null)?p.connectionToClient.connectionId:-1);
+                    }
+                    if (doKick) {
+                        Debug.LogFormat("{0}: kicking player {1} from GAME", op, p.m_mp_name);
+                        ReturnToAll(String.Format("player {0} has been BANNED", p.m_mp_name), (p.connectionToClient!=null)?p.connectionToClient.connectionId:-1);
+                        p.connectionToClient.Disconnect();
+                    }
                 }
             }
+            return false;
+        }
+
+        public bool DoUnban()
+        {
+            // TODO: currently, we can only unban all
+            MPBanPlayers.UnbanAll();
+            ReturnToAll("BAN list has been cleared");
             return false;
         }
 
@@ -160,6 +214,31 @@ namespace GameMod {
             } else {
                 foreach (var p in Overload.NetworkManager.m_Players) {
                     if (p != null && p.connectionToClient != null && p.connectionToClient.connectionId == sender_conn) {
+                        p.CallTargetSendFullChat(p.connectionToClient, sender_conn, "server", MpTeam.TEAM0, msg);
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        // Send a chat message to all clients except the given connection id, -1 for all
+        public bool ReturnToAll(string msg, int connId = -1) {
+            if (inLobby) {
+                var lmsg = new LobbyChatMessage(sender_conn, "server", MpTeam.TEAM0, msg, false);
+                if (connId < 0) {
+                    NetworkServer.SendToAll(75, lmsg);
+                } else {
+                    foreach(NetworkConnection c in NetworkServer.connections) {
+                        if (c != null && c.connectionId != connId) {
+                            NetworkServer.SendToClient(c.connectionId, 75, lmsg);
+                        }
+                    }
+                }
+                return true;
+            } else {
+                foreach (var p in Overload.NetworkManager.m_Players) {
+                    if (p != null && p.connectionToClient != null && p.connectionToClient.connectionId != connId) {
                         p.CallTargetSendFullChat(p.connectionToClient, sender_conn, "server", MpTeam.TEAM0, msg);
                         return true;
                     }
