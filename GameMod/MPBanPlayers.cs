@@ -170,8 +170,17 @@ namespace GameMod {
             banList.RemoveAll(entry => entry.permanent == false);
         }
 
+        // Reset the bans for the next game
+        // Removes all non-permanent bans of all modes
+        public static void Reset() {
+            for (MPBanMode mode = (MPBanMode)0; mode < MPBanMode.Count; mode++) {
+                UnbanAllNonPermanent(mode);
+            }
+        }
+
     }
 
+    // Apply the ban when a new player connects
     [HarmonyPatch(typeof(NetworkMatch), "AcceptNewConnection")]
     class MPBanPlayers_AcceptNewConnection {
         static FieldInfo FieldNMHostActiveInfo = null;
@@ -234,6 +243,14 @@ namespace GameMod {
                     }
                 }
             }
+        }
+    }
+
+    // Initialize the bans
+    [HarmonyPatch(typeof(NetworkMatch), "NetSystemOnGameSessionStart")]
+    class MPBanPlayers_OnNewGameSession {
+        private static void Postfix() {
+            MPBanPlayers.Reset();
         }
     }
 }
