@@ -112,6 +112,7 @@ namespace GameMod {
     public class MPBanPlayers {
         // this is the Ban List
         private static List<MPBanEntry>[] banLists = new List<MPBanEntry>[(int)MPBanMode.Count];
+        private static int totalBanCount=0; // Count of bans in all lists
 
         // Get the ban list
         public static List<MPBanEntry> GetList(MPBanMode mode = MPBanMode.Ban) {
@@ -164,6 +165,15 @@ namespace GameMod {
             }
         }
 
+        // Delayed disconnect on Kick
+        public static IEnumerator DelayedDisconnect(int connection_id)
+        {
+            yield return new WaitForSecondsRealtime(1);
+            if (connection_id < NetworkServer.connections.Count && NetworkServer.connections[connection_id] != null) {
+                NetworkServer.connections[connection_id].Disconnect();
+            }
+        }
+
         // Kicks a player by a connection id. Also works in the Lobby
         public static void KickPlayer(int connection_id, string name="")
         {
@@ -172,11 +182,15 @@ namespace GameMod {
             }
             if (NetworkServer.connections[connection_id] != null) {
                 MPChatTools.SendTo(String.Format("KICKED player {0}",name), -1, connection_id);
+                //
+                NetworkServer.SendToClient(connection_id,51, new IntegerMessage(2000000000));
                 // SendPostGame(), prevents that the client immediately re-joins when in GAME
                 // (doesn't help in Lobby)
                 NetworkServer.SendToClient(connection_id,74, new IntegerMessage(0));
                 // Goodbye
-                NetworkServer.connections[connection_id].Disconnect();
+                //NetworkServer.connections[connection_id].Disconnect();
+                // disconnect it in an instant, to give client time to execute the commands
+                GameManager.m_gm.StartCoroutine(DelayedDisconnect(connection_id));
             }
 
         }
@@ -229,8 +243,27 @@ namespace GameMod {
         // Appy all bans to all all active players in Game
         public static void ApplyAllBans()
         {
+            if (totalBanCount < 1) {
+                return;
+            }
             AnnoyPlayers();
             KickBannedPlayers();
+        }
+
+        // The ban list was modified
+        public static void OnUpdate(MPBanMode mode, bool added)
+        {
+            totalBanCount = 0;
+            for (MPBanMode m = (MPBanMode)0; m < MPBanMode.Count; m++) {
+                totalBanCount += GetList(m).Count;
+            }
+            if (added) {
+                if (mode == MPBanMode.Annoy) {
+                    // apply Annoy bans directly, but not normal bans, as we have the specil KICK and KICKBAN commands
+                    // that way, we can ban players without having them to be immediately kicked
+                    AnnoyPlayers();
+                }
+            }
         }
 
         // Add a player to the Ban List
@@ -242,16 +275,13 @@ namespace GameMod {
                 if (entry.matches(candidate, "BAN already matched: ")) {
                     // Update it
                     entry.Set(candidate);
+                    OnUpdate(mode, true);
                     return false;
                 }
             }
             banList.Add(candidate);
-            if (mode == MPBanMode.Annoy) {
-                // apply Annoy bans directly, but not normal bans, as we have the specil KICK and KICKBAN commands
-                // that way, we can ban players without having them to be immediately kicked
-                AnnoyPlayers();
-            }
-            Debug.LogFormat("BAN: player {0} is NOW banned as", candidate.Describe(), mode);
+            Debug.LogFormat("BAN: player {0} is NOW banned in mode: {1}", candidate.Describe(), mode);
+            OnUpdate(mode, true);
             return true;
         }
 
@@ -260,19 +290,25 @@ namespace GameMod {
         {
             var banList = GetList(mode);
             int cnt = banList.RemoveAll(entry => entry.matches(candidate,"UNBAN: "));
-            return (cnt > 0);
+            if (cnt > 0) {
+                OnUpdate(mode, false);
+                return true;
+            }
+            return false;
         }
 
         // Remove all bans
         public static void UnbanAll(MPBanMode mode = MPBanMode.Ban) {
             var banList = GetList(mode);
             banList.Clear();
+            OnUpdate(mode, false);
         }
 
         // Remove all non-Permanent bans
         public static void UnbanAllNonPermanent(MPBanMode mode = MPBanMode.Ban) {
             var banList = GetList(mode);
             banList.RemoveAll(entry => entry.permanent == false);
+            OnUpdate(mode, false);
         }
 
         // Reset the bans for the next game
