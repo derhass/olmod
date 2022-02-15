@@ -311,14 +311,14 @@ namespace GameMod {
             OnUpdate(mode, false);
         }
 
-        // Reset the bans for the next game
+        // Reset the bans for the next game if a new player creates it
         // Removes all non-permanent bans of all modes
         public static void Reset() {
+            Debug.Log("MPBanPlayers: resetting all non-permanent bans");
             for (MPBanMode mode = (MPBanMode)0; mode < MPBanMode.Count; mode++) {
                 UnbanAllNonPermanent(mode);
             }
         }
-
     }
 
     /*
@@ -397,13 +397,29 @@ namespace GameMod {
         }
     }
 
-    // Reset the bans when a new lobby starts
+    // Reset the bans and th MPChatCommands when a new lobby starts created by a new player
     // TODO: find a nice way to orevent banned players from creating a game on the
     //       server
     [HarmonyPatch(typeof(NetworkMatch), "NetSystemOnGameSessionStart")]
     class MPBanPlayers_OnNewGameSession {
+        private static string lastGameCreator = null;
         private static void Postfix() {
-            MPBanPlayers.Reset();
+            bool doReset = true;
+
+            if (NetworkMatch.m_name != null) {
+                string creator = NetworkMatch.m_name.Split('\0')[0].ToUpper();
+                if (!String.IsNullOrEmpty(creator) && !String.IsNullOrEmpty(lastGameCreator)) {
+                    if (creator == lastGameCreator) {
+                        Debug.Log("MPBanPlayers: same game creator as last match, keeping all bans and permissions");
+                        doReset = false;
+                    }
+                }
+                lastGameCreator = creator;
+            }
+            if (doReset) {
+                MPBanPlayers.Reset();
+                MPChatCommand.Reset();
+            }
         }
     }
 }

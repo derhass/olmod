@@ -519,6 +519,11 @@ namespace GameMod {
             }
             return bestPlayer;
         }
+
+        public static void Reset() {
+            Debug.Log("MPChatCommands: clearing command authentications");
+            authenticatedConnections.Clear();
+        }
     }
 
     [HarmonyPatch(typeof(NetworkMatch), "ProcessLobbyChatMessageOnServer")]
