@@ -113,6 +113,8 @@ namespace GameMod {
         // this is the Ban List
         private static List<MPBanEntry>[] banLists = new List<MPBanEntry>[(int)MPBanMode.Count];
         private static int totalBanCount=0; // Count of bans in all lists
+        public static bool unbannedPlayerInLobby = false; // Set to true when the first unbanned player joined the Lobby
+        public static bool bannedPlayerInLobby = false; // Set to true when the first banned player joined the Lobby
 
         // Get the ban list
         public static List<MPBanEntry> GetList(MPBanMode mode = MPBanMode.Ban) {
@@ -321,73 +323,48 @@ namespace GameMod {
         }
     }
 
-    /*
-    // THIS APPROACH DOES'T WORK TOO WELL, DISABLED FOR NOW
-    // Apply the ban when a new player connects
     [HarmonyPatch(typeof(NetworkMatch), "AcceptNewConnection")]
     class MPBanPlayers_AcceptNewConnection {
-        static FieldInfo FieldNMHostActiveInfo = null;
-        static FieldInfo FieldLastGamesessionMatchmakerDatas = null;
-        static FieldInfo FieldPlayerId = null;
-        static FieldInfo FieldTimeSlotReserved = null;
+        private static string lastGameCreator = null;
 
-        private static bool Prefix(ref bool __result, int connection_id, int version, string player_name, string player_session_id, string player_id, string player_uid) {
-            MPBanEntry candidate = new MPBanEntry(player_name, connection_id, player_id);
-            if (MPBanPlayers.IsBanned(candidate)) {
-                // Player is banned
-                MPChatTools.SendTo(String.Format("blocked BANNED player {0} from joining",player_name), -1, connection_id);
-                __result = false;
-                // hack to prevent matchmaking from waiting for this player to join...
-                // This is ugly as hell as we have to iterate over a Dictionary with
-                // internal Data Types, wich is intsels stored in an internal data type...
-                if (FieldNMHostActiveInfo == null) {
-                    FieldNMHostActiveInfo = AccessTools.Field( AccessTools.TypeByName("NetworkMatch"), "m_host_active_info");
-                }
-                var HAMI = FieldNMHostActiveInfo.GetValue(null);
-                if (HAMI == null) {
-                    Debug.LogFormat("MPBanPlayers: failed to get HAMI");
-                    return false;
-                }
-                if (FieldLastGamesessionMatchmakerDatas == null) {
-                    FieldLastGamesessionMatchmakerDatas = AccessTools.Field(HAMI.GetType(), "m_last_gamesession_matchmaker_datas");
-                }
-                var datas = FieldLastGamesessionMatchmakerDatas.GetValue(HAMI);
-                if (datas == null) {
-                    Debug.LogFormat("MPBanPlayers: failed to get matchmaker datas");
-                    return false;
-                }
-                IDictionary dataDict = datas as IDictionary;
-                if (dataDict != null) {
-                    var it = dataDict.GetEnumerator();
-                    while (it.MoveNext()) {
-                        var data = it.Value;
-                        if (FieldPlayerId == null) {
-                            FieldPlayerId = AccessTools.Field(data.GetType(), "m_playerId");
-                        }
-                        if (FieldTimeSlotReserved == null) {
-                            FieldTimeSlotReserved = AccessTools.Field(data.GetType(), "m_time_slot_reserved");
-                        }
-                        if (FieldPlayerId != null && FieldTimeSlotReserved != null) {
-                            string id = (string)FieldPlayerId.GetValue(data);
-                            if (id == player_id) {
-                                // modify the timeout for this player as the entry still survises
-                                // after the connection is closed, and server woudl wait for timeout (1 Minute)
-                                // instead...
-                                DateTime t = (DateTime)FieldTimeSlotReserved.GetValue(data);
-                                t = DateTime.Now - TimeSpan.FromSeconds(57); // Timeout is 60 seconds by default, let it time out in 3 sec
-                                Debug.LogFormat("BAN: timing out banned player id {0}", id);
-                                FieldTimeSlotReserved.SetValue(data,t);
+        private static void Postfix(ref bool __result, int connection_id, int version, string player_name, string player_session_id, string player_id, string player_uid) {
+            if (__result) {
+                // the player has been accepted by the game's matchmaking, but is he banned?
+                MPBanEntry candidate = new MPBanEntry(player_name, connection_id, player_id);
+                if (MPBanPlayers.IsBanned(candidate)) {
+                    // we do not reject him here as this causes all sorts of issues,
+                    // we kick him out of the lobby later instead
+                    MPBanPlayers.KickPlayer(connection_id, player_name);
+                    MPBanPlayers.bannedPlayerInLobby = true;
+                } else {
+                    // an unbanned Player entered the Lobby!
+                    if (!MPBanPlayers.unbannedPlayerInLobby) {
+                        // for the first time:
+                        MPBanPlayers.unbannedPlayerInLobby = true;
+                        if (!MPBanPlayers.bannedPlayerInLobby) {
+                            // Clear all non-permanent bans if the match was created by someone else
+                            bool doReset = true;
+                            if (NetworkMatch.m_name != null) {
+                                string creator = NetworkMatch.m_name.Split('\0')[0].ToUpper();
+                                if (!String.IsNullOrEmpty(creator) && !String.IsNullOrEmpty(lastGameCreator)) {
+                                    if (creator == lastGameCreator) {
+                                        Debug.Log("MPBanPlayers: same game creator as last match, keeping all bans and permissions");
+                                        MPChatTools.SendTo("keeping bans and permissions from previous match");
+                                        doReset = false;
+                                    }
+                                }
+                                lastGameCreator = creator;
+                            }
+                            if (doReset) {
+                                MPBanPlayers.Reset();
+                                MPChatCommand.Reset();
                             }
                         }
                     }
                 }
-                return false;
             }
-            // run the method as intented
-            return true;
         }
     }
-    */
 
     // Apply the Annoy-Ban when the match starts
     [HarmonyPatch(typeof(NetworkMatch), "StartPlaying")]
@@ -402,24 +379,10 @@ namespace GameMod {
     //       server
     [HarmonyPatch(typeof(NetworkMatch), "NetSystemOnGameSessionStart")]
     class MPBanPlayers_OnNewGameSession {
-        private static string lastGameCreator = null;
         private static void Postfix() {
-            bool doReset = true;
-
-            if (NetworkMatch.m_name != null) {
-                string creator = NetworkMatch.m_name.Split('\0')[0].ToUpper();
-                if (!String.IsNullOrEmpty(creator) && !String.IsNullOrEmpty(lastGameCreator)) {
-                    if (creator == lastGameCreator) {
-                        Debug.Log("MPBanPlayers: same game creator as last match, keeping all bans and permissions");
-                        doReset = false;
-                    }
-                }
-                lastGameCreator = creator;
-            }
-            if (doReset) {
-                MPBanPlayers.Reset();
-                MPChatCommand.Reset();
-            }
+            // lobby is empty right now...
+            MPBanPlayers.unbannedPlayerInLobby = false;
+            MPBanPlayers.bannedPlayerInLobby = false;
         }
     }
 }
