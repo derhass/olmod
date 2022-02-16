@@ -172,7 +172,7 @@ namespace GameMod {
         // Execute a command: Returns true if the caller should forward the chat message
         // to the clients, and false if not (when it was a special command for the server)
         public bool Execute() {
-            if (!IsEnabled) {
+            if (!IsEnabled()) {
                 // chat commands are not enabled
                 return true;
             }
@@ -190,7 +190,7 @@ namespace GameMod {
             Debug.LogFormat("CHATCMD {0}: {1} {2}", cmd, cmdName, arg);
             if (needAuth) {
                 if (!CheckPermission()) {
-                    ReturnToSender("You do not have the permission for command {0}!", cmd);
+                    ReturnToSender(String.Format("You do not have the permission for command {0}!", cmd));
                     Debug.LogFormat("CHATCMD {0}: client is not authenticated!", cmd);
                     return false;
                 }
@@ -355,7 +355,7 @@ namespace GameMod {
         // Execute END command
         public bool DoEnd()
         {
-            Debug.LogFormat("END request via chat command");
+            Debug.Log("END request via chat command");
             ReturnTo("manual match END request");
             NetworkMatch.End();
             return false;
@@ -376,7 +376,7 @@ namespace GameMod {
         }
 
         // Execute STATUS command
-        public Bool DoStatus()
+        public bool DoStatus()
         {
             string creator;
             if (MPBanPlayers.MatchCreator != null && !String.IsNullOrEmpty(MPBanPlayers.MatchCreator.name)) {
@@ -385,7 +385,7 @@ namespace GameMod {
                 creator = "<UNKNOWN>";
             }
 
-            ReturnToSender(String.Format("STATUS: {0}'s game, your auth: {1}", creator,CheckPermission());
+            ReturnToSender(String.Format("STATUS: {0}'s game, your auth: {1}", creator,CheckPermission()));
             ReturnToSender(String.Format("STATUS: bans: {0}, annoy-bans: {1}, authList: {2}",
                                          MPBanPlayers.GetList(MPBanMode.Ban).Count,
                                          MPBanPlayers.GetList(MPBanMode.Annoy).Count,

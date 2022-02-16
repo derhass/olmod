@@ -354,7 +354,7 @@ namespace GameMod {
                     // NOTE: we cannot just say __accept = false, because this causes all sorts of troubles later
                     MPBanPlayers.KickPlayer(connection_id, player_name);
                     if (isCreator) {
-                        Debug.Log("Creator for this match {0} is BANNED, ending match", candidate.name);
+                        Debug.LogFormat("Creator for this match {0} is BANNED, ending match", candidate.name);
                         GameManager.m_gm.StartCoroutine(DelayedEndMatch());
                     }
                 } else {
