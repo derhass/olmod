@@ -452,7 +452,7 @@ namespace GameMod {
                 Debug.LogFormat("CheckPermission: failed to query player for connection {0}", sender_conn);
                 return false;
             }
-            if (entry.matches(MPBanPlayers.MatchCreator)) {
+            if (MPBanPlayers.MatchCreator != null && entry.matches(MPBanPlayers.MatchCreator)) {
                 // the match creator is always authenticated
                 return true;
             }
