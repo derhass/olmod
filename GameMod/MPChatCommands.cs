@@ -79,6 +79,7 @@ namespace GameMod {
             Unannoy,
             End,
             Start,
+            Test,
         }
 
         // properties:
@@ -152,6 +153,8 @@ namespace GameMod {
             } else if (cmdName == "S" || cmdName == "START") {
                 cmd = Command.Start;
                 needAuth = true;
+            } else if (cmdName == "T" || cmdName == "TEST") {
+                cmd = Command.Test;
             }
         }
 
@@ -207,6 +210,9 @@ namespace GameMod {
                     break;
                 case Command.Start:
                     result = DoStart();
+                    break;
+                case Command.Test:
+                    result = DoTest();
                     break;
                 default:
                     Debug.LogFormat("CHATCMD {0}: {1} {2} was not handled by server", cmd, cmdName, arg);
@@ -344,6 +350,17 @@ namespace GameMod {
             Debug.LogFormat("START request via chat command");
             ReturnTo("manual match START request");
             MPChatCommands_ModifyLobbyStartTime.StartMatch = true;
+            return false;
+        }
+
+        public bool DoTest()
+        {
+            Debug.LogFormat("TEST request for {0}", arg);
+            if (!SelectPlayer(arg)) {
+                Debug.LogFormat("TEST: no player matching {0} found", arg);
+                return false;
+            }
+            ReturnToSender(String.Format("found player {0}",selectedPlayerEntry.name));
             return false;
         }
 
