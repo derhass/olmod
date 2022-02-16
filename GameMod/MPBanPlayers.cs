@@ -344,7 +344,7 @@ namespace GameMod {
                 }
                 // check if player is banned
                 bool isBanned = MPBanPlayers.IsBanned(candidate);
-                if (isCreator || !isBanned) {
+                if (isCreator && !isBanned) {
                     // also check annoy-bans, annoy-banned players shall not create matches either
                     // (although they can join games)
                     isBanned = MPBanPlayers.IsBanned(candidate, MPBanMode.Annoy);
