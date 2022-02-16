@@ -99,6 +99,14 @@ namespace GameMod {
         // Authentication is done based on Player.m_player_id / PlayerLobbyData.m_player_id
         private static Dictionary<string,bool> authenticatedConnections = new Dictionary<string,bool>();
 
+        // Check if chat commands are enabled.
+        public static bool IsEnabled()
+        {
+            // always enable them
+            // we might add some command-line argument to disable them, if a server op doesn't want this
+            return true;
+        }
+
         // Construct a MPChatCommand from a Chat message
         public MPChatCommand(string message, int sender_connection_id, bool isInLobby) {
             cmd = Command.None;
@@ -164,6 +172,11 @@ namespace GameMod {
         // Execute a command: Returns true if the caller should forward the chat message
         // to the clients, and false if not (when it was a special command for the server)
         public bool Execute() {
+            if (!IsEnabled) {
+                // chat commands are not enabled
+                return true;
+            }
+
             if (cmd == Command.None) {
                 // there might be Annoy-Banned players, and we can just ignore their ramblings
                 if (MPBanPlayers.GetList(MPBanMode.Annoy).Count > 0) {
@@ -372,7 +385,7 @@ namespace GameMod {
                 creator = "<UNKNOWN>";
             }
 
-            ReturnToSender(String.Format("STATUS: {0}'s game, auth: {1}", creator, CheckPermission()));
+            ReturnToSender(String.Format("STATUS: {0}'s game, your auth: {1}", creator,CheckPermission());
             ReturnToSender(String.Format("STATUS: bans: {0}, annoy-bans: {1}, authList: {2}",
                                          MPBanPlayers.GetList(MPBanMode.Ban).Count,
                                          MPBanPlayers.GetList(MPBanMode.Annoy).Count,
