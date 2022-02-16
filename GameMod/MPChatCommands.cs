@@ -76,6 +76,7 @@ namespace GameMod {
             KickBan,
             Unban,
             Annoy,
+            Unannoy,
             End,
             Start,
         }
@@ -136,6 +137,9 @@ namespace GameMod {
             } else if (cmdName == "A" || cmdName == "ANNOY") {
                 cmd = Command.Annoy;
                 needAuth = true;
+            } else if (cmdName == "UA" || cmdName == "UNANNOY") {
+                cmd = Command.Unannoy;
+                needAuth = true;
             } else if (cmdName == "KB" || cmdName == "KICKBAN") {
                 cmd = Command.KickBan;
                 needAuth = true;
@@ -194,6 +198,9 @@ namespace GameMod {
                     break;
                 case Command.Unban:
                     result = DoUnban(MPBanMode.Ban);
+                    break;
+                case Command.Unannoy:
+                    result = DoUnban(MPBanMode.Annoy);
                     break;
                 case Command.End:
                     result = DoEnd();
@@ -312,6 +319,7 @@ namespace GameMod {
                 string pattern = arg.ToUpper();
                 var banList=MPBanPlayers.GetList(banMode);
                 int cnt = banList.RemoveAll(entry => (MatchPlayerName(entry.name, pattern) != 0));
+                MPBanPlayers.OnUpdate(banMode, false);
                 ReturnTo(String.Format("{0} players have been UNBANNED from {1} list", cnt, banMode));
                 return (cnt > 0);
             }
@@ -431,35 +439,58 @@ namespace GameMod {
             return (authenticatedConnections.ContainsKey(id) && authenticatedConnections[id] == true);
         }
 
+        // Match string name version pattern,
+        // Allow '?' as wildcard character in pattern, matches every character
+        public static int MatchIndexOf(string name, string pattern) {
+            int nLen = name.Length;
+            int pLen = pattern.Length;
+            int cnt;
+            int i,j;
+            cnt = nLen - pLen + 1;
+
+            if (pLen < 1) {
+                // empty pattern matches everything
+                return 0;
+            }
+
+            for (i=0; i < cnt; i++) {
+                bool matches = true;
+                for (j=0; j<pLen; j++) {
+                    if ( (pattern[j] != '?') && (pattern[j] != name[i+j])) {
+                        matches = false;
+                        break;
+                    }
+                }
+                if (matches) {
+                    return i;
+                }
+            }
+            return -1;
+        }
+
         // Match a player name versus the player name pattern
         // Return 1 on perfect match
         //        0 on no match at all
         // or a negative value with lower value meaning worse match
         public int MatchPlayerName(string name, string pattern)
         {
+            if (String.IsNullOrEmpty(name)) {
+                // no match possible
+                return 0;
+            }
+
             if (name == pattern) {
                 // perfect match
                 return 1;
             }
 
-            int index = name.IndexOf(pattern);
+            int index = MatchIndexOf(name, pattern);
             if (index >= 0) {
                int extraChars = name.Length - pattern.Length + 1;
                // the earlier the match, the better is the score,
                // the less extra chars, the better the the score
                return -extraChars -(index*100);
 
-            }
-            // special workaround '::WEIRD*' matches the most non-ascii chars, in case the player has a non-typeable name
-            if (pattern == "::WEIRD*") {
-                int weirdCount = 0;
-                for (int i=0; i<name.Length; i++) {
-                    if (name[i] < (Char)33 || name[i] > (Char)127) {
-                        weirdCount++;
-                    }
-                }
-                int extraChars = name.Length - weirdCount + 1;
-                return -extraChars - 1000000;
             }
             return 0;
         }
