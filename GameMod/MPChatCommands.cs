@@ -135,6 +135,7 @@ namespace GameMod {
             cmdName = cmdName.ToUpper();
             if (cmdName == "GP" || cmdName == "GIVEPERM") {
                 cmd = Command.GivePerm;
+                needAuth = true;
             } else if (cmdName == "RP" || cmdName == "REVOKEPERM") {
                 cmd = Command.RevokePerm;
                 needAuth = true;
