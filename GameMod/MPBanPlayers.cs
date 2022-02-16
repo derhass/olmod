@@ -113,8 +113,7 @@ namespace GameMod {
         // this is the Ban List
         private static List<MPBanEntry>[] banLists = new List<MPBanEntry>[(int)MPBanMode.Count];
         private static int totalBanCount=0; // Count of bans in all lists
-        public static bool unbannedPlayerInLobby = false; // Set to true when the first unbanned player joined the Lobby
-        public static bool bannedPlayerInLobby = false; // Set to true when the first banned player joined the Lobby
+        public static MPBanEntry MatchCreator = null; // description of the Game Creator
 
         // Get the ban list
         public static List<MPBanEntry> GetList(MPBanMode mode = MPBanMode.Ban) {
@@ -325,40 +324,54 @@ namespace GameMod {
 
     [HarmonyPatch(typeof(NetworkMatch), "AcceptNewConnection")]
     class MPBanPlayers_AcceptNewConnection {
-        private static string lastGameCreator = null;
+        // Delayed end game
+        public static IEnumerator DelayedEndMatch()
+        {
+            yield return new WaitForSecondsRealtime(3);
+            NetworkMatch.End();
+        }
 
         private static void Postfix(ref bool __result, int connection_id, int version, string player_name, string player_session_id, string player_id, string player_uid) {
             if (__result) {
-                // the player has been accepted by the game's matchmaking, but is he banned?
+                // the player has been accepted by the game's matchmaking
                 MPBanEntry candidate = new MPBanEntry(player_name, connection_id, player_id);
-                if (MPBanPlayers.IsBanned(candidate)) {
-                    // we do not reject him here as this causes all sorts of issues,
-                    // we kick him out of the lobby later instead
+                bool isCreator = false;
+                if (!String.IsNullOrEmpty(NetworkMatch.m_name) && !String.IsNullOrEmpty(candidate.name)) {
+                    string creator = NetworkMatch.m_name.Split('\0')[0].ToUpper();
+                    if (creator == candidate.name) {
+                        isCreator = true;
+                    }
+                }
+                // check if player is banned
+                bool isBanned = MPBanPlayers.IsBanned(candidate);
+                if (isCreator || !isBanned) {
+                    // also check annoy-bans, annoy-banned players shall not create matches either
+                    // (although they can join games)
+                    isBanned = MPBanPlayers.IsBanned(candidate, MPBanMode.Annoy);
+                }
+                if (isBanned) {
+                    // banned player entered the lobby
+                    // NOTE: we cannot just say __accept = false, because this causes all sorts of troubles later
                     MPBanPlayers.KickPlayer(connection_id, player_name);
-                    MPBanPlayers.bannedPlayerInLobby = true;
+                    if (isCreator) {
+                        Debug.Log("Creator for this match {0} is BANNED, ending match", candidate.name);
+                        GameManager.m_gm.StartCoroutine(DelayedEndMatch());
+                    }
                 } else {
-                    // an unbanned Player entered the Lobby!
-                    if (!MPBanPlayers.unbannedPlayerInLobby) {
-                        // for the first time:
-                        MPBanPlayers.unbannedPlayerInLobby = true;
-                        if (!MPBanPlayers.bannedPlayerInLobby) {
-                            // Clear all non-permanent bans if the match was created by someone else
-                            bool doReset = true;
-                            if (NetworkMatch.m_name != null) {
-                                string creator = NetworkMatch.m_name.Split('\0')[0].ToUpper();
-                                if (!String.IsNullOrEmpty(creator) && !String.IsNullOrEmpty(lastGameCreator)) {
-                                    if (creator == lastGameCreator) {
-                                        Debug.Log("MPBanPlayers: same game creator as last match, keeping all bans and permissions");
-                                        MPChatTools.SendTo("keeping bans and permissions from previous match");
-                                        doReset = false;
-                                    }
-                                }
-                                lastGameCreator = creator;
-                            }
-                            if (doReset) {
-                                MPBanPlayers.Reset();
-                                MPChatCommand.Reset();
-                            }
+                    // unbanned player entered the lobby
+                    if (isCreator) {
+                        bool doReset = true;
+                        if (MPBanPlayers.MatchCreator != null && MPBanPlayers.MatchCreator.matches(candidate, "last game creator: ")) {
+                            // This game's creator is the same as last
+                            Debug.Log("MPBanPlayers: same game creator as last match, keeping all bans and permissions");
+                            MPChatTools.SendTo(true, "keeping bans and permissions from previous match", connection_id);
+                            doReset = false;
+                        }
+                        MPBanPlayers.MatchCreator = candidate;
+                        if (doReset) {
+                            Debug.Log("MPBanPlayers: new game creator, resetting bans and permissions");
+                            MPBanPlayers.Reset();
+                            MPChatCommand.Reset();
                         }
                     }
                 }
@@ -366,23 +379,11 @@ namespace GameMod {
         }
     }
 
-    // Apply the Annoy-Ban when the match starts
+    // Apply the bans when the match starts
     [HarmonyPatch(typeof(NetworkMatch), "StartPlaying")]
     class MPBanPlayers_OnStartPlaying {
         private static void Postfix() {
             MPBanPlayers.ApplyAllBans();
-        }
-    }
-
-    // Reset the bans and th MPChatCommands when a new lobby starts created by a new player
-    // TODO: find a nice way to orevent banned players from creating a game on the
-    //       server
-    [HarmonyPatch(typeof(NetworkMatch), "NetSystemOnGameSessionStart")]
-    class MPBanPlayers_OnNewGameSession {
-        private static void Postfix() {
-            // lobby is empty right now...
-            MPBanPlayers.unbannedPlayerInLobby = false;
-            MPBanPlayers.bannedPlayerInLobby = false;
         }
     }
 }

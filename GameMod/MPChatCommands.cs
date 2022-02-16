@@ -174,7 +174,7 @@ namespace GameMod {
             Debug.LogFormat("CHATCMD {0}: {1} {2}", cmd, cmdName, arg);
             if (needAuth) {
                 if (!CheckPermission()) {
-                    ReturnToSender("You do not have the permission for this command!");
+                    ReturnToSender("You do not have the permission for command {0}!", cmd);
                     Debug.LogFormat("CHATCMD {0}: client is not authenticated!", cmd);
                     return false;
                 }
@@ -245,7 +245,7 @@ namespace GameMod {
             return true;
         }
 
-        // Excute GIVEPERM/REVOKEPERM command
+        // Execute GIVEPERM/REVOKEPERM command
         public bool DoPerm(bool give)
         {
             string op = (give)?"GIVEPERM":"REVOKEPERM";
@@ -273,7 +273,7 @@ namespace GameMod {
             return false;
         }
 
-        // Execute KICK or BAN command
+        // Execute KICK or BAN or KICKBAN or ANNOY command
         public bool DoKickBan(bool doKick, bool doBan, MPBanMode banMode) {
             string op;
             string banOp = banMode.ToString().ToUpper();
@@ -316,6 +316,7 @@ namespace GameMod {
             return false;
         }
 
+        // Execute UNBAN or UNANNOY
         public bool DoUnban(MPBanMode banMode)
         {
             if (String.IsNullOrEmpty(arg)) {
@@ -332,6 +333,7 @@ namespace GameMod {
             return false;
         }
 
+        // Execute END command
         public bool DoEnd()
         {
             Debug.LogFormat("END request via chat command");
@@ -340,6 +342,7 @@ namespace GameMod {
             return false;
         }
 
+        // Execute START commad
         public bool DoStart()
         {
             if (!inLobby) {
@@ -353,6 +356,7 @@ namespace GameMod {
             return false;
         }
 
+        // Execute TEST command
         public bool DoTest()
         {
             Debug.LogFormat("TEST request for {0}", arg);
@@ -443,17 +447,21 @@ namespace GameMod {
 
         // Check if the sender of the message is authenticated
         public bool CheckPermission() {
-            string creator = NetworkMatch.m_name.Split('\0')[0].ToUpper();
-            if (creator == FindPlayerNameForConnection(sender_conn, inLobby)) {
-                // the creator of the match is always authenticated
-                return true;
-            }
-            string id = FindPlayerIDForConnection(sender_conn, inLobby);
-            if (id.Length < 1) {
-                Debug.LogFormat("CHATCMD: could not determine client's player ID!");
+            MPBanEntry entry = FindPlayerEntryForConnection(sender_conn, inLobby);
+            if (entry == null) {
+                Debug.LogFormat("CheckPermission: failed to query player for connection {0}", sender_conn);
                 return false;
             }
-            return (authenticatedConnections.ContainsKey(id) && authenticatedConnections[id] == true);
+            if (entry.matches(MPBanPlayers.MatchCreator)) {
+                // the match creator is always authenticated
+                return true;
+            }
+
+            if (String.IsNullOrEmpty(entry.id)) {
+                Debug.LogFormat("CheckPermission: failed to query player ID for connection {0}", sender_conn);
+                return false;
+            }
+            return (authenticatedConnections.ContainsKey(entry.id) && authenticatedConnections[entry.id] == true);
         }
 
         // Match string name version pattern,
@@ -568,6 +576,8 @@ namespace GameMod {
             return bestPlayer;
         }
 
+        // Reset the state of the chat commands
+        // This clears all authentications
         public static void Reset() {
             Debug.Log("MPChatCommands: clearing command authentications");
             authenticatedConnections.Clear();
