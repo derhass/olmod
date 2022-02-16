@@ -361,10 +361,8 @@ namespace GameMod {
                     // unbanned player entered the lobby
                     if (isCreator) {
                         bool doReset = true;
-                        if (MPBanPlayers.MatchCreator != null && MPBanPlayers.MatchCreator.matches(candidate, "last game creator: ")) {
-                            // This game's creator is the same as last
-                            Debug.Log("MPBanPlayers: same game creator as last match, keeping all bans and permissions");
-                            MPChatTools.SendTo(true, "keeping bans and permissions from previous match", connection_id);
+                        if (MPChatCommand.CheckPermission(candidate)) {
+                            Debug.Log("MPBanPlayers: same game creator as last match, or with permissions");
                             doReset = false;
                         }
                         MPBanPlayers.MatchCreator = candidate;
@@ -372,6 +370,8 @@ namespace GameMod {
                             Debug.Log("MPBanPlayers: new game creator, resetting bans and permissions");
                             MPBanPlayers.Reset();
                             MPChatCommand.Reset();
+                        } else {
+                            MPChatTools.SendTo(true, "keeping bans and permissions from previous match", connection_id);
                         }
                     }
                 }

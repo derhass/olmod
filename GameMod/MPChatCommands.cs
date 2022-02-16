@@ -481,11 +481,9 @@ namespace GameMod {
             return null;
         }
 
-        // Check if the sender of the message is authenticated
-        public bool CheckPermission() {
-            MPBanEntry entry = FindPlayerEntryForConnection(sender_conn, inLobby);
+        // check if a specific player has chat command permissions
+        public static bool CheckPermission(MPBanEntry entry) {
             if (entry == null) {
-                Debug.LogFormat("CheckPermission: failed to query player for connection {0}", sender_conn);
                 return false;
             }
             if (MPBanPlayers.MatchCreator != null && entry.matches(MPBanPlayers.MatchCreator)) {
@@ -494,10 +492,20 @@ namespace GameMod {
             }
 
             if (String.IsNullOrEmpty(entry.id)) {
-                Debug.LogFormat("CheckPermission: failed to query player ID for connection {0}", sender_conn);
+                Debug.LogFormat("CheckPermission: failed to get player ID");
                 return false;
             }
             return (authenticatedConnections.ContainsKey(entry.id) && authenticatedConnections[entry.id] == true);
+        }
+
+        // Check if the sender of the message is authenticated
+        public bool CheckPermission() {
+            MPBanEntry entry = FindPlayerEntryForConnection(sender_conn, inLobby);
+            if (entry == null) {
+                Debug.LogFormat("CheckPermission: failed to query player for connection {0}", sender_conn);
+                return false;
+            }
+            return CheckPermission(entry);
         }
 
         // Match string name version pattern,
