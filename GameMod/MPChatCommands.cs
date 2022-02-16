@@ -347,7 +347,6 @@ namespace GameMod {
                 int cnt = banList.RemoveAll(entry => (MatchPlayerName(entry.name, pattern) != 0));
                 MPBanPlayers.OnUpdate(banMode, false);
                 ReturnTo(String.Format("{0} players have been UNBANNED from {1} list", cnt, banMode));
-                return (cnt > 0);
             }
             return false;
         }
