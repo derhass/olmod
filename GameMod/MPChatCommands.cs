@@ -79,6 +79,7 @@ namespace GameMod {
             Unannoy,
             End,
             Start,
+            Status,
             Test,
         }
 
@@ -153,6 +154,8 @@ namespace GameMod {
             } else if (cmdName == "S" || cmdName == "START") {
                 cmd = Command.Start;
                 needAuth = true;
+            } else if (cmdName == "STATUS") {
+                cmd = Command.Status;
             } else if (cmdName == "T" || cmdName == "TEST") {
                 cmd = Command.Test;
             }
@@ -210,6 +213,9 @@ namespace GameMod {
                     break;
                 case Command.Start:
                     result = DoStart();
+                    break;
+                case Command.Status:
+                    result = DoStatus();
                     break;
                 case Command.Test:
                     result = DoTest();
@@ -356,12 +362,30 @@ namespace GameMod {
             return false;
         }
 
+        // Execute STATUS command
+        public Bool DoStatus()
+        {
+            string creator;
+            if (MPBanPlayers.MatchCreator != null && !String.IsNullOrEmpty(MPBanPlayers.MatchCreator.name)) {
+                creator = MPBanPlayers.MatchCreator.name;
+            } else {
+                creator = "<UNKNOWN>";
+            }
+
+            ReturnToSender(String.Format("STATUS: {0}'s game, auth: {1}", creator, CheckPermission()));
+            ReturnToSender(String.Format("STATUS: bans: {0}, annoy-bans: {1}, authList: {2}",
+                                         MPBanPlayers.GetList(MPBanMode.Ban).Count,
+                                         MPBanPlayers.GetList(MPBanMode.Annoy).Count,
+                                         authenticatedConnections.Count));
+            return false;
+        }
+
         // Execute TEST command
         public bool DoTest()
         {
             Debug.LogFormat("TEST request for {0}", arg);
             if (!SelectPlayer(arg)) {
-                Debug.LogFormat("TEST: no player matching {0} found", arg);
+                ReturnToSender(String.Format("did not find player {0}",arg));
                 return false;
             }
             ReturnToSender(String.Format("found player {0}",selectedPlayerEntry.name));
