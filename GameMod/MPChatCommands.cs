@@ -496,7 +496,7 @@ namespace GameMod {
             if (entry == null) {
                 return false;
             }
-            if (MPBanPlayers.MatchCreator != null && entry.matches(MPBanPlayers.MatchCreator)) {
+            if (MPBanPlayers.MatchCreator != null && entry.matches(MPBanPlayers.MatchCreator, "MATCH CREATOR: ")) {
                 // the match creator is always authenticated
                 return true;
             }
@@ -511,10 +511,6 @@ namespace GameMod {
         // Check if a client on a specific connection id is authenticated
         public static bool CheckPermission(int connection_id, bool inLobby) {
             MPBanEntry entry = FindPlayerEntryForConnection(connection_id, inLobby);
-            if (entry == null) {
-                Debug.LogFormat("CheckPermission: failed to query player for connection {0}", connection_id);
-                return false;
-            }
             return CheckPermission(entry);
         }
 
@@ -633,6 +629,13 @@ namespace GameMod {
                 Debug.LogFormat("CHATCMD: did not find a player matching {0}", pattern);
             }
             return bestPlayer;
+        }
+
+        // Check if we have set any MPChatCommand related state
+        // Currently, this check only whether the authl list is not empty
+        public static bool HasModifiedState()
+        {
+            return (authenticatedConnections.Count > 0);
         }
 
         // Reset the state of the chat commands
