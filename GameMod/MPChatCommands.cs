@@ -352,11 +352,24 @@ namespace GameMod {
                 MPBanPlayers.UnbanAll(banMode);
                 ReturnTo(String.Format("ban list {0} has been cleared",banMode));
             } else {
+                // check against names in ban list (must not be current player names)
                 string pattern = arg.ToUpper();
                 var banList=MPBanPlayers.GetList(banMode);
                 int cnt = banList.RemoveAll(entry => (MatchPlayerName(entry.name, pattern) != 0));
-                MPBanPlayers.OnUpdate(banMode, false);
-                ReturnTo(String.Format("{0} players have been UNBANNED from {1} list", cnt, banMode));
+                if (cnt > 0) {
+                    MPBanPlayers.OnUpdate(banMode, false);
+                } else {
+                    // check the currently connected players
+                    if (SelectPlayer(arg)) {
+                        cnt = MPBanPlayers.Unban(selectedPlayerEntry, banMode);
+                    }
+                }
+
+                if (cnt > 0) {
+                    ReturnTo(String.Format("{0} players have been UNBANNED from {1} list", cnt, banMode));
+                } else {
+                    ReturnToSender(String.Format("Un{0}: no player {1} found",banMode, arg));
+                }
             }
             return false;
         }

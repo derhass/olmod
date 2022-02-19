@@ -297,15 +297,14 @@ namespace GameMod {
         }
 
         // Remove all entries matching a candidate from the ban list
-        public static bool Unban(MPBanEntry candidate, MPBanMode mode = MPBanMode.Ban)
+        public static int Unban(MPBanEntry candidate, MPBanMode mode = MPBanMode.Ban)
         {
             var banList = GetList(mode);
             int cnt = banList.RemoveAll(entry => entry.matches(candidate,"UNBAN: "));
             if (cnt > 0) {
                 OnUpdate(mode, false);
-                return true;
             }
-            return false;
+            return cnt;
         }
 
         // Remove all bans
