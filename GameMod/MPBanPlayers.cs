@@ -403,40 +403,35 @@ namespace GameMod {
         }
     }
 
-    // Prevent sending an "AcceptedToLobby" state to a banned player
-    [HarmonyPatch(typeof(Overload.Server), "SendAcceptedToLobby")]
-    class MPBanPlayers_SendAcceptedToLobby {
-        private static bool Prefix(NetworkConnection conn) {
-            bool runMethod = true;
-            if (conn != null &&  conn.connectionId >= 0 && conn.connectionId < NetworkServer.connections.Count) {
-                // rename annoy-banned players
+    // Don't send banned players in the lobby to other players
+    // rename ANNOY-BANNED players
+    [HarmonyPatch(typeof(Overload.Server), "SendPlayersInLobbyToAllClients")]
+    class MPBanPlayers_SendPlayersInLobbyToAllClients {
+        private static void Prefix() {
+            if (MPBanPlayers.JoiningPlayerConnectionId >= 0) {
                 if (MPBanPlayers.JoiningPlayerIsAnnoyed) {
-                    foreach (KeyValuePair<int, PlayerLobbyData> p in NetworkMatch.m_players) {
-                        if (p.Key == conn.connectionId) {
-                            if (p.Value != null) {
-                                MPChatTools.SendTo(String.Format("ANNOY-BANNED player {0} joined, renamed to {1}",p.Value.m_name, MPBanPlayers.bannedName), -1, conn.connectionId, true);
-                                p.Value.m_name = MPBanPlayers.bannedName;
+                    // rename annoy-banned players
+                    if (MPBanPlayers.JoiningPlayerIsAnnoyed) {
+                        foreach (KeyValuePair<int, PlayerLobbyData> p in NetworkMatch.m_players) {
+                            if (p.Key == MPBanPlayers.JoiningPlayerConnectionId) {
+                                if (p.Value != null) {
+                                    MPChatTools.SendTo(String.Format("ANNOY-BANNED player {0} joined, renamed to {1}",p.Value.m_name, MPBanPlayers.bannedName), -1, MPBanPlayers.JoiningPlayerConnectionId, true);
+                                    p.Value.m_name = MPBanPlayers.bannedName;
+                                }
                             }
                         }
                     }
                 }
-                // remove Banned Players
                 if (MPBanPlayers.JoiningPlayerIsBanned) {
-                    if (NetworkMatch.m_players.ContainsKey(conn.connectionId)) {
+                    if (NetworkMatch.m_players.ContainsKey(MPBanPlayers.JoiningPlayerConnectionId)) {
                         // Save the PlayerLobbyData that we remove here, we add it back after SendPlayersInLobbyToAllClients
-                        MPBanPlayers.JoiningPlayerLobbyData = NetworkMatch.m_players[conn.connectionId];
-                        NetworkMatch.m_players.Remove(conn.connectionId);
+                        MPBanPlayers.JoiningPlayerLobbyData = NetworkMatch.m_players[MPBanPlayers.JoiningPlayerConnectionId];
+                        NetworkMatch.m_players.Remove(MPBanPlayers.JoiningPlayerConnectionId);
                     }
-                    runMethod = false; // Don't sent the accept to the client
                 }
             }
-            return runMethod;
         }
-    }
 
-    // Add back player lobby data which we might have removed in SendAcceptedToLobby
-    [HarmonyPatch(typeof(Overload.Server), "SendPlayersInLobbyToAllClients")]
-    class MPBanPlayers_SendPlayersInLobbyToAllClients {
         private static void Posfix() {
             if (MPBanPlayers.JoiningPlayerIsBanned && MPBanPlayers.JoiningPlayerConnectionId >= 0 && MPBanPlayers.JoiningPlayerLobbyData != null) {
                 // Add back the PlayerLobbyData which we temporarily removed
