@@ -502,7 +502,6 @@ namespace GameMod {
             }
 
             if (String.IsNullOrEmpty(entry.id)) {
-                Debug.LogFormat("CheckPermission: failed to get player ID");
                 return false;
             }
             return (authenticatedConnections.ContainsKey(entry.id) && authenticatedConnections[entry.id] == true);

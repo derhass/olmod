@@ -121,60 +121,6 @@ namespace GameMod {
         public static int  JoiningPlayerConnectionId = -1;
         public static PlayerLobbyData JoiningPlayerLobbyData = null;
 
-        static FieldInfo FieldNMHostActiveInfo = null;
-        static FieldInfo FieldLastGamesessionMatchmakerDatas = null;
-        static FieldInfo FieldPlayerId = null;
-        static FieldInfo FieldTimeSlotReserved = null;
-
-        // Ugly Hack: the server can get stuck in "Payer Joining" state if we Kick some player
-        //
-        static private void MatchmakingTimoutKickedPlayer(string player_id) {
-            // hack to prevent matchmaking from waiting for this player to join...
-            // This is ugly as hell as we have to iterate over a Dictionary with
-            // internal Data Types, wich is itself stored in an internal data type...
-            if (FieldNMHostActiveInfo == null) {
-                FieldNMHostActiveInfo = AccessTools.Field( AccessTools.TypeByName("NetworkMatch"), "m_host_active_info");
-            }
-            var HAMI = FieldNMHostActiveInfo.GetValue(null);
-            if (HAMI == null) {
-                Debug.LogFormat("MPBanPlayers: failed to get HAMI");
-                return;
-            }
-            if (FieldLastGamesessionMatchmakerDatas == null) {
-                FieldLastGamesessionMatchmakerDatas = AccessTools.Field(HAMI.GetType(), "m_last_gamesession_matchmaker_datas");
-            }
-            var datas = FieldLastGamesessionMatchmakerDatas.GetValue(HAMI);
-            if (datas == null) {
-                Debug.LogFormat("MPBanPlayers: failed to get matchmaker datas");
-                return;
-            }
-            IDictionary dataDict = datas as IDictionary;
-            if (dataDict != null) {
-                var it = dataDict.GetEnumerator();
-                while (it.MoveNext()) {
-                    var data = it.Value;
-                    if (FieldPlayerId == null) {
-                        FieldPlayerId = AccessTools.Field(data.GetType(), "m_playerId");
-                    }
-                    if (FieldTimeSlotReserved == null) {
-                        FieldTimeSlotReserved = AccessTools.Field(data.GetType(), "m_time_slot_reserved");
-                    }
-                    if (FieldPlayerId != null && FieldTimeSlotReserved != null) {
-                        string id = (string)FieldPlayerId.GetValue(data);
-                        if (id == player_id) {
-                            // modify the timeout for this player as the entry still survises
-                            // after the connection is closed, and server woudl wait for timeout (1 Minute)
-                            // instead...
-                            DateTime t = (DateTime)FieldTimeSlotReserved.GetValue(data);
-                            t = DateTime.Now - TimeSpan.FromSeconds(3600);
-                            Debug.LogFormat("timing out kicked player id {0}", id);
-                            FieldTimeSlotReserved.SetValue(data,t);
-                        }
-                    }
-                }
-            }
-        }
-
         // Get the ban list
         public static List<MPBanEntry> GetList(MPBanMode mode = MPBanMode.Ban) {
             int m = (int)mode;
@@ -206,7 +152,6 @@ namespace GameMod {
                     if (p.connectionToClient != null) {
                         MPChatTools.SendTo(String.Format("ANNOY-BANNING player {0}",p.m_mp_name), -1, p.connectionToClient.connectionId, true);
                     }
-                    p.m_mp_name = bannedName;
                 }
             }
         }
@@ -228,18 +173,18 @@ namespace GameMod {
         }
 
         // Delayed disconnect on Kick
+        static private MethodInfo _Server_OnDisconnect_Method = AccessTools.Method(typeof(Overload.Server), "OnDisconnect");
+
         public static IEnumerator DelayedDisconnect(int connection_id)
         {
             yield return new WaitForSecondsRealtime(1);
             if (connection_id < NetworkServer.connections.Count && NetworkServer.connections[connection_id] != null) {
-                MPBanEntry entry = MPChatCommand.FindPlayerEntryForConnection(connection_id, false);
-                if (entry == null) {
-                    entry = MPChatCommand.FindPlayerEntryForConnection(connection_id, true);
-                }
-                if (entry != null) {
-                    MatchmakingTimoutKickedPlayer(entry.id);
-                }
-                NetworkServer.connections[connection_id].Disconnect();
+                NetworkConnection conn =  NetworkServer.connections[connection_id];
+                NetworkMessage msg = new NetworkMessage();
+                msg.conn = conn;
+                msg.msgType = 33; // Disconnect
+                _Server_OnDisconnect_Method.Invoke(null, new object[] { msg });
+                conn.Disconnect();
             }
         }
 
@@ -250,7 +195,7 @@ namespace GameMod {
                 return;
             }
             if (NetworkServer.connections[connection_id] != null) {
-                MPChatTools.SendTo(String.Format("KICKING {0}player {1}",(banned)?"BANNED ":"",name), -1, connection_id, true);
+                MPChatTools.SendTo(String.Format("KICKING {0}player {1}",((banned)?"BANNED ":""),name), -1, connection_id, true);
                 // SendPostGame(), prevents that the client immediately re-joins
                 NetworkServer.SendToClient(connection_id,74, new IntegerMessage(0));
                 // Goodbye
