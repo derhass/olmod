@@ -144,7 +144,7 @@ namespace GameMod {
                     p.m_spectator = true;
                     Debug.LogFormat("BAN ANNOY player {0}",p.m_mp_name);
                     if (p.connectionToClient != null) {
-                        MPChatTools.SendTo(String.Format("ANNOY BANNED player {0}",p.m_mp_name), -1, p.connectionToClient.connectionId);
+                        MPChatTools.SendTo(String.Format("ANNOY-BANNING player {0}",p.m_mp_name), -1, p.connectionToClient.connectionId, true);
                     }
                 }
             }
@@ -182,9 +182,7 @@ namespace GameMod {
                 return;
             }
             if (NetworkServer.connections[connection_id] != null) {
-                MPChatTools.SendTo(String.Format("KICKED player {0}",name), -1, connection_id);
-                //
-                NetworkServer.SendToClient(connection_id,51, new IntegerMessage(2000000000));
+                MPChatTools.SendTo(String.Format("KICKING BANNED player {0}",name), -1, connection_id, true);
                 // SendPostGame(), prevents that the client immediately re-joins when in GAME
                 // (doesn't help in Lobby)
                 NetworkServer.SendToClient(connection_id,74, new IntegerMessage(0));
