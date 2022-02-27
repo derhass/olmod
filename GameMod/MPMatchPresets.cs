@@ -104,6 +104,44 @@ namespace GameMod
                 teamCount = 2
             });
 
+            presets.Add(new MPMatchPreset
+            {
+                title = "DERHASS-1",
+                matchMode = MatchMode.ANARCHY,
+                maxPlayers = 16,
+                friendlyFire = 0,
+                timeLimit = 15 * 60,
+                scoreLimit = 0,
+                respawnTime = 2,
+                respawnInvuln = 2,
+                showNames = MatchShowEnemyNames.NORMAL,
+                turnSpeedLimit = 2,
+                forceLoadout = 0,
+                forcePrimary1 = WeaponType.IMPULSE,
+                forcePrimary2 = WeaponType.NUM,
+                forceSecondary1 = MissileType.FALCON,
+                forceSecondary2 = MissileType.NUM,
+                forceModifier1 = 4,
+                forceModifier2 = 4,
+                powerupSpawn = 2,
+                powerupInitial = 2,
+                powerupBigSpawn = 1,
+                powerupFilter = new bool[] { true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true },
+                jipEnabled = true,
+                suddenDeathOvertime = false,
+                lapLimit = 0,
+                sniperPackets = false,
+                noCompression = true,
+                allowRearView = true,
+                scaleRespawnTime = false,
+                ctfCarrierBoostEnabled = false,
+                classicSpawnsEnabled = false,
+                alwaysCloaked = false,
+                allowSmash = false,
+                assistScoring = true,
+                teamCount = 2
+            });
+
             GameManager.m_gm.StartCoroutine(GetMatchPresets());
         }        
 
