@@ -80,12 +80,15 @@ namespace GameMod {
             // List of Commands
             GivePerm,
             RevokePerm,
+            Auth,
             Kick,
             Ban,
             KickBan,
             Unban,
             Annoy,
             Unannoy,
+            BlockChat,
+            UnblockChat,
             End,
             Start,
             Status,
@@ -153,6 +156,9 @@ namespace GameMod {
             } else if (cmdName == "RP" || cmdName == "REVOKEPERM") {
                 cmd = Command.RevokePerm;
                 needAuth = true;
+            } else if (cmdName == "AUTH") {
+                cmd = Command.Auth;
+                needAuth = false;
             } else if (cmdName == "K" || cmdName == "KICK") {
                 cmd = Command.Kick;
                 needAuth = true;
@@ -170,6 +176,12 @@ namespace GameMod {
                 needAuth = true;
             } else if (cmdName == "UB" || cmdName == "UNBAN") {
                 cmd = Command.Unban;
+                needAuth = true;
+            } else if (cmdName == "BC" || cmdName == "BLOCKCHAT") {
+                cmd = Command.BlockChat;
+                needAuth = true;
+            } else if (cmdName == "UBC" || cmdName == "UNBLOCKCHAT") {
+                cmd = Command.UnblockChat;
                 needAuth = true;
             } else if (cmdName == "E" || cmdName == "END") {
                 cmd = Command.End;
@@ -193,10 +205,10 @@ namespace GameMod {
             }
 
             if (cmd == Command.None) {
-                // there might be Annoy-Banned players, and we can just ignore their ramblings
-                if (MPBanPlayers.GetList(MPBanMode.Annoy).Count > 0) {
+                // there might be BlockChat-Banned players, and we can just ignore their ramblings
+                if (MPBanPlayers.GetList(MPBanMode.BlockChat).Count > 0) {
                     MPBanEntry we = FindPlayerEntryForConnection(sender_conn, inLobby);
-                    if (we != null && MPBanPlayers.IsBanned(we, MPBanMode.Annoy)) {
+                    if (we != null && MPBanPlayers.IsBanned(we, MPBanMode.BlockChat)) {
                         return false;
                     }
                 }
@@ -223,6 +235,9 @@ namespace GameMod {
                 case Command.RevokePerm:
                     result = DoPerm(false);
                     break;
+                case Command.Auth:
+                    result = DoAuth();
+                    break;
                 case Command.Kick:
                     result = DoKickBan(true, false, MPBanMode.Ban);
                     break;
@@ -240,6 +255,12 @@ namespace GameMod {
                     break;
                 case Command.Unannoy:
                     result = DoUnban(MPBanMode.Annoy);
+                    break;
+                case Command.BlockChat:
+                    result = DoKickBan(false, true, MPBanMode.BlockChat);
+                    break;
+                case Command.UnblockChat:
+                    result = DoUnban(MPBanMode.BlockChat);
                     break;
                 case Command.End:
                     result = DoEnd();
@@ -268,7 +289,7 @@ namespace GameMod {
             }
             trustedPlayers = new List<MPBanEntry>();
             string idstring = null;
-            if (!GameMod.Core.GameMod.FindArgVal("-trustedPlayerIds", out idstring) && String.IsNullOrEmpty(idstring)) {
+            if (!GameMod.Core.GameMod.FindArgVal("-trustedPlayerIds", out idstring) || String.IsNullOrEmpty(idstring)) {
                 return; // no trustedPlayerIds specified;
             }
             string[] ids = idstring.Split(',',';',':','|');
@@ -293,7 +314,7 @@ namespace GameMod {
         private static bool SetAuth(bool allowed, MPBanEntry playerEntry)
         {
             if (playerEntry == null || !playerEntry.IsValid()) {
-                Debug.LogFormat("SETAUTH callid without valid player");
+                Debug.LogFormat("SETAUTH called without valid player");
                 return false;
             }
 
@@ -317,6 +338,26 @@ namespace GameMod {
                 }
             }
             return true;
+        }
+
+        // check if the supplied password matches the server password
+        private static bool SetAuthIsPassword(string password)
+        {
+            if (String.IsNullOrEmpty(password)) {
+                Debug.Log("SETAUTH Password check called without password");
+                return false;
+            }
+            string serverPassword = null;
+            if (!GameMod.Core.GameMod.FindArgVal("-chatCommandPassword", out serverPassword) || String.IsNullOrEmpty(serverPassword)) {
+                Debug.Log("SETAUTH Password is DISABLED on this server");
+                return false;
+            }
+            if (password.ToUpper() == serverPassword.ToUpper()) {
+                Debug.Log("SETAUTH Password CORRECT");
+                return true;
+            }
+            Debug.LogFormat("SETAUTH Password {0} is WRONG", password);
+            return false;
         }
 
         // Check if a player is an authenticated player on this server
@@ -378,7 +419,30 @@ namespace GameMod {
             return false;
         }
 
-        // Execute KICK or BAN or KICKBAN or ANNOY command
+        // Execute the AUTH command
+        public bool DoAuth()
+        {
+            if (!SetAuthIsPassword(arg)) {
+                ReturnToSender("Nope.");
+                // De-Authenticate player with wrong password
+                SetAuth(false, senderEntry);
+                return false;
+            }
+
+            if (IsAuthenticatedPlayer(senderEntry)) {
+                ReturnToSender("Already Authenticated");
+                return false;
+            }
+            if (SetAuth(true, senderEntry)) {
+                ReturnToSender("AUTH successfull.");
+            } else {
+                // this shouldn't really happen...
+                ReturnToSender("AUTH failed! See server log for details.");
+            }
+            return false;
+        }
+
+        // Execute KICK or BAN or KICKBAN or ANNOY or BLOCKCHAT command
         public bool DoKickBan(bool doKick, bool doBan, MPBanMode banMode) {
             string op;
             string banOp = banMode.ToString().ToUpper();
@@ -412,6 +476,10 @@ namespace GameMod {
 
             if (doBan) {
                 MPBanPlayers.Ban(selectedPlayerEntry, banMode);
+                if (banMode == MPBanMode.Annoy) {
+                    // ANNOY also implies BLOCKCHAT
+                    MPBanPlayers.Ban(selectedPlayerEntry, MPBanMode.BlockChat);
+                }
                 ReturnTo(String.Format("{0} player {1} by {2}", banOp, selectedPlayerEntry.name, senderEntry.name), -1, selectedPlayerConnectionId);
             }
             if (doKick) {
@@ -427,14 +495,18 @@ namespace GameMod {
             return false;
         }
 
-        // Execute UNBAN or UNANNOY
+        // Execute UNBAN or UNANNOY or UNBLOCKCHAT
         public bool DoUnban(MPBanMode banMode)
         {
+            if (banMode == MPBanMode.Annoy) {
+                // UNANNOY also implies UNBLOCKCHAT
+                DoUnban(MPBanMode.BlockChat);
+            }
             if (String.IsNullOrEmpty(arg)) {
                 MPBanPlayers.UnbanAll(banMode);
                 ReturnTo(String.Format("ban list {0} cleared by {1}",banMode,senderEntry.name));
             } else {
-                // check against names in ban list (must not be current player names)
+                // check against names in ban list (may not be current player names)
                 string pattern = arg.ToUpper();
                 var banList=MPBanPlayers.GetList(banMode);
                 int cnt = banList.RemoveAll(entry => (MatchPlayerName(entry.name, pattern) != 0));
@@ -491,9 +563,10 @@ namespace GameMod {
 
             GetTrustedPlayerIds();
             ReturnToSender(String.Format("STATUS: {0}'s game, your auth: {1}", creator,CheckPermission(senderEntry)));
-            ReturnToSender(String.Format("STATUS: bans: {0}, annoy-bans: {1}, auth: {2} trust: {3}",
+            ReturnToSender(String.Format("STATUS: bans: {0}, annoys: {1}, blocks: {2}, auth: {3} trust: {4}",
                                          MPBanPlayers.GetList(MPBanMode.Ban).Count,
                                          MPBanPlayers.GetList(MPBanMode.Annoy).Count,
+                                         MPBanPlayers.GetList(MPBanMode.BlockChat).Count,
                                          authenticatedPlayers.Count,
                                          trustedPlayers.Count));
             return false;
