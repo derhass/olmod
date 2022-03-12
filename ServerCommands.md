@@ -14,6 +14,8 @@ see [the section on privilege management below](#privilege-management) for detai
  * `/UNANNOY [<player>]`: Remove the annoy-bans for a player or all annoy-banned players. Note that an annoy-banned player needs to re-join before the all of the effects are removed. This implies `/UNBLOCKCHAT`.
  * `/BLOCKCHAT <player>`: Block all chat messages from the specified player on the server, do not relay them to the other clients. This is a ban and will still apply if a player re-connects.
  * `/UNBLOCKCHAT [<player>]`: Remove the block-chat ban for a player or all players.
+ * `/UNTRUST <player>`: Add player to the untrusted player list.
+ * `/REMOVEUNTRUST [<player>]`: Remove a player from the untrusted player list.
  * `/START`: Start the match immediately (when in lobby)
  * `/END`: End the match immediately
  * `/GIVEPERM <player>`: grant a player the chat command permissions.
@@ -36,16 +38,21 @@ Player names are matches the `<player>` pattern as follows:
 
 ## Privilege Management
 
-The person who initially created the match has always permission to use the chat commands. Further players can be added by using the `/GIVEPERM` command, 
+The person who initially created the match has permission to use the chat commands. Further players can be added by using the `/GIVEPERM` command,
 and revoked with `/REVOKEPERM`. If the server operator specified a chat command password, any player knowing the password can also self-authenticate 
 via `/AUTH` command.
 
+Untrusted players never have any chat command permissions, even if they are the match creator.
+If a match was created by an untrusted player, any other player (who is itself
+not untrusted or banned) may self-authenticate with the `/AUTH` command, no password is required
+in that case.
+
 ### Persistence of bans and privileges
 
-The bans and command privileges stay effective until a new game is created on the server _by a different, unbanned person_.
-Bans and permissions are not persistently stored - if the server process is restarted, all bans and permissions are reset.
+The bans and command privileges which were issued via the chat command system stay effective until a new game is created on the server _by a different, unbanned person_.
+Bans and permissions are not persistently stored - if the server process is restarted, all bans and permissions are reset to the default state.
 
-If a match is created by the same creator as before, or a player who has chat command privileges, the match creator is informed
+If a match is created by the same creator as before, or by a player who has chat command privileges, the match creator is informed
 by the server that all bans and permissions were kept. If a new match is created by any other player, the match creator is informed
 that all bans and permissions were reset _if_ any bans and permissions were active before.
 
@@ -55,6 +62,13 @@ Players can always use the `/STATUS` command to check whether bans or chat permi
 
 Server operators can further control the chat commands via commandline arguments:
  * `-disableChatCommands` will disable all chat commands on this server
- * `-trustedPlayerIds id1[,...,idN]` will add the specified player IDs (sepatated by comma, colon or semicolon) as _trusted players_. Trusted Players always have chat command permission, and can not be kicked or banned from the server. Note that the player IDs are **not** player names. Server operators can find the player IDs in the server log file.
  * `-chatCommandPassword serverPassword` will allow players knowing the password to authenticate themselves with the `/AUTH` command.
+ * `-trustedPlayerIds id1[,...,idN]` will add the specified player IDs (sepatated by comma, colon or semicolon) as _trusted players_. Trusted Players always have chat command permission, and can not be kicked or banned from the server. Note that the player IDs are **not** player names. Server operators can find the player IDs in the server log file.
+ * `-bannedPlayerIds id1[,...,idN]` / `-bannedPlayerIPs ip1[,...,ipN]` to add the set of player IDs or IPs as _banned_ from this server.
+ * `-annoyPlayerIds id1[,...,idN]` / `-annoyPlayerIPs ip1[,...,ipN]` to add the set of player IDs or IPs as _annoy-banned_ on this server.
+ * `-blockchatPlayerIds id1[,...,idN]` / `-blockchatPlayerIPs ip1[,...,ipN]` to add the set of player IDs or IPs as _blockchat-banned_ on this server.
+ * `-untrustedPlayerIds id1[,...,idN]` / `-untrustedPlayerIPs ip1[,...,ipN]` to add the set of player IDs or IPs as _untrusted_ on this server.
 
+Note that any bans and trusted and untrusted player entries specifiec via command line
+cannnot be removed via in-game chat commands. If bans and permissions are reset for a new game,
+these entries still apply.

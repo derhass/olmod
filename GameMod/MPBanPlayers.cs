@@ -15,6 +15,7 @@ namespace GameMod {
         Ban=0,
         Annoy,
         BlockChat,
+        Untrusted,
         Count // End Marker, always add before
     }
 
@@ -129,6 +130,8 @@ namespace GameMod {
         // this is the Ban List
         private static List<MPBanEntry>[] banLists = new List<MPBanEntry>[(int)MPBanMode.Count];
         private static int totalBanCount=0; // Count of bans in all lists
+        private static bool inited=false;
+        private static bool isModified=false;
 
         public static MPBanEntry MatchCreator = null; // description of the Game Creator
         public static string bannedName = " ** BANNED ** ";
@@ -136,6 +139,53 @@ namespace GameMod {
         public static bool JoiningPlayerIsAnnoyed = false;
         public static int  JoiningPlayerConnectionId = -1;
         public static PlayerLobbyData JoiningPlayerLobbyData = null;
+
+        // Initialize the ban system
+        public static void Init()
+        {
+            if (inited) {
+                return;
+            }
+            inited = true;
+
+            Debug.Log("MPBanPlayers: Init() called");
+            AddBansFromCommandline("bannedPlayer", MPBanMode.Ban);
+            AddBansFromCommandline("annoyPlayer", MPBanMode.Annoy);
+            AddBansFromCommandline("blockchatPlayer", MPBanMode.BlockChat);
+            AddBansFromCommandline("untrustedPlayer", MPBanMode.Untrusted);
+            isModified = false;
+        }
+
+        // Read commandline arguments for banned players
+        private static int AddBansFromCommandline(string param, MPBanMode mode) {
+            int added = 0;
+            string idstring = null;
+            string ipstring = null;
+            string fullParam = "-" + param + "Ids";
+            if (GameMod.Core.GameMod.FindArgVal(fullParam, out idstring) && !String.IsNullOrEmpty(idstring)) {
+                string[] ids = idstring.Split(',',';',':','|');
+                foreach (string id in ids) {
+                    MPBanEntry entry = new MPBanEntry(null, null, id);
+                    if (Ban(entry, mode, true)) {
+                        added++;
+                    }
+                }
+            }
+            fullParam = "-" + param + "IPs";
+            if (GameMod.Core.GameMod.FindArgVal(fullParam, out ipstring) && !String.IsNullOrEmpty(ipstring)) {
+                string[] ips = idstring.Split(',',';','|');
+                foreach (string ip in ips) {
+                    MPBanEntry entry = new MPBanEntry(null, ip, null);
+                    if (Ban(entry, mode, true)) {
+                        added++;
+                    }
+                }
+            }
+            if (added > 0) {
+                Debug.LogFormat("Added {0} {1}s via commandline", added, param);
+            }
+            return added;
+        }
 
         // Get the ban list
         public static List<MPBanEntry> GetList(MPBanMode mode = MPBanMode.Ban) {
@@ -155,6 +205,16 @@ namespace GameMod {
                 }
             }
             // no ban entry matches this player..
+            return false;
+        }
+
+        // Check if this player is banned in any mode
+        public static bool IsBannedAnyMode(MPBanEntry candidate) {
+            for (MPBanMode m = (MPBanMode)0; m < MPBanMode.Count; m++) {
+                if (IsBanned(candidate, m)) {
+                    return true;
+                }
+            }
             return false;
         }
 
@@ -298,6 +358,7 @@ namespace GameMod {
                     AnnoyPlayers();
                 }
             }
+            isModified = true;
         }
 
         // Add a player to the Ban List
@@ -333,24 +394,39 @@ namespace GameMod {
             return cnt;
         }
 
+        // Remove all entries matching a candidate from the ban list
+        public static int UnbanNonPermanent(MPBanEntry candidate, MPBanMode mode = MPBanMode.Ban)
+        {
+            var banList = GetList(mode);
+            int cnt = banList.RemoveAll(entry => (!entry.permanent && entry.matches(candidate,"UNBAN: ")));
+            if (cnt > 0) {
+                OnUpdate(mode, false);
+            }
+            return cnt;
+        }
+
         // Remove all bans
         public static void UnbanAll(MPBanMode mode = MPBanMode.Ban) {
             var banList = GetList(mode);
-            banList.Clear();
-            OnUpdate(mode, false);
+            if (banList.Count > 0) {
+                banList.Clear();
+                OnUpdate(mode, false);
+            }
         }
 
         // Remove all non-Permanent bans
         public static void UnbanAllNonPermanent(MPBanMode mode = MPBanMode.Ban) {
             var banList = GetList(mode);
-            banList.RemoveAll(entry => entry.permanent == false);
-            OnUpdate(mode, false);
+            int cnt = banList.RemoveAll(entry => entry.permanent == false);
+            if (cnt > 0) {
+                OnUpdate(mode, false);
+            }
         }
 
         // Check if the MPBanPlayers has a non-default state
         // This checks if any bans are present
         public static bool HasModifiedState() {
-            return (totalBanCount > 0);
+            return isModified;
         }
 
         // Reset the MPBanPlayers state
@@ -360,6 +436,7 @@ namespace GameMod {
             for (MPBanMode mode = (MPBanMode)0; mode < MPBanMode.Count; mode++) {
                 UnbanAllNonPermanent(mode);
             }
+            isModified = false;
         }
     }
 
@@ -377,6 +454,7 @@ namespace GameMod {
         }
 
         private static void Postfix(ref bool __result, int connection_id, int version, string player_name, string player_session_id, string player_id, string player_uid) {
+            MPBanPlayers.Init();
             MPBanPlayers.JoiningPlayerIsBanned = false;
             MPBanPlayers.JoiningPlayerIsAnnoyed = false;
             MPBanPlayers.JoiningPlayerConnectionId = connection_id;

@@ -122,6 +122,8 @@ namespace GameMod {
             Unannoy,
             BlockChat,
             UnblockChat,
+            Untrust,
+            RemoveUntrust,
             End,
             Start,
             Status,
@@ -230,6 +232,12 @@ namespace GameMod {
             } else if (cmdName == "UBC" || cmdName == "UNBLOCKCHAT") {
                 cmd = Command.UnblockChat;
                 needAuth = true;
+            } else if (cmdName == "UT" || cmdName == "UNTRUST") {
+                cmd = Command.Untrust;
+                needAuth = true;
+            } else if (cmdName == "RUT" || cmdName == "REMOVEUNTRUST") {
+                cmd = Command.RemoveUntrust;
+                needAuth = true;
             } else if (cmdName == "E" || cmdName == "END") {
                 cmd = Command.End;
                 needAuth = true;
@@ -312,6 +320,12 @@ namespace GameMod {
                     break;
                 case Command.UnblockChat:
                     result = DoUnban(MPBanMode.BlockChat);
+                    break;
+                case Command.Untrust:
+                    result = DoKickBan(false, true, MPBanMode.Untrusted);
+                    break;
+                case Command.RemoveUntrust:
+                    result = DoUnban(MPBanMode.Untrusted);
                     break;
                 case Command.End:
                     result = DoEnd();
@@ -476,6 +490,19 @@ namespace GameMod {
         // Execute the AUTH command
         public bool DoAuth()
         {
+            // special case if the game was created by an untrusted or banned creator:
+            // any non-banned player can self-authenticate in this case, no need to know the password
+            if (MPBanPlayers.MatchCreator != null && MPBanPlayers.IsBannedAnyMode(MPBanPlayers.MatchCreator)) {
+                // Banned or untrusted players are not allowed to use AUTH
+                if (!MPBanPlayers.IsBannedAnyMode(senderEntry)) {
+                    // the player doing the AUTH is not banned or untrusted: allow authentication
+                    SetAuth(true, senderEntry);
+                    ReturnToSender("AUTH successful (match creator was not trusted).");
+                    return false;
+                }
+            }
+
+            // normal case: AUTH can be done only by knowing the password
             if (!SetAuthIsPassword(arg)) {
                 ReturnToSender("Nope.");
                 // De-Authenticate player with wrong password
@@ -557,19 +584,19 @@ namespace GameMod {
                 DoUnban(MPBanMode.BlockChat);
             }
             if (String.IsNullOrEmpty(arg)) {
-                MPBanPlayers.UnbanAll(banMode);
+                MPBanPlayers.UnbanAllNonPermanent(banMode);
                 ReturnTo(String.Format("ban list {0} cleared by {1}",banMode,senderEntry.name));
             } else {
                 // check against names in ban list (may not be current player names)
                 string pattern = arg.ToUpper();
                 var banList=MPBanPlayers.GetList(banMode);
-                int cnt = banList.RemoveAll(entry => (MatchPlayerName(entry.name, pattern) != 0));
+                int cnt = banList.RemoveAll(entry => (!entry.permanent && MatchPlayerName(entry.name, pattern) != 0));
                 if (cnt > 0) {
                     MPBanPlayers.OnUpdate(banMode, false);
                 } else {
                     // check the currently connected players
                     if (SelectPlayer(arg)) {
-                        cnt = MPBanPlayers.Unban(selectedPlayerEntry, banMode);
+                        cnt = MPBanPlayers.UnbanNonPermanent(selectedPlayerEntry, banMode);
                     }
                 }
 
@@ -614,15 +641,23 @@ namespace GameMod {
             } else {
                 creator = "<UNKNOWN>";
             }
+            bool creatorTrusted = true;
+            if (MPBanPlayers.MatchCreator != null && MPBanPlayers.IsBannedAnyMode(MPBanPlayers.MatchCreator)) {
+                creatorTrusted = false;
+            }
 
             GetTrustedPlayerIds();
-            ReturnToSender(String.Format("STATUS: {0}'s game, your auth: {1}", creator,CheckPermission(senderEntry)));
-            ReturnToSender(String.Format("STATUS: bans: {0}, annoys: {1}, blocks: {2}, auth: {3} trust: {4}",
+            ReturnToSender(String.Format("STATUS: {0}'s game{1}, your auth: {2}",
+                                         creator,
+                                         creatorTrusted?"":" (!)",
+                                         CheckPermission(senderEntry)));
+            ReturnToSender(String.Format("STATUS: ban{0}, annoy{1}, block{2}, auth{3} trust{4} untr{5}",
                                          MPBanPlayers.GetList(MPBanMode.Ban).Count,
                                          MPBanPlayers.GetList(MPBanMode.Annoy).Count,
                                          MPBanPlayers.GetList(MPBanMode.BlockChat).Count,
                                          authenticatedPlayers.Count,
-                                         trustedPlayers.Count));
+                                         trustedPlayers.Count,
+                                         MPBanPlayers.GetList(MPBanMode.Untrusted).Count));
             return false;
         }
 
@@ -725,22 +760,27 @@ namespace GameMod {
 
         // check if a specific player has chat command permissions
         public static bool CheckPermission(MPBanEntry entry) {
-            if (entry == null) {
-                return false;
-            }
-            if (MPBanPlayers.MatchCreator != null && entry.matches(MPBanPlayers.MatchCreator, "MATCH CREATOR: ")) {
-                // the match creator is always authenticated
-                return true;
-            }
-
-            if (String.IsNullOrEmpty(entry.id)) {
+            if (entry == null || !entry.IsValid()) {
                 return false;
             }
             // Trusted Players always have permission
             if (IsTrustedPlayer(entry)) {
                 return true;
             }
-            return IsAuthenticatedPlayer(entry);
+            // Authenticated Players also have permission
+            if (IsAuthenticatedPlayer(entry)) {
+                return true;
+            }
+            // banned or untrusted players do not have permission, even if they created the match
+            if (MPBanPlayers.IsBannedAnyMode(entry)) {
+                return false;
+            }
+            // the match creator is always authenticated
+            if (MPBanPlayers.MatchCreator != null && entry.matches(MPBanPlayers.MatchCreator, "MATCH CREATOR: ")) {
+                return true;
+            }
+            // all others don't have permission
+            return false;
         }
 
         // Check if a client on a specific connection id is authenticated
