@@ -23,11 +23,13 @@ namespace GameMod {
             msg = null;
             var i = password.IndexOf('_'); // allow password suffix with '_'
             string name = i == -1 ? password : password.Substring(0, i);
+            /* Allow a host name without any dots...
             if (!name.Contains('.'))
             {
                 msg = "Invalid IP/server name";
                 return null;
             }
+            */
             if (new Regex(@"\d{1,3}([.]\d{1,3}){3}").IsMatch(name) &&
                 IPAddress.TryParse(name, out IPAddress adr))
                 return adr;
@@ -608,6 +610,185 @@ namespace GameMod {
                 }
             foreach (var req in delReqs)
                 candidates.Remove(req);
+        }
+    }
+
+    // InternalSendPacket does not handle potential socket exceptions
+    // these Exceptions occur if the peer sends an ICMP failure when the port is not open,
+    // In case of such a socket error, we abort the connection attempt.
+    // Note that in theory, since UDP is connection-less, we could just ignore
+    // the exception and go on, and a later attempt may succeed. However, this
+    // is useless, as the async receive callback will also get the exception
+    // and will bail out, so we're never able to receive an answer
+    [HarmonyPatch(typeof(BroadcastState), "InternalSendPacket")]
+    class MPInternetFixUnreachableServerException
+    {
+        private static Exception Finalizer(Exception __exception) {
+            if (__exception != null) {
+                if (__exception.GetType() == typeof(SocketException)) {
+                    if (MPInternet.Enabled) {
+                        NetworkMatch.CreateGeneralUIPopup("ERROR connecting to server", __exception.Message, 5.0f);
+                        NetworkMatch.ExitMatchToMainMenu();
+                    }
+                    return null;
+                }
+            }
+            // forward all other exceptions
+            return __exception;
+        }
+    }
+
+    // The receiveCallback delegate does not handle exceptions
+    // These exceptions are catched _somewhere_ and do not end up
+    // in the logfile, but the recieve callback dies when an
+    // exception occurs. However, the main thread waits for
+    // BrodcastState.m_readLoopExit == true to be set by
+    // the receiveCallback, which won't happen in that case.
+    // This patch ensures that this is done in the exception case.
+    // The code is ultra-ugly due to all the reflection as it
+    // involves two compiler-generated classes.
+    [HarmonyPatch]
+    class MPInternetFixHangOnUnreachableServer
+    {
+        private static FieldInfo _BroadcastState_m_readLoopExit = typeof(BroadcastState).GetField("m_readLoopExit", BindingFlags.NonPublic | BindingFlags.Instance);
+
+        // helper function to find the types for the anon classes
+        private static Type FindTypeHelper(string name)
+        {
+            foreach (var x in typeof(BroadcastState).GetNestedTypes(BindingFlags.NonPublic)) {
+                if (x.Name.Contains(name)) {
+                    return x;
+                }
+            }
+            return null;
+        }
+
+        // the traget method for the harmony patch
+        public static MethodBase TargetMethod()
+        {
+            var x = FindTypeHelper("c__AnonStorey1");
+            if (x != null) {
+                var m = AccessTools.Method(x, "<>m__0");
+                if (m != null) {
+                    Debug.Log("BrodcastState receiveCallback TargetMethod found");
+                    return m;
+                }
+            }
+            Debug.Log("BroadcastState receiveCallback TargetMethod not found");
+            return null;
+        }
+
+        // the actual patch
+        private static Exception Finalizer(object __instance, Exception __exception) {
+            if (__exception != null) {
+                Debug.LogFormat("BroadcastState receiveCallback died, telling main thread!");
+                try {
+                    Type anon0 = FindTypeHelper("c__AnonStorey0");
+                    Type anon1 = FindTypeHelper("c__AnonStorey1");
+                    FieldInfo _f_ref_field = AccessTools.Field(anon1, "<>f__ref$0");
+                    FieldInfo _this_field = AccessTools.Field(anon0, "$this");
+                    object f_ref = _f_ref_field.GetValue(__instance);
+                    BroadcastState bs = (BroadcastState)_this_field.GetValue(f_ref);
+                   _BroadcastState_m_readLoopExit.SetValue(bs, true);
+                } catch(Exception ex) {
+                    Debug.LogFormat("failed to inform main thread: {0}", ex.ToString());
+                }
+            }
+            return null;
+        }
+    }
+
+    [HarmonyPatch]
+    class MPInternetIgnoreIPHostnameForMatchmaking
+    {
+        // helper function to find the types for the anon classes
+        private static Type FindTypeHelper(string name)
+        {
+            foreach (var x in typeof(NetworkMatch).GetNestedTypes(BindingFlags.NonPublic)) {
+                if (x.Name.Contains(name)) {
+                    return x;
+                }
+            }
+            return null;
+        }
+
+        // the traget method for the harmony patch
+        public static MethodBase TargetMethod()
+        {
+            var x = FindTypeHelper("c__AnonStoreyF");
+            if (x != null) {
+                var m = AccessTools.Method(x, "<>m__1");
+                if (m != null) {
+                    //Debug.Log("TryLocalMatchmaking TargetMethod found");
+                    return m;
+                }
+            }
+            Debug.Log("TryLocalMatchmaking TargetMethod not found");
+            return null;
+        }
+
+        public static string TransformPassword(string pw)
+        {
+            if (pw != null && MPInternet.Enabled) {
+                // ignore IP/hostname for password comparison
+                int pos = pw.IndexOf('_');
+                if (pos >= 0) {
+                    // there is a password, use it (including the underscore)
+                    pw = pw.Substring(pos);
+                    //Debug.LogFormat("TryLocalMatchmaking: using \"{0}\" as passowrd", pw);
+                } else {
+                    pw = "EMPTY"; // without underscore, so no client could have sent it
+                    //Debug.LogFormat("TryLocalMatchmaking: game with no password, using \"{0}\" internally", pw);
+                }
+            }
+            return pw;
+        }
+
+        private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> codes)
+        {
+            var our_Method = AccessTools.Method(typeof(MPInternetIgnoreIPHostnameForMatchmaking), "TransformPassword");
+            foreach (var code in codes)
+            {
+                // Loc 5 is the password, we modify it before it gets stored
+                if (code.opcode == OpCodes.Stloc_S && ((LocalBuilder)code.operand).LocalIndex == 5) {
+                    yield return new CodeInstruction(OpCodes.Call, our_Method);
+                }
+                yield return code;
+            }
+        }
+    }
+
+    [HarmonyPatch]
+    class MPInternetAllowSimpleHostname {
+        // the traget method for the harmony patch
+        public static MethodBase TargetMethod()
+        {
+            var x = typeof(GameManager).Assembly.GetType("InternetMatch");
+            if (x != null) {
+                var m = AccessTools.Method(x, "FindPasswordAddress");
+                if (m != null) {
+                    return m;
+                }
+            }
+            Debug.Log("InternetMatch FindPasswordAddress TargetMethod not found");
+            return null;
+        }
+        private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> codes)
+        {
+            int state = 0;
+            foreach (var code in codes)
+            {
+                if (state == 0 && code.opcode == OpCodes.Ldstr && ((string)code.operand) == "Invalid IP address or server name") {
+                    state = 1;
+                    yield return code;
+                } else if (state == 1 && code.opcode == OpCodes.Ret) {
+                    state = 2;
+                    // omit this return, pop the return value from the stack again instead
+                    yield return new CodeInstruction(OpCodes.Pop);
+                } else {
+                    yield return code;
+                }
+            }
         }
     }
 }
