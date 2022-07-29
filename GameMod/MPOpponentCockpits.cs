@@ -35,5 +35,47 @@ namespace GameMod {
                 SetOpponentCockpitVisibility(__instance, false);
             }
         }
+
+        public static void SetOpponentVisibility(Player p, int cockpit, int rest) {
+            if (p != null && p.c_player_ship != null && !p.isLocalPlayer && !p.m_spectator) {
+                Debug.LogFormat("iSetVis: {0} {1} {2}",p.m_mp_name,cockpit,rest);
+                MeshRenderer[] componentsInChildren = p.c_player_ship.GetComponentsInChildren<MeshRenderer>(includeInactive: true);
+                foreach (MeshRenderer meshRenderer in componentsInChildren)
+                {
+                    bool isCockpit = false;
+                    if (string.CompareOrdinal(meshRenderer.name, 0, "cp_", 0, 3) == 0) {
+                        isCockpit = true;
+                    }
+                    int mode = (isCockpit)?cockpit:rest;
+                    if (mode == 0) {
+                        meshRenderer.enabled = false;
+                    } else if (mode > 0) {
+                        meshRenderer.enabled = true;
+                    }
+                }
+            }
+        }
+
+        private static void hack_cockpit_command() {
+                int n = uConsole.GetNumParameters();
+                int v = 1;
+                int w = 1;
+                if (n > 0) {
+                        v = uConsole.GetInt();
+                }
+                if (n > 1) {
+                        w = uConsole.GetInt();
+                }
+                foreach (Player p in NetworkManager.m_Players) {
+                    SetOpponentVisibility(p,v,w);
+                }
+        }
+
+        [HarmonyPatch(typeof(GameManager), "Awake")]
+        class MPErrorSmoothingFix_Controller {
+            static void Postfix() {
+                uConsole.RegisterCommand("hack_vis", hack_cockpit_command);
+            }
+        }
     }
 }
