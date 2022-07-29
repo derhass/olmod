@@ -8,12 +8,12 @@ namespace GameMod {
     public class MPOpponentCockpits {
         public static void SetOpponentCockpitVisibility(Player p, bool enabled) {
             if (p != null && p.c_player_ship != null && !p.isLocalPlayer && !p.m_spectator) {
-                //Debug.LogFormat("Disabling cockpit for player ship {0}",p.name);
+                //Debug.LogFormat("Setting cockpit visibility for player ship {0} to {1}",p.m_mp_name, enabled);
                 MeshRenderer[] componentsInChildren = p.c_player_ship.GetComponentsInChildren<MeshRenderer>(includeInactive: true);
                 foreach (MeshRenderer meshRenderer in componentsInChildren)
                 {
                     if (meshRenderer.enabled != enabled) {
-                        if (string.Compare(meshRenderer.name, 0, "cp_", 0, 3) == 0) {
+                        if (string.CompareOrdinal(meshRenderer.name, 0, "cp_", 0, 3) == 0) {
                             meshRenderer.enabled = enabled;
                             meshRenderer.shadowCastingMode = 0;
                         }
