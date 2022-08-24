@@ -104,6 +104,8 @@
     <Compile Include="Console.cs" />
     <Compile Include="Controllers.cs" />
     <Compile Include="CrusherTrails.cs" />
+    <Compile Include="HUDVelocity.cs" />
+    <Compile Include="DisableProfanityFilter.cs" />
     <Compile Include="MatchModeCTF.cs" />
     <Compile Include="CustomDoorAutomap.cs" />
     <Compile Include="CustomLevelResources.cs" />
@@ -124,7 +126,9 @@
     <Compile Include="MPAutomap.cs" />
     <Compile Include="MPAutoSelection.cs" />
     <Compile Include="MPAutoSelectionUI.cs" />
+    <Compile Include="MPBanPlayers.cs" />
     <Compile Include="MPCeiling.cs" />
+    <Compile Include="MPChatCommands.cs" />
     <Compile Include="MPClassic.cs" />
     <Compile Include="MPClientExtrapolation.cs" />
     <Compile Include="MPCloak.cs" />
@@ -135,9 +139,12 @@
     <Compile Include="MPDamageEffects.cs" />
     <Compile Include="MPDeathExplosion.cs" />
     <Compile Include="MPDeathReview.cs" />
+    <Compile Include="MPDeathRollSync.cs" />
     <Compile Include="MPErrorSmoothingFix.cs" />
     <Compile Include="MPFixGhostProjectiles.cs" />
     <Compile Include="MPHUDMessage.cs" />
+    <Compile Include="MPIPLogging.cs" />
+    <Compile Include="MPItemSpawns.cs" />
     <Compile Include="MPLongPwd.cs" />
     <Compile Include="MPMatchPresets.cs" />
     <Compile Include="MPMatchTimeLimits.cs" />
@@ -195,6 +202,7 @@
     <Compile Include="ServerTrackerPost.cs" />
     <Compile Include="Menus.cs" />
     <Compile Include="Shaders.cs" />
+    <Compile Include="WarperOrientation.cs" />
     <Compile Include="UIMeshColliderNoRender.cs" />
     <Compile Include="VersionHandling\OlmodVersion.cs" />
     <Compile Include="VersionHandling\PatchVersionInfo.cs" />
