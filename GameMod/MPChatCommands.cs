@@ -16,7 +16,7 @@ namespace GameMod {
             if (authOnly || unblockedOnly) {
                 MPBanEntry entry = MPChatCommand.FindPlayerEntryForConnection(connection_id, true);
                 if (authOnly) {
-                    doSend = doSend && MPChatCommand.CheckPermission(entry);
+                    doSend = doSend && MPChatCommand.CheckPermission(entry, connection_id);
                 }
                 if (doSend && unblockedOnly) {
                     if (entry != null) {
@@ -72,7 +72,7 @@ namespace GameMod {
                             if (authOnly || unblockedOnly) {
                                 MPBanEntry entry = new MPBanEntry(p);
                                 if (authOnly) {
-                                    doSend = doSend && MPChatCommand.CheckPermission(entry);
+                                    doSend = doSend && MPChatCommand.CheckPermission(entry, p.connectionToClient.connectionId);
                                 }
                                 if (doSend && unblockedOnly) {
                                     doSend = !MPBanPlayers.IsBanned(entry, MPBanMode.BlockChat);
@@ -275,7 +275,7 @@ namespace GameMod {
             }
             Debug.LogFormat("CHATCMD {0}: {1} {2} by {3}", cmd, cmdName, arg, senderEntry.name);
             if (needAuth) {
-                if (!CheckPermission(senderEntry)) {
+                if (!CheckPermission(senderEntry,sender_conn)) {
                     ReturnToSender(String.Format("You do not have the permission for command {0}!", cmd));
                     Debug.LogFormat("CHATCMD {0}: client is not authenticated!", cmd);
                     return false;
@@ -428,7 +428,7 @@ namespace GameMod {
                 return false;
             }
             foreach(MPBanEntry e in authenticatedPlayers) {
-                if (e.matches(playerEntry, "AUTHENTICATED PLAYER: ")) {
+                if (e.matchesStrict(playerEntry, "AUTHENTICATED PLAYER: ")) {
                     return true;
                 }
             }
@@ -622,7 +622,7 @@ namespace GameMod {
             }
 
             GetTrustedPlayerIds();
-            ReturnToSender(String.Format("STATUS: {0}'s game, your auth: {1}", creator,CheckPermission(senderEntry)));
+            ReturnToSender(String.Format("STATUS: {0}'s game, your auth: {1}", creator,CheckPermission(senderEntry, sender_conn)));
             ReturnToSender(String.Format("STATUS: bans: {0}, annoys: {1}, blocks: {2}, auth: {3} trust: {4}",
                                          MPBanPlayers.GetList(MPBanMode.Ban).Count,
                                          MPBanPlayers.GetList(MPBanMode.Annoy).Count,
@@ -678,7 +678,7 @@ namespace GameMod {
 
             if (senderEntry == null || String.IsNullOrEmpty(senderEntry.name) || String.IsNullOrEmpty(selectedPlayerEntry.name) || senderEntry.name != selectedPlayerEntry.name) {
                 // requesting a switch for another player requires permission
-                if (!CheckPermission(senderEntry)) {
+                if (!CheckPermission(senderEntry, sender_conn)) {
                     ReturnToSender(String.Format("You do not have the permission for command {0}!", cmd));
                     Debug.LogFormat("CHATCMD {0}: client is not authenticated!", cmd);
                     return false;
@@ -809,13 +809,24 @@ namespace GameMod {
         }
 
         // check if a specific player has chat command permissions
-        public static bool CheckPermission(MPBanEntry entry) {
+        public static bool CheckPermission(MPBanEntry entry, int connection_id) {
             if (entry == null) {
                 return false;
             }
-            if (MPBanPlayers.MatchCreator != null && entry.matches(MPBanPlayers.MatchCreator, "MATCH CREATOR: ")) {
+            if (MPBanPlayers.MatchCreator != null && entry.matchesStrict(MPBanPlayers.MatchCreator, "MATCH CREATOR: ")) {
                 // the match creator is always authenticated
-                return true;
+                // if we have a connection id for the creator, also check it
+                // note that this function is called with connection_id = -1 only from
+                // MPBanPlayers_AcceptNewConnection.Postfix(), where it is used to
+                // check if the new match creator (who is already verified) is the same
+                // as the previous one
+                if (connection_id >= 0 && MPBanPlayers.MatchCreatorConnectionId >= 0) {
+                    if (connection_id == MPBanPlayers.MatchCreatorConnectionId) {
+                        return true;
+                    }
+                } else {
+                    return true;
+                }
             }
 
             if (String.IsNullOrEmpty(entry.id)) {
@@ -831,7 +842,7 @@ namespace GameMod {
         // Check if a client on a specific connection id is authenticated
         public static bool CheckPermission(int connection_id, bool inLobby) {
             MPBanEntry entry = FindPlayerEntryForConnection(connection_id, inLobby);
-            return CheckPermission(entry);
+            return CheckPermission(entry, connection_id);
         }
 
         // Match string name version pattern,
