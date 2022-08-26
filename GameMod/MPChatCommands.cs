@@ -528,13 +528,32 @@ namespace GameMod {
                 return false;
             }
 
-            if(selectedPlayerConnectionId >= 0 && sender_conn == selectedPlayerConnectionId) {
-                Debug.LogFormat("{0}: won't self-apply", op, arg);
-                ReturnToSender(String.Format("{0}: won't self-apply",op, arg));
-                return false;
+            if(selectedPlayerConnectionId >= 0) {
+                if (sender_conn == selectedPlayerConnectionId) {
+                    Debug.LogFormat("{0}: won't self-apply", op);
+                    ReturnToSender(String.Format("{0}: won't self-apply",op));
+                    return false;
+                }
+                if (selectedPlayerConnectionId == MPBanPlayers.MatchCreatorConnectionId) {
+                    Debug.LogFormat("{0}: won't apply to match creator", op);
+                    ReturnToSender(String.Format("{0}: won't apply to match creator",op));
+                    return false;
+                }
             }
 
             if (doBan) {
+                if (!selectedPlayerEntry.IsValid()) {
+                    Debug.LogFormat("{0}: failed to find ban entry for player {1}", op, arg);
+                    ReturnToSender(String.Format("{0}: failed to find ban entry for {1}",op, arg));
+                    return false;
+                }
+                // Make sure the newly created ban entry won't alias the match creator or 
+                // any other currently authenticated player. 
+                if (!TrimBanCandidate(ref selectedPlayerEntry)) {
+                    // we can't ban the player as it would completely alias us
+                    return false;
+                }
+                
                 MPBanPlayers.Ban(selectedPlayerEntry, banMode);
                 if (banMode == MPBanMode.Annoy) {
                     // ANNOY also implies BLOCKCHAT
@@ -702,6 +721,39 @@ namespace GameMod {
             return false;
         }
 
+        // trim down the fields in candidate so that it doesn't alias authenticated
+        // Return values is the same as MPBanEntry.trim
+        private int TrimBanCandidate(ref MPBanEntry candidate, MPBanEntry authenticated) {
+            int val = candidate.trim(authenticated, "Alias check: ");
+            if (val < 0) {
+                Debug.LogFormat("BAN rejected because it would affect {0}",authenticated.name);
+                ReturnToSender(String.Format("BAN rejected because it would also affect {0}",authenticated.name));
+            } else if (val > 0) {
+                Debug.LogFormat("BAN entry reduced to {0} to avoid aliasing {1}",candidate.Describe(),authenticated.Describe());
+            }
+            return val;
+        }
+
+        // Trim down the fileds in candidate so that it never aliases an authenticated player
+        // Returns true if the candidate entry is still valid (might be trimmed),
+        // and false when the trimmed candidate is not valid any more
+        private bool TrimBanCandidate(ref MPBanEntry candidate) {
+            int val;
+            if (MPBanPlayers.MatchCreator != null) {
+                val = TrimBanCandidate(ref candidate, MPBanPlayers.MatchCreator);
+                if (val < 0) {
+                    return false;
+                }
+            }
+            foreach(MPBanEntry e in authenticatedPlayers) {
+                val = TrimBanCandidate(ref candidate, e);
+                if (val < 0) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
         // Send a chat message back to the sender of the command
         // HA: An Elvis reference!
         public bool ReturnToSender(string msg) {
@@ -822,9 +874,11 @@ namespace GameMod {
                 // as the previous one
                 if (connection_id >= 0 && MPBanPlayers.MatchCreatorConnectionId >= 0) {
                     if (connection_id == MPBanPlayers.MatchCreatorConnectionId) {
+                        Debug.LogFormat("MATCH CREATOR: connection ID {0} is authenticated", connection_id);
                         return true;
                     }
                 } else {
+                    Debug.LogFormat("MATCH CREATOR: connection id not checked ({0} {1})", connection_id, MPBanPlayers.MatchCreatorConnectionId);
                     return true;
                 }
             }
