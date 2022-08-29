@@ -23,20 +23,39 @@ namespace GameMod
     [HarmonyPatch(typeof(UIElement), "DrawHUD")]
     class FixFPSCalculation
     {
-        private static uint lastFrameCount = 0;
-        private static float lastFrameTime = 0.0f;
+        private static uint lastMeasurementCount = 0;
+        private static float lastMeasurementTime = 0.0f;
+        private static float currentFrameTime = 0.1f;
+        private static float currentDuration = 0.1f;
         private static float currentFPS = 0.0f;
         private static MethodInfo our_Method = AccessTools.Method(typeof(FixFPSCalculation), "CalculateFPS");
 
         private static float CalculateFPS()
         {
+           const float intervalLength = 1.0f; // duration (seconds) of base FPS measurement interval
            float now = Time.realtimeSinceStartup;
-           float duration = now - lastFrameTime;
-           if (duration >= 0.25f) {
-               uint frameCount = (uint)Time.frameCount;
-               currentFPS = (frameCount - lastFrameCount) / duration;
-               lastFrameCount = frameCount;
-               lastFrameTime = now;
+           float duration = now - lastMeasurementTime;
+           uint frameCount = (uint)Time.frameCount;
+           uint frames = (frameCount - lastMeasurementCount);
+           if (frames > 0) {
+               float newFrameTime = duration / frames;
+               if (duration >= intervalLength) {
+                    // take average frame time during the interval
+                   currentFrameTime = newFrameTime;
+                   currentDuration = duration;
+                   lastMeasurementCount = frameCount;
+                   lastMeasurementTime = now;
+                   currentFPS = 1.0f / currentFrameTime;
+               } else {
+                   // mix the previous interval with the new data since then
+                   // weighted on the difference of durations
+                   float factor = duration / currentDuration;
+                   if (factor > 1.0f) {
+                       factor = 1.0f;
+                   }
+                   float avgFrameTime = factor * newFrameTime + (1.0f - factor) * currentFrameTime;
+                   currentFPS = 1.0f / avgFrameTime;
+               }
            }
            return currentFPS;
         }
