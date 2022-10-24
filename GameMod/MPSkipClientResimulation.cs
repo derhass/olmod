@@ -66,8 +66,11 @@ namespace GameMod
                           Debug.LogFormat("XC {0} {1} {2}", err_distsqr, err_angle, skip);
                         }
                         if (skip) {
-                            // we are skipping the resim, consume the message right here
+                            // we are skipping the resimulation, consume the message right here
                             xxx_skipped++;
+                            if (Client.m_last_acknowledged_tick < msg.m_tick) {
+                                Client.m_last_acknowledged_tick = msg.m_tick;
+                            }
                             Client.m_PendingPlayerStateMessages.Dequeue();
                             return false;
                         }
