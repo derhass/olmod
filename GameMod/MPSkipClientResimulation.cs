@@ -6,6 +6,7 @@ namespace GameMod
 {
     class MPSkipClientResimulation
     {
+        private static int hackResim = 1;
         // Client.ReconcileServerPlayerState is called at every fixed physics tick
         // it will replay the local simulation from the last packet we've seen
         // from the server.
@@ -35,11 +36,14 @@ namespace GameMod
 
             private static bool Prefix(Player player, PlayerState[] ___m_player_state_history)
             {
+                if (hackResim < 1) {
+                    return true;
+                }
                 if (Client.m_PendingPlayerStateMessages.Count < 1) {
                     // nothing to do, we can skip the original as it doesn't do anything anyway
                     return false;
                 }
-                if (xxx_done + xxx_skipped >= 300) {
+                if (hackResim > 1 && xxx_done + xxx_skipped >= 300) {
                     Debug.LogFormat("XXX SkipResim: {0}/{1}", xxx_skipped, xxx_skipped+xxx_done);
                     xxx_skipped = 0;
                     xxx_done = 0;
@@ -58,17 +62,37 @@ namespace GameMod
                         float err_distsqr = (msg.m_player_pos - s.m_pos).sqrMagnitude;
                         float err_angle = Mathf.Abs(Quaternion.Angle(msg.m_player_rot, s.m_rot));
                         bool skip = (err_distsqr < 0.0004f) && (err_angle < 0.5f);
+                        if (hackResim > 2) {
+                          Debug.LogFormat("XC {0} {1} {2}", err_distsqr, err_angle, skip);
+                        }
                         if (skip) {
                             // we are skipping the resim, consume the message right here
                             xxx_skipped++;
                             Client.m_PendingPlayerStateMessages.Dequeue();
                             return false;
                         }
-                        //Debug.LogFormat("XC {0} {1} {2}", err_distsqr, err_angle, skip);
                     }
                 }
                 xxx_done++;
                 return true;
+            }
+        }
+
+        private static void hack_resim_command() {
+                int n = uConsole.GetNumParameters();
+                if (n > 0) {
+                        int value = uConsole.GetInt();
+                        hackResim = value;
+                } else {
+                        hackResim = (hackResim >0)?0:1;
+                }
+                UnityEngine.Debug.LogFormat("hackResim is now {0}", hackResim);
+        }
+
+        [HarmonyPatch(typeof(GameManager), "Awake")]
+        class MPErrorSmoothingFix_Controller {
+            static void Postfix() {
+                uConsole.RegisterCommand("resim", hack_resim_command);
             }
         }
     }
