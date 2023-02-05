@@ -307,6 +307,7 @@ namespace GameMod
             {
             }
 
+            [HarmonyPriority(Priority.Normal - 1)] // set global order of transpilers for this function
             private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> codes)
             {
                 Debug.Log("XXMP MPMatchPresets1");

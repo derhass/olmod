@@ -287,6 +287,7 @@ namespace GameMod {
             return !Core.GameMod.HasInternetMatch();
         }
 
+        [HarmonyPriority(Priority.Normal - 5)] // set global order of transpilers for this function
         private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> codes)
         {
             Debug.Log("XXMP MPInternet1");
@@ -312,6 +313,7 @@ namespace GameMod {
             return Core.GameMod.HasInternetMatch();
         }
 
+        [HarmonyPriority(Priority.Normal - 6)] // set global order of transpilers for this function
         private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> codes)
         {
             Debug.Log("XXMP MPInternet2");

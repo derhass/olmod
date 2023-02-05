@@ -656,6 +656,7 @@ namespace GameMod {
             uie.DrawMenuToolTip(position + Vector2.up * 40f);
         }
 
+        [HarmonyPriority(Priority.Normal - 7)] // set global order of transpilers for this function
         private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> codes)
         {
             Debug.Log("XXMP MPJoinInProgess1");

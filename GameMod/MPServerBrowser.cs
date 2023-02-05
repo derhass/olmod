@@ -982,6 +982,7 @@ namespace GameMod
             position.y += 62f;
         }
 
+        [HarmonyPriority(Priority.Normal - 3)] // set global order of transpilers for this function
         private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> codes)
         {
             Debug.Log("XXMP MPServerBrowser1");
