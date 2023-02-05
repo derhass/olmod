@@ -95,6 +95,7 @@ namespace GameMod
 
             private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> codes)
             {
+                Debug.Log("XXMP MPModifiers1");
                 int state = 0;
 
                 foreach (var code in codes)

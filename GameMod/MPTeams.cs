@@ -996,6 +996,7 @@ namespace GameMod
     {
         static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> cs)
         {
+            Debug.Log("XXMP MPTeams1");
             var vector2_y_Field = AccessTools.Field(typeof(Vector2), "y");
 
             int lastAdv = 0;

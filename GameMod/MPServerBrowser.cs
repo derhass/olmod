@@ -984,6 +984,7 @@ namespace GameMod
 
         private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> codes)
         {
+            Debug.Log("XXMP MPServerBrowser1");
             var mpServerBrowser_UIElement_DrawMpMatchSetup_DrawMatchNotes_Method = AccessTools.Method(typeof(MPServerBrowser_UIElement_DrawMpMatchSetup), "DrawMatchNotes");
             var mpServerBrowser_UIElement_DrawMpMatchSetup_DrawFriendlyFire_Method = AccessTools.Method(typeof(MPServerBrowser_UIElement_DrawMpMatchSetup), "DrawFriendlyFire");
 

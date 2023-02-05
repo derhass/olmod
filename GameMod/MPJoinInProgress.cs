@@ -658,6 +658,7 @@ namespace GameMod {
 
         private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> codes)
         {
+            Debug.Log("XXMP MPJoinInProgess1");
             var jipMatchSetup_DrawMpMatchCreateOpen_Method = AccessTools.Method(typeof(JIPMatchSetup), "DrawMpMatchCreateOpen");
             var jipMatchSetup_DrawMpMatchJIP_Method = AccessTools.Method(typeof(JIPMatchSetup), "DrawMpMatchJIP");
 

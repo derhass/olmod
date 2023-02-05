@@ -309,6 +309,7 @@ namespace GameMod
 
             private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> codes)
             {
+                Debug.Log("XXMP MPMatchPresets1");
                 int state = 0;
                 foreach (var code in codes)
                 {

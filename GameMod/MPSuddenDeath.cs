@@ -141,6 +141,7 @@ namespace GameMod
 
         private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> codes)
         {
+            Debug.Log("XXMP MPSuddenDeath1");
             var powerupFound = false;
             foreach (var code in codes)
             {

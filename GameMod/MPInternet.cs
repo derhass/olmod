@@ -289,6 +289,7 @@ namespace GameMod {
 
         private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> codes)
         {
+            Debug.Log("XXMP MPInternet1");
             var mpInternet_PasswordFieldName_Method = AccessTools.Method(typeof(MPInternet), "PasswordFieldName");
 
             foreach (var code in codes)
@@ -313,6 +314,7 @@ namespace GameMod {
 
         private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> codes)
         {
+            Debug.Log("XXMP MPInternet2");
             int state = 0; // 0 before olmod text, 1 waiting for position reset, 2 after position reset
             foreach (var code in codes)
             {

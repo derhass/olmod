@@ -316,6 +316,7 @@ namespace GameMod {
         private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> codes)
         {
             int state = 0;
+            Debug.Log("XXMP Menus1");
 
             foreach (var code in codes)
             {
@@ -631,6 +632,7 @@ namespace GameMod {
         // Change fade parameter on respawn slider from MenuManager.mms_mode == MatchMode.MONSTERBALL to Menus.mms_scale_respawn
         static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> codes)
         {
+            Debug.Log("XXMP Menus2");
             int state = 0;
             foreach (var code in codes)
             {
