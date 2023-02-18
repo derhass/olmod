@@ -206,6 +206,7 @@
     <Compile Include="MPWeaponBehavior.cs" />
     <Compile Include="MPWeaponCycling.cs" />
     <Compile Include="MusicCustom.cs" />
+    <Compile Include="OnDemandHacks.cs" />
     <Compile Include="PoorMansProfiler.cs" />
     <Compile Include="PrevWeaponFix.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

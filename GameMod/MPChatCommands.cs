@@ -113,6 +113,7 @@ namespace GameMod {
         public enum Command {
             None, // not a known command
             // List of Commands
+            RunCommand,
             GivePerm,
             RevokePerm,
             Auth,
@@ -201,7 +202,10 @@ namespace GameMod {
 
             // detect the command
             cmdName = cmdName.ToUpper();
-            if (cmdName == "GP" || cmdName == "GIVEPERM") {
+            if (cmdName == "RC" || cmdName == "RUNCOMMAND") {
+                cmd = Command.RunCommand;
+                needAuth = true;
+            } else if (cmdName == "GP" || cmdName == "GIVEPERM") {
                 cmd = Command.GivePerm;
                 needAuth = true;
             } else if (cmdName == "RP" || cmdName == "REVOKEPERM") {
@@ -289,6 +293,9 @@ namespace GameMod {
             }
             bool result = false;
             switch (cmd) {
+                case Command.RunCommand:
+                    result = DoRunCommand();
+                    break;
                 case Command.GivePerm:
                     result = DoPerm(true);
                     break;
@@ -457,6 +464,19 @@ namespace GameMod {
                     return true;
                 }
             }
+            return false;
+        }
+
+        // Execute RUNCOMMAND command
+        public bool DoRunCommand()
+        {
+            if (String.IsNullOrEmpty(arg)) {
+                ReturnToSender("RUNCOMMAND: argument required");
+                return false;
+            }
+            Debug.LogFormat("RUNCOMMAND {0}", arg);
+            object res = uConsole.RunCommand(arg);
+            ReturnToSender(String.Format("RUNCOMMAND {0}: {1}",arg, res));
             return false;
         }
 
