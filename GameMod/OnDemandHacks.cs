@@ -51,7 +51,7 @@ namespace GameMod {
                 GameManager.m_local_player.m_error_rot.ToAngleAxis(out rotErr, out axis);
                 Color c = Color.Lerp(UIManager.m_col_good_ping, UIManager.m_col_em5, (10.0f*posErr + rotErr) / 5.0f);
                 pos.x -= 130f;
-                __instance.DrawStringSmall(String.Format("{0,5:0.000} {0,5:0.000}", posErr, rotErr), pos, 0.4f, StringOffset.LEFT, c, 1f);
+                __instance.DrawStringSmall(String.Format("{0,5:0.000} {1,5:0.000}", posErr, rotErr), pos, 0.4f, StringOffset.LEFT, c, 1f);
             }
         }
     }
