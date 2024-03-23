@@ -209,7 +209,7 @@ namespace GameMod
             public static void Postfix()
             {
                 //uConsole.Log("ExtendedConfig_PilotManager_SavePreferences");
-                if (Network.isServer)
+                if (GameplayManager.IsDedicatedServer())
                 {
                     Debug.Log("ExtendedConfig_Controls_SavePreferences called on the server");
                     return;
