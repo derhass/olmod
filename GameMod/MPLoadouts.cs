@@ -122,16 +122,14 @@ namespace GameMod
             int cntDefault = CountAllowed(filter & MASK_DEFAULT);
             int cntAll = CountAllowed(filter & (MASK_ALL_WEAPONS | MASK_ALL_MISSILES));
             int cntDefaultMax = CountAllowed(MASK_DEFAULT);
-            if ((cntAll > 0) && (cntDefault > cntDefaultMax / 2))
-            {
+            if ((cntAll > 0) && (cntDefault > cntDefaultMax / 2)) {
                 // more than half of the default elements are allowed, list only the disabled ones
                 mode = "DISABLED IN LOADOUTS:";
                 return GetDefaultItems(filter, false, (WeaponType)0, DefaultWeaponEnd, (MissileType)0, DefaultMissileEnd);
             }
             mode = "RESTRICTED LOADOUTS:";
-            if (cntAll < 1)
-            {
-                return new List<string>() { "NONE" };
+            if (cntAll < 1) {
+                return new List<string>() {"NONE"};
             }
             return GetDefaultItems(filter, true, (WeaponType)0, WeaponType.NUM, (MissileType)0, MissileType.NUM);
         }
@@ -139,19 +137,15 @@ namespace GameMod
         public static List<string> GetDefaultItems(int filter, bool allowed, WeaponType wStart, WeaponType wEnd, MissileType mStart, MissileType mEnd)
         {
             List<string> list = new List<string>();
-            for (WeaponType weapon = wStart; weapon < wEnd; weapon++)
-            {
+            for (WeaponType weapon = wStart; weapon < wEnd; weapon++) {
                 bool isAllowed = IsAllowedByFilter(weapon, filter);
-                if ((allowed && isAllowed) || (!allowed && !isAllowed))
-                {
+                if ((allowed && isAllowed) || (!allowed && !isAllowed)) {
                     list.Add(Player.GetWeaponNameNoDefault(weapon));
                 }
             }
-            for (MissileType missile = mStart; missile < mEnd; missile++)
-            {
+            for (MissileType missile = mStart; missile < mEnd; missile++) {
                 bool isAllowed = IsAllowedByFilter(missile, filter);
-                if ((allowed && isAllowed) || (!allowed && !isAllowed))
-                {
+                if ((allowed && isAllowed) || (!allowed && !isAllowed)) {
                     list.Add(Player.GetMissileNameNoDefault(missile));
                 }
             }
@@ -189,19 +183,15 @@ namespace GameMod
             public string Describe()
             {
                 string desc = "weapons: {";
-                for (int i = 0; i < weapons.Count; i++)
-                {
-                    if (i > 0)
-                    {
+                for(int i=0; i< weapons.Count; i++) {
+                    if (i > 0) {
                         desc = desc + ", ";
                     }
                     desc = desc + Player.GetWeaponNameNoDefault(weapons[i]);
                 }
                 desc = desc + "} missiles: {";
-                for (int i = 0; i < missiles.Count; i++)
-                {
-                    if (i > 0)
-                    {
+                for(int i=0; i<missiles.Count; i++) {
+                    if (i > 0) {
                         desc = desc + ", ";
                     }
                     desc = desc + Player.GetMissileNameNoDefault(missiles[i]);
@@ -212,33 +202,25 @@ namespace GameMod
 
             private static void CleanupList<T>(List<T> l, T emptyMarker)
             {
-                if (l.Count < 1)
-                {
+                if (l.Count < 1) {
                     return;
                 }
 
-                for (int i = 0; i < l.Count; i++)
-                {
-                    if (l[i].Equals(emptyMarker))
-                    {
+                for (int i=0; i<l.Count; i++) {
+                    if (l[i].Equals(emptyMarker)) {
                         int found = -1;
                         // check if any non-empty element is present later in the list
-                        for (int j = i + 1; j < l.Count; j++)
-                        {
-                            if (!l[j].Equals(emptyMarker))
-                            {
+                        for (int j=i+1; j<l.Count; j++) {
+                            if (!l[j].Equals(emptyMarker)) {
                                 found = j;
                                 break;
                             }
                         }
-                        if (found >= 0)
-                        {
+                        if (found >= 0) {
                             // swap it
                             l[i] = l[found];
                             l[found] = emptyMarker;
-                        }
-                        else
-                        {
+                        } else {
                             break;
                         }
                     }
@@ -256,27 +238,21 @@ namespace GameMod
                 //Debug.LogFormat("Loadout filter: before: {0}", Describe());
 
                 // filter out not allowed entries, replace by allowed ones
-                for (i = 0; i < weapons.Count; i++)
-                {
-                    if (!IsAllowedByFilter(weapons[i], filter))
-                    {
+                for (i=0; i<weapons.Count; i++) {
+                    if (!IsAllowedByFilter(weapons[i], filter)) {
                         weapons[i] = WeaponType.NUM;
                         replaced++;
                     }
-                    if (weapons[i] == WeaponType.NUM)
-                    {
+                    if (weapons[i] == WeaponType.NUM) {
                         weapons[i] = FindFirstUnusedAllowed(weapons, filter);
                     }
                 }
-                for (i = 0; i < missiles.Count; i++)
-                {
-                    if (!IsAllowedByFilter(missiles[i], filter))
-                    {
+                for (i=0; i<missiles.Count; i++) {
+                    if (!IsAllowedByFilter(missiles[i], filter)) {
                         missiles[i] = MissileType.NUM;
                         replaced++;
                     }
-                    if (missiles[i] == MissileType.NUM)
-                    {
+                    if (missiles[i] == MissileType.NUM) {
                         missiles[i] = FindFirstUnusedAllowed(missiles, filter);
                     }
                 }
@@ -306,34 +282,27 @@ namespace GameMod
                 weapons.Clear();
                 weapons.Add(ldm.GetMpLoadoutWeapon1(index));
                 WeaponType w = ldm.GetMpLoadoutWeapon2(index);
-                if (w != WeaponType.NUM)
-                {
+                if (w != WeaponType.NUM) {
                     weapons.Add(w);
                     loadoutType = LoadoutType.GUNNER;
-                }
-                else
-                {
+                } else {
                     loadoutType = LoadoutType.BOMBER;
                 }
 
                 missiles.Clear();
                 missiles.Add(ldm.GetMpLoadoutMissile1(index));
-                if (loadoutType == LoadoutType.BOMBER)
-                {
+                if (loadoutType == LoadoutType.BOMBER) {
                     missiles.Add(ldm.GetMpLoadoutMissile2(index));
                 }
             }
 
             public int ExportToLegacyLoadout(Overload.LoadoutDataMessage ldm)
             {
-                if (loadoutType == LoadoutType.BOMBER)
-                {
-                    for (int i = 0; i < 6; i++)
-                    {
+                if (loadoutType == LoadoutType.BOMBER) {
+                    for (int i=0; i<6; i++) {
                         MissileType m1 = ldm.GetMpLoadoutMissile1(i);
                         MissileType m2 = ldm.GetMpLoadoutMissile2(i);
-                        if (ldm.GetMpLoadoutWeapon1(i) == weapons[0] && ((m1 == missiles[0] && m2 == missiles[1]) || (m1 == missiles[1] && m2 == missiles[0])))
-                        {
+                        if (ldm.GetMpLoadoutWeapon1(i)  == weapons[0] && ( (m1 == missiles[0] && m2 == missiles[1]) || (m1 == missiles[1] && m2 == missiles[0]) )) {
                             return i;
                         }
                     }
@@ -342,12 +311,10 @@ namespace GameMod
                     ldm.m_mp_custom1_m2 = missiles[1];
                     return 6;
                 }
-                for (int i = 0; i < 6; i++)
-                {
+                for (int i=0; i<6; i++) {
                     WeaponType w1 = ldm.GetMpLoadoutWeapon1(i);
                     WeaponType w2 = ldm.GetMpLoadoutWeapon2(i);
-                    if (((w1 == weapons[0] && w2 == weapons[1]) || (w1 == weapons[1] && w2 == weapons[0])) && ldm.GetMpLoadoutMissile1(i) == missiles[0])
-                    {
+                    if ( ((w1 == weapons[0] && w2 == weapons[1]) || (w1 == weapons[1] && w2 == weapons[0])) && ldm.GetMpLoadoutMissile1(i) == missiles[0]) {
                         return i;
                     }
                 }
@@ -491,7 +458,7 @@ namespace GameMod
             if (Menus.mms_classic_spawns)
                 return;
 
-            var nextWeapon = WeaponType.NUM;
+                var nextWeapon = WeaponType.NUM;
             if (NetworkMatch.m_force_loadout == 1)
             {
                 if (NetworkMatch.m_force_w2 == WeaponType.NUM)
@@ -562,17 +529,13 @@ namespace GameMod
         {
             int allowedWeapons = 0;
             int allowedMissiles = 0;
-            for (WeaponType w = (WeaponType)0; w < WeaponType.NUM; w++)
-            {
-                if (IsAllowed(w))
-                {
+            for (WeaponType w = (WeaponType)0; w < WeaponType.NUM;  w++) {
+                if (IsAllowed(w)) {
                     allowedWeapons++;
                 }
             }
-            for (MissileType m = (MissileType)0; m < MissileType.NUM; m++)
-            {
-                if (IsAllowed(m))
-                {
+            for (MissileType m = (MissileType)0; m < MissileType.NUM;  m++) {
+                if (IsAllowed(m)) {
                     allowedMissiles++;
                 }
             }
@@ -608,8 +571,7 @@ namespace GameMod
             foreach (var player in Overload.NetworkManager.m_Players.Where(x => x.connectionToClient.connectionId > 0))
             {
                 // disconnect legacy clients with a message if they do not support the filtered loadouts
-                if (incompleteLoadouts && !MPTweaks.ClientHasTweak(player.connectionToClient.connectionId, "incompleteloadouts"))
-                {
+                if (incompleteLoadouts && !MPTweaks.ClientHasTweak(player.connectionToClient.connectionId, "incompleteloadouts")) {
                     NetworkServer.SendToClient(player.connectionToClient.connectionId, CustomMsgType.UnsupportedMatch, new StringMessage("This match enforces INCOMPLETE LOADOUTS, which is not supported for legacy clients"));
                 }
                 if (MPTweaks.ClientHasTweak(player.connectionToClient.connectionId, "customloadouts"))
@@ -645,8 +607,7 @@ namespace GameMod
             }
 
             // Add free Reflex sidearm
-            if (MPLoadouts.IsAllowedByFilter(WeaponType.REFLEX, MPLoadouts.LoadoutFilterBitmask))
-            {
+            if (MPLoadouts.IsAllowedByFilter(WeaponType.REFLEX, MPLoadouts.LoadoutFilterBitmask)) {
                 MPLoadouts.NetworkLoadouts[msg.lobby_id].loadouts
                     .Where(x => !x.weapons.Contains(WeaponType.REFLEX))
                     .ToList()
@@ -654,8 +615,7 @@ namespace GameMod
             }
 
             // Filter the loadout according to the allowed weapons in the match setting
-            foreach (var loadout in MPLoadouts.NetworkLoadouts[msg.lobby_id].loadouts)
-            {
+            foreach(var loadout in  MPLoadouts.NetworkLoadouts[msg.lobby_id].loadouts) {
                 loadout.ApplyFilter();
             }
         }
@@ -671,7 +631,7 @@ namespace GameMod
                 {
                     if (MPTweaks.ClientHasTweak(player.connectionToClient.connectionId, "customloadouts"))
                     {
-                        NetworkServer.SendToClient(player.connectionToClient.connectionId, MessageTypes.MsgSetCustomLoadout, msg);
+                            NetworkServer.SendToClient(player.connectionToClient.connectionId, MessageTypes.MsgSetCustomLoadout, msg);
                     }
                 }
             }
@@ -786,8 +746,7 @@ namespace GameMod
 
                 foreach (var weapon in loadout.weapons)
                 {
-                    if (weapon != WeaponType.NUM)
-                    {
+                    if (weapon != WeaponType.NUM) {
                         player.m_weapon_level[(int)weapon] = WeaponUnlock.LEVEL_1;
                         if (Player.WeaponUsesAmmo2(weapon))
                             num2++;
@@ -796,8 +755,7 @@ namespace GameMod
 
                 foreach (var missile in loadout.missiles)
                 {
-                    if (missile != MissileType.NUM)
-                    {
+                    if (missile != MissileType.NUM) {
                         player.m_missile_level[(int)missile] = WeaponUnlock.LEVEL_1;
                         player.m_missile_ammo[(int)missile] = Player.MP_DEFAULT_MISSILE_AMMO[(int)missile];
                     }
@@ -1179,10 +1137,8 @@ namespace GameMod
 
     // Take care about the old-style loadout messages, especially apply the filters there, too
     [HarmonyPatch(typeof(NetworkMatch), "UpdatePlayerLoadout")]
-    class MPLoadouts_NetworkMatch_UpdatePlayerLoadout
-    {
-        static void Prefix(int lobby_id, ref Overload.LoadoutDataMessage ldm)
-        {
+    class MPLoadouts_NetworkMatch_UpdatePlayerLoadout {
+        static void Prefix(int lobby_id, ref Overload.LoadoutDataMessage ldm) {
             MPLoadouts.CustomLoadout l1 = new MPLoadouts.CustomLoadout();
             MPLoadouts.CustomLoadout l2 = new MPLoadouts.CustomLoadout();
 
@@ -1208,13 +1164,10 @@ namespace GameMod
 
     // Prevent SwitchVisibleWeapon if no primary is allowed at all
     [HarmonyPatch(typeof(PlayerShip), "SwitchVisibleWeapon")]
-    class MPLoadouts_PlayerShip_SwitchVisibleWeapon
-    {
+    class MPLoadouts_PlayerShip_SwitchVisibleWeapon {
         [HarmonyPriority(Priority.First)]
-        static bool Prefix(PlayerShip __instance, bool force_visible = false, WeaponType wt = WeaponType.NUM)
-        {
-            if (wt == WeaponType.NUM && __instance.c_player.m_weapon_type == WeaponType.NUM)
-            {
+        static bool Prefix(PlayerShip __instance, bool force_visible = false, WeaponType wt = WeaponType.NUM) {
+            if (wt == WeaponType.NUM && __instance.c_player.m_weapon_type == WeaponType.NUM) {
                 return false;
             }
             return true;
@@ -1223,13 +1176,10 @@ namespace GameMod
 
     // Prevent DrawHUDPrimaryWeapon if no primary is allowed at all
     [HarmonyPatch(typeof(UIElement), "DrawHUDPrimaryWeapon")]
-    class MPLoadouts_UIElement_DrawHUDPrimaryWeapon
-    {
+    class MPLoadouts_UIElement_DrawHUDPrimaryWeapon {
         [HarmonyPriority(Priority.First)]
-        static bool Prefix()
-        {
-            if (GameManager.m_local_player.m_weapon_type == WeaponType.NUM)
-            {
+        static bool Prefix() {
+            if (GameManager.m_local_player.m_weapon_type == WeaponType.NUM) {
                 return false;
             }
             return true;
@@ -1238,26 +1188,20 @@ namespace GameMod
 
     // Fix crash in SpewItemsOnDeath if no primary is available at all
     [HarmonyPatch(typeof(PlayerShip), "SpewItemsOnDeath")]
-    class MPLoadouts_PlayerShip_SpewItemsOnDeath
-    {
+    class MPLoadouts_PlayerShip_SpewItemsOnDeath {
         static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> codes)
         {
             int state = 0;
-            if ((int)WeaponType.NUM != 8)
-            {// just to make sure...
+            if ((int)WeaponType.NUM  != 8) {// just to make sure...
                 throw new System.Exception("MPLoadouts_PlayerShip_SpewItemsOnDeath expects WeaponType.NUM == 8");
             }
             foreach (var code in codes)
             {
-                if (state == 0)
-                {
-                    if (code.opcode == OpCodes.Ldfld && ((FieldInfo)code.operand).Name == "m_weapon_type")
-                    {
+                if (state == 0) {
+                    if (code.opcode == OpCodes.Ldfld && ((FieldInfo)code.operand).Name == "m_weapon_type") {
                         state = 1;
                     }
-                }
-                else if (state == 1)
-                {
+                } else if (state == 1) {
                     if (code.opcode == OpCodes.Ldelem_U1)
                     {
                         yield return new CodeInstruction(OpCodes.Ldc_I4_7);
@@ -1273,13 +1217,12 @@ namespace GameMod
 
     // Draw Selection Menu 
     [HarmonyPatch(typeof(UIElement), "DrawMpMatchSetup")]
-    class MPLoadouts_UIElement_DrawMpMatchSetup
-    {
+    class MPLoadouts_UIElement_DrawMpMatchSetup {
 
         [HarmonyPriority(Priority.Normal + 1)]
         private static void Postfix(UIElement __instance)
         {
-
+            
             switch (MenuManager.m_menu_micro_state)
             {
                 case 15:
