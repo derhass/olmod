@@ -26,9 +26,9 @@ then
 	if [[ -v SteamAppId ]];
 	then
 		echo "Running under Steam; replacing LD_PRELOAD to avoid conflict with Steam Overlay"
-		olpreload="${olmodso}"
+		olpreload="./olmod.so"
 	else
-		olpreload="${LD_PRELOAD:+${LD_PRELOAD}:}${olmodso}"
+		olpreload="${LD_PRELOAD:+${LD_PRELOAD}:}./olmod.so"
 	fi
 
 	if [[ -f "${olmodso}" ]];
